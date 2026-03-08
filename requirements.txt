@@ -1,0 +1,4 @@
+# Underwater Plant Ecosystem Simulation
+# Python dependencies
+
+pygame>=2.5.0
