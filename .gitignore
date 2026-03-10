@@ -1,2 +1,7 @@
 /__pycache__
 /_DEV_
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
+/.codacy
+project_review_report.md

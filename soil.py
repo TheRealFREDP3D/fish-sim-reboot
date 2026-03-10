@@ -1,4 +1,5 @@
 """Soil grid system with improved organic sediment rendering"""
+
 import pygame
 import random
 import math
@@ -11,8 +12,11 @@ from config import (
     SCREEN_HEIGHT,
     WATER_LINE_Y,
     SOIL_SOLIDIFY_THRESHOLD,
-    SOIL_MAX_NUTRIENT
+    SOIL_MAX_NUTRIENT,
+    WORLD_WIDTH,
+    WORLD_HEIGHT,
 )
+
 
 class SoilCell:
     def __init__(self, x, y, initial_nutrient, start_as_water=False):
@@ -27,12 +31,14 @@ class SoilCell:
         # Pre-calculate some grain offsets for performance
         self.grains = []
         for _ in range(3):
-            self.grains.append({
-                'ox': random.uniform(0, SOIL_CELL_SIZE),
-                'oy': random.uniform(0, SOIL_CELL_SIZE),
-                'size': random.uniform(1, 2.5),
-                'color_mod': random.uniform(0.8, 1.2)
-            })
+            self.grains.append(
+                {
+                    "ox": random.uniform(0, SOIL_CELL_SIZE),
+                    "oy": random.uniform(0, SOIL_CELL_SIZE),
+                    "size": random.uniform(1, 2.5),
+                    "color_mod": random.uniform(0.8, 1.2),
+                }
+            )
 
     def deplete(self, amount):
         if self.is_water:
@@ -56,11 +62,18 @@ class SoilCell:
     def get_color(self, time):
         # Calculate color based on nutrient level
         t = min(1.0, self.nutrient)
-        base = tuple(int(SOIL_DEPLETED_COLOR[i] + (SOIL_FERTILE_COLOR[i] - SOIL_DEPLETED_COLOR[i]) * t) for i in range(3))
+        base = tuple(
+            int(
+                SOIL_DEPLETED_COLOR[i]
+                + (SOIL_FERTILE_COLOR[i] - SOIL_DEPLETED_COLOR[i]) * t
+            )
+            for i in range(3)
+        )
         # Organic shading based on position and time
         noise = math.sin(self.x * 0.5 + self.noise_offset + time * 0.2) * 0.5 + 0.5
         shade = tuple(int(c * (0.9 + 0.1 * noise)) for c in base)
         return shade
+
 
 class SoilGrid:
     def __init__(self, world):
@@ -70,8 +83,8 @@ class SoilGrid:
         self.generate_soil()
 
     def generate_soil(self):
-        cols = SCREEN_WIDTH // self.cell_size + 1
-        rows = SCREEN_HEIGHT // self.cell_size + 1
+        cols = WORLD_WIDTH // self.cell_size + 1
+        rows = WORLD_HEIGHT // self.cell_size + 1
         for cx in range(cols):
             for cy in range(rows):
                 px = cx * self.cell_size
@@ -80,7 +93,9 @@ class SoilGrid:
                     continue
                 ty = self.world.get_initial_terrain_height(px)
                 if py >= ty:
-                    initial = max(0.2, min(1.0, SOIL_BASE_NUTRIENT + random.uniform(-0.1, 0.1)))
+                    initial = max(
+                        0.2, min(1.0, SOIL_BASE_NUTRIENT + random.uniform(-0.1, 0.1))
+                    )
                     self.cells[(cx, cy)] = SoilCell(cx, cy, initial, False)
                 else:
                     self.cells[(cx, cy)] = SoilCell(cx, cy, 0.0, True)
@@ -124,28 +139,54 @@ class SoilGrid:
                 s.nutrient = max(0.0, min(SOIL_MAX_NUTRIENT, s.nutrient - amt))
                 t.nutrient = max(0.0, min(SOIL_MAX_NUTRIENT, t.nutrient + amt))
 
-    def draw(self, screen, time=0):
-        for (cx, cy), cell in self.cells.items():
-            if not cell.is_water:
-                px = cx * self.cell_size + cell.jitter_x
-                py = cy * self.cell_size + cell.jitter_y
-                color = cell.get_color(time)
+    def draw(self, screen, camera, time=0):
+        # Only iterate over visible cells
+        view = camera.get_view_rect()
+        start_cx = max(0, int(view.left // self.cell_size))
+        end_cx = min(
+            WORLD_WIDTH // self.cell_size, int(view.right // self.cell_size) + 1
+        )
+        start_cy = max(0, int(view.top // self.cell_size))
+        end_cy = min(
+            WORLD_HEIGHT // self.cell_size, int(view.bottom // self.cell_size) + 1
+        )
 
-                # Main organic body
-                rect = pygame.Rect(px - 1, py - 1, self.cell_size + 2, self.cell_size + 2)
-                pygame.draw.rect(screen, color, rect, border_radius=3)
+        for cx in range(start_cx, end_cx + 1):
+            for cy in range(start_cy, end_cy + 1):
+                cell = self.get_cell(cx, cy)
+                if cell and not cell.is_water:
+                    px, py = camera.apply(
+                        (
+                            cx * self.cell_size + cell.jitter_x,
+                            cy * self.cell_size + cell.jitter_y,
+                        )
+                    )
+                    px, py = int(px), int(py)
+                    color = cell.get_color(time)
 
-                # Grain details
-                for grain in cell.grains:
-                    g_color = tuple(max(0, min(255, int(c * grain['color_mod']))) for c in color)
-                    gx = px + grain['ox']
-                    gy = py + grain['oy']
-                    pygame.draw.circle(screen, g_color, (int(gx), int(gy)), int(grain['size']))
+                    # Main organic body
+                    rect = pygame.Rect(
+                        px - 1, py - 1, self.cell_size + 2, self.cell_size + 2
+                    )
+                    pygame.draw.rect(screen, color, rect, border_radius=3)
 
-                # Nutrient sparkle for very fertile soil
-                if cell.nutrient > 1.0:
-                    sparkle_intensity = int(100 + 155 * (math.sin(time * 3 + cell.noise_offset) + 1) / 2)
-                    s_color = (200, 255, sparkle_intensity)
-                    sx = px + self.cell_size // 2
-                    sy = py + self.cell_size // 2
-                    pygame.draw.circle(screen, s_color, (int(sx), int(sy)), 2)
+                    # Grain details
+                    for grain in cell.grains:
+                        g_color = tuple(
+                            max(0, min(255, int(c * grain["color_mod"]))) for c in color
+                        )
+                        gx = px + grain["ox"]
+                        gy = py + grain["oy"]
+                        pygame.draw.circle(
+                            screen, g_color, (int(gx), int(gy)), int(grain["size"])
+                        )
+
+                    # Nutrient sparkle for very fertile soil
+                    if cell.nutrient > 1.0:
+                        sparkle_intensity = int(
+                            100 + 155 * (math.sin(time * 3 + cell.noise_offset) + 1) / 2
+                        )
+                        s_color = (200, 255, sparkle_intensity)
+                        sx = px + self.cell_size // 2
+                        sy = py + self.cell_size // 2
+                        pygame.draw.circle(screen, s_color, (int(sx), int(sy)), 2)

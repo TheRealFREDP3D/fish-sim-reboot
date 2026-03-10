@@ -1,22 +1,49 @@
 """Plant system with organic visual rendering, tapered blades, and visible seed production"""
+
 import pygame
 import math
 import random
 from config import (
-    SCREEN_HEIGHT, WATER_LINE_Y,
-    KELP_HEIGHT_MIN, KELP_HEIGHT_MAX, KELP_SWAY_SPEED, KELP_SWAY_AMPLITUDE,
-    KELP_COLOR, KELP_HIGHLIGHT, KELP_WIDTH, KELP_DEPTH_MAX,
-    SEAGRASS_HEIGHT_MIN, SEAGRASS_HEIGHT_MAX, SEAGRASS_SWAY_SPEED,
-    SEAGRASS_SWAY_AMPLITUDE, SEAGRASS_COLOR, SEAGRASS_HIGHLIGHT, SEAGRASS_WIDTH,
-    SEAGRASS_DEPTH_MIN, SEAGRASS_DEPTH_MAX,
-    ALGAE_HEIGHT_MIN, ALGAE_HEIGHT_MAX, ALGAE_SWAY_SPEED, ALGAE_SWAY_AMPLITUDE,
-    ALGAE_COLOR, ALGAE_HIGHLIGHT, ALGAE_WIDTH, ALGAE_DEPTH_MIN,
-    ROOT_BASE_GROWTH_RATE, SEED_PRODUCTION_ENERGY, SEED_PRODUCTION_COST,
-    BUBBLE_CHANCE, BUBBLE_COLOR, SOIL_MAX_NUTRIENT
+    SCREEN_HEIGHT,
+    WATER_LINE_Y,
+    KELP_HEIGHT_MIN,
+    KELP_HEIGHT_MAX,
+    KELP_SWAY_SPEED,
+    KELP_SWAY_AMPLITUDE,
+    KELP_COLOR,
+    KELP_HIGHLIGHT,
+    KELP_WIDTH,
+    KELP_DEPTH_MAX,
+    SEAGRASS_HEIGHT_MIN,
+    SEAGRASS_HEIGHT_MAX,
+    SEAGRASS_SWAY_SPEED,
+    SEAGRASS_SWAY_AMPLITUDE,
+    SEAGRASS_COLOR,
+    SEAGRASS_HIGHLIGHT,
+    SEAGRASS_WIDTH,
+    SEAGRASS_DEPTH_MIN,
+    SEAGRASS_DEPTH_MAX,
+    ALGAE_HEIGHT_MIN,
+    ALGAE_HEIGHT_MAX,
+    ALGAE_SWAY_SPEED,
+    ALGAE_SWAY_AMPLITUDE,
+    ALGAE_COLOR,
+    ALGAE_HIGHLIGHT,
+    ALGAE_WIDTH,
+    ALGAE_DEPTH_MIN,
+    ROOT_BASE_GROWTH_RATE,
+    SEED_PRODUCTION_ENERGY,
+    SEED_PRODUCTION_COST,
+    BUBBLE_CHANCE,
+    BUBBLE_COLOR,
+    SOIL_MAX_NUTRIENT,
+    WORLD_WIDTH,
+    WORLD_HEIGHT,
 )
 from roots import RootSystem
 from seeds import Seed
 from plant_development import PlantDevelopment
+
 
 class Plant:
     def __init__(self, x, base_y, plant_type, soil_grid, seed_traits):
@@ -32,32 +59,34 @@ class Plant:
             "algae": (ALGAE_HEIGHT_MIN, ALGAE_HEIGHT_MAX),
         }[plant_type]
         base_min, base_max = height_min_max
-        self.max_height = int(base_min + (base_max - base_min) * self.traits["max_height_factor"])
+        self.max_height = int(
+            base_min + (base_max - base_min) * self.traits["max_height_factor"]
+        )
 
         self.sway_speed = {
             "kelp": KELP_SWAY_SPEED,
             "seagrass": SEAGRASS_SWAY_SPEED,
-            "algae": ALGAE_SWAY_SPEED
+            "algae": ALGAE_SWAY_SPEED,
         }[plant_type]
         self.sway_amplitude = {
             "kelp": KELP_SWAY_AMPLITUDE,
             "seagrass": SEAGRASS_SWAY_AMPLITUDE,
-            "algae": ALGAE_SWAY_AMPLITUDE
+            "algae": ALGAE_SWAY_AMPLITUDE,
         }[plant_type]
         self.base_color = {
             "kelp": KELP_COLOR,
             "seagrass": SEAGRASS_COLOR,
-            "algae": ALGAE_COLOR
+            "algae": ALGAE_COLOR,
         }[plant_type]
         self.highlight_color = {
             "kelp": KELP_HIGHLIGHT,
             "seagrass": SEAGRASS_HIGHLIGHT,
-            "algae": ALGAE_HIGHLIGHT
+            "algae": ALGAE_HIGHLIGHT,
         }[plant_type]
         self.width = {
             "kelp": KELP_WIDTH,
             "seagrass": SEAGRASS_WIDTH,
-            "algae": ALGAE_WIDTH
+            "algae": ALGAE_WIDTH,
         }[plant_type]
 
         self.phase_offset = random.uniform(0, math.pi * 2)
@@ -68,12 +97,14 @@ class Plant:
             self.blade_count = random.randint(4, 7)
             self.blade_data = []
             for _ in range(self.blade_count):
-                self.blade_data.append({
-                    'offset': random.uniform(-12, 12),
-                    'h_mult': random.uniform(0.7, 1.1),
-                    'phase': random.uniform(0, math.pi * 2),
-                    'speed': random.uniform(0.8, 1.2)
-                })
+                self.blade_data.append(
+                    {
+                        "offset": random.uniform(-12, 12),
+                        "h_mult": random.uniform(0.7, 1.1),
+                        "phase": random.uniform(0, math.pi * 2),
+                        "speed": random.uniform(0.8, 1.2),
+                    }
+                )
 
         self.floating_leaves = []
         self.decomposition_particles = []
@@ -84,25 +115,39 @@ class Plant:
         self.seed_release_cooldown = max(0, self.seed_release_cooldown - dt)
 
         base_mult = self.traits["root_aggression"]
-        need_mult = self.development.get_root_growth_multiplier(self.development.energy, self.development.current_height)
-        self.root_system.adjust_growth_rate(ROOT_BASE_GROWTH_RATE * base_mult * need_mult)
+        need_mult = self.development.get_root_growth_multiplier(
+            self.development.energy, self.development.current_height
+        )
+        self.root_system.adjust_growth_rate(
+            ROOT_BASE_GROWTH_RATE * base_mult * need_mult
+        )
 
         self.root_system.update(dt, self.development.current_height)
         nutrients = self.root_system.harvest_nutrients()
 
-        alive = self.development.update(dt, nutrients * self.traits["growth_rate_mult"], self.development.current_height)
+        alive = self.development.update(
+            dt,
+            nutrients * self.traits["growth_rate_mult"],
+            self.development.current_height,
+        )
 
         # Kelp Leaf Detachment
-        if self.plant_type == "kelp" and self.development.is_mature and random.random() < 0.0005:
-            self.floating_leaves.append({
-                "x": self.x,
-                "y": self.base_y - self.development.current_height * 0.7,
-                "vx": random.uniform(-0.5, 0.5),
-                "vy": random.uniform(-0.8, -0.4),
-                "life": random.uniform(6, 12),
-                "rot": 0,
-                "spin": random.uniform(-5, 5)
-            })
+        if (
+            self.plant_type == "kelp"
+            and self.development.is_mature
+            and random.random() < 0.0005
+        ):
+            self.floating_leaves.append(
+                {
+                    "x": self.x,
+                    "y": self.base_y - self.development.current_height * 0.7,
+                    "vx": random.uniform(-0.5, 0.5),
+                    "vy": random.uniform(-0.8, -0.4),
+                    "life": random.uniform(6, 12),
+                    "rot": 0,
+                    "spin": random.uniform(-5, 5),
+                }
+            )
 
         for leaf in self.floating_leaves[:]:
             leaf["x"] += leaf["vx"]
@@ -114,13 +159,16 @@ class Plant:
 
         # Decomposition visual feedback
         if self.development.stage == "decomposing" and random.random() < 0.1:
-            self.decomposition_particles.append({
-                "x": self.x + random.uniform(-10, 10),
-                "y": self.base_y - random.uniform(0, self.development.current_height),
-                "vx": random.uniform(-0.3, 0.3),
-                "vy": random.uniform(-0.2, 0.2),
-                "life": 2.0
-            })
+            self.decomposition_particles.append(
+                {
+                    "x": self.x + random.uniform(-10, 10),
+                    "y": self.base_y
+                    - random.uniform(0, self.development.current_height),
+                    "vx": random.uniform(-0.3, 0.3),
+                    "vy": random.uniform(-0.2, 0.2),
+                    "life": 2.0,
+                }
+            )
 
         for p in self.decomposition_particles[:]:
             p["x"] += p["vx"]
@@ -133,16 +181,23 @@ class Plant:
 
     def produce_seed(self, time):
         """Attempt to produce a seed if flowering and energy permits"""
-        can_seed = self.development.stage == "flowering" or (self.development.stage == "mature" and random.random() < 0.05)
-        
+        can_seed = self.development.stage == "flowering" or (
+            self.development.stage == "mature" and random.random() < 0.05
+        )
+
         if can_seed and self.seed_release_cooldown <= 0:
-            if self.development.energy >= SEED_PRODUCTION_ENERGY * self.traits["seed_efficiency"]:
-                self.development.energy -= SEED_PRODUCTION_COST * self.traits["seed_efficiency"]
-                self.seed_release_cooldown = 3.0 # Wait between seeds
-                
+            if (
+                self.development.energy
+                >= SEED_PRODUCTION_ENERGY * self.traits["seed_efficiency"]
+            ):
+                self.development.energy -= (
+                    SEED_PRODUCTION_COST * self.traits["seed_efficiency"]
+                )
+                self.seed_release_cooldown = 3.0  # Wait between seeds
+
                 child_seed = Seed(self.plant_type)
                 child_seed.traits = child_seed.mutate(self.traits)
-                
+
                 # Position seed at the tip
                 tip_x, tip_y = self.get_tip_position(time)
                 child_seed.x = tip_x
@@ -150,43 +205,65 @@ class Plant:
                 # Give it some initial "ejection" velocity
                 child_seed.vx = random.uniform(-1.5, 1.5)
                 child_seed.vy = random.uniform(-2.0, -0.5)
-                
+
                 return child_seed
         return None
 
-    def draw(self, screen, time, soil_grid):
+    def draw(self, screen, camera, time, soil_grid):
+        if not camera.is_visible((self.x, self.base_y - 100), margin=200):
+            return
+
         color = self.get_organic_color()
         height = self.development.current_height
 
         if self.plant_type == "seagrass":
-            self.draw_seagrass(screen, time, color, height)
+            self.draw_seagrass(screen, camera, time, color, height)
         elif self.plant_type == "kelp":
-            self.draw_kelp(screen, time, color, height)
+            self.draw_kelp(screen, camera, time, color, height)
         else:
-            self.draw_algae(screen, time, color, height)
+            self.draw_algae(screen, camera, time, color, height)
 
         # Draw flowering effect with pulse
         if self.development.is_flowering:
-            top_pos = self.get_tip_position(time)
+            tip_pos = self.get_tip_position(time)
+            screen_tip = camera.apply(tip_pos)
             pulse = (math.sin(time * 5) + 1) * 0.5
             radius = 6 + pulse * 4
-            pygame.draw.circle(screen, (255, 255, 150), (int(top_pos[0]), int(top_pos[1])), int(radius))
-            pygame.draw.circle(screen, (255, 255, 255), (int(top_pos[0]), int(top_pos[1])), int(radius + 2), 1)
+            pygame.draw.circle(
+                screen,
+                (255, 255, 150),
+                (int(screen_tip[0]), int(screen_tip[1])),
+                int(radius),
+            )
+            pygame.draw.circle(
+                screen,
+                (255, 255, 255),
+                (int(screen_tip[0]), int(screen_tip[1])),
+                int(radius + 2),
+                1,
+            )
 
         # Draw decomp particles
         for p in self.decomposition_particles:
             alpha = max(0, min(255, int(150 * (p["life"] / 2.0))))
             surf = pygame.Surface((4, 4), pygame.SRCALPHA)
             pygame.draw.circle(surf, (100, 80, 50, alpha), (2, 2), 2)
-            screen.blit(surf, (int(p["x"]) - 2, int(p["y"]) - 2))
+            screen_p = camera.apply((p["x"], p["y"]))
+            screen.blit(surf, (int(screen_p[0]) - 2, int(screen_p[1]) - 2))
 
     def get_organic_color(self):
-        depth_ratio = (self.base_y - WATER_LINE_Y) / (SCREEN_HEIGHT - WATER_LINE_Y)
+        depth_ratio = (self.base_y - WATER_LINE_Y) / (WORLD_HEIGHT - WATER_LINE_Y)
         energy_ratio = min(1.0, max(0.2, self.development.energy / 10.0))
 
-        r = int(self.base_color[0] * (0.6 + 0.4 * energy_ratio) * (1.0 - 0.3 * depth_ratio))
-        g = int(self.base_color[1] * (0.6 + 0.4 * energy_ratio) * (1.0 - 0.3 * depth_ratio))
-        b = int(self.base_color[2] * (0.6 + 0.4 * energy_ratio) * (1.0 - 0.3 * depth_ratio))
+        r = int(
+            self.base_color[0] * (0.6 + 0.4 * energy_ratio) * (1.0 - 0.3 * depth_ratio)
+        )
+        g = int(
+            self.base_color[1] * (0.6 + 0.4 * energy_ratio) * (1.0 - 0.3 * depth_ratio)
+        )
+        b = int(
+            self.base_color[2] * (0.6 + 0.4 * energy_ratio) * (1.0 - 0.3 * depth_ratio)
+        )
 
         if self.development.stage == "decomposing":
             return (80, 70, 50)
@@ -195,38 +272,47 @@ class Plant:
 
         return (r, g, b)
 
-    def draw_seagrass(self, screen, time, color, height):
+    def draw_seagrass(self, screen, camera, time, color, height):
         visible_blades = getattr(self.development, "visible_blades", self.blade_count)
         for i in range(int(visible_blades)):
             if i >= len(self.blade_data):
                 break
             data = self.blade_data[i]
             points = []
-            blade_h = height * data['h_mult']
+            blade_h = height * data["h_mult"]
             segments = 8
             for s in range(segments + 1):
                 prog = s / segments
-                sway = math.sin(time * self.sway_speed * data['speed'] + self.phase_offset + data['phase'] + s * 0.2)
-                sway *= self.sway_amplitude * (prog ** 1.8)
-                px = self.x + data['offset'] + sway
+                sway = math.sin(
+                    time * self.sway_speed * data["speed"]
+                    + self.phase_offset
+                    + data["phase"]
+                    + s * 0.2
+                )
+                sway *= self.sway_amplitude * (prog**1.8)
+                px = self.x + data["offset"] + sway
                 py = self.base_y - (blade_h * prog)
-                points.append((px, py))
+                points.append(camera.apply((px, py)))
 
             if len(points) > 1:
                 for s in range(len(points) - 1):
                     w = max(1, int(self.width * (1.0 - (s / len(points)))))
-                    pygame.draw.line(screen, color, points[s], points[s+1], w)
+                    pygame.draw.line(screen, color, points[s], points[s + 1], w)
 
-    def draw_kelp(self, screen, time, color, height):
+    def draw_kelp(self, screen, camera, time, color, height):
         segments = int(self.development.current_segments)
-        points = [(self.x, self.base_y)]
+        points = [camera.apply((self.x, self.base_y))]
         seg_h = height / max(1, segments)
         for i in range(1, segments + 1):
             prog = i / segments
-            sway = math.sin(time * self.sway_speed + self.phase_offset + i * 0.3) * self.sway_amplitude * (prog ** 1.5)
+            sway = (
+                math.sin(time * self.sway_speed + self.phase_offset + i * 0.3)
+                * self.sway_amplitude
+                * (prog**1.5)
+            )
             px = self.x + sway
             py = self.base_y - (seg_h * i)
-            points.append((px, py))
+            points.append(camera.apply((px, py)))
 
             # Larger leaves for kelp
             if i > 2 and i % 3 == 0:
@@ -235,37 +321,50 @@ class Plant:
                 leaf_color = color[:3] if len(color) >= 3 else color
                 pygame.draw.ellipse(leaf_surf, (*leaf_color, 180), (0, 0, 24, 12))
                 rotated_leaf = pygame.transform.rotate(leaf_surf, leaf_dir * 45)
-                screen.blit(rotated_leaf, (px + leaf_dir * 12 - 12, py - 6))
+                screen_px, screen_py = points[-1]
+                screen.blit(
+                    rotated_leaf, (screen_px + leaf_dir * 12 - 12, screen_py - 6)
+                )
 
         if len(points) > 1:
             for i in range(len(points) - 1):
                 thickness = max(1, int(self.width * (1.1 - (i / len(points)))))
-                pygame.draw.line(screen, color, points[i], points[i+1], thickness)
+                pygame.draw.line(screen, color, points[i], points[i + 1], thickness)
 
-    def draw_algae(self, screen, time, color, height):
-        points = [(self.x, self.base_y)]
+    def draw_algae(self, screen, camera, time, color, height):
+        points = [camera.apply((self.x, self.base_y))]
         segments = 6
         seg_h = height / segments
         for i in range(1, segments + 1):
             prog = i / segments
-            sway = math.sin(time * self.sway_speed + self.phase_offset + i * 0.5) * self.sway_amplitude * prog
-            points.append((self.x + sway, self.base_y - seg_h * i))
+            sway = (
+                math.sin(time * self.sway_speed + self.phase_offset + i * 0.5)
+                * self.sway_amplitude
+                * prog
+            )
+            points.append(camera.apply((self.x + sway, self.base_y - seg_h * i)))
 
         if len(points) > 1:
             for i in range(len(points) - 1):
-                thickness = max(2, int((self.width + 2) * (1.0 - (i / len(points)) * 0.5)))
-                pygame.draw.line(screen, color, points[i], points[i+1], thickness)
+                thickness = max(
+                    2, int((self.width + 2) * (1.0 - (i / len(points)) * 0.5))
+                )
+                pygame.draw.line(screen, color, points[i], points[i + 1], thickness)
 
         # Bulbous tip for algae
         tip = points[-1]
         pygame.draw.circle(screen, color, (int(tip[0]), int(tip[1])), self.width + 2)
 
     def get_tip_position(self, time):
-        sway = math.sin(time * self.sway_speed + self.phase_offset + 3.0) * self.sway_amplitude
+        sway = (
+            math.sin(time * self.sway_speed + self.phase_offset + 3.0)
+            * self.sway_amplitude
+        )
         return (self.x + sway, self.base_y - self.development.current_height)
 
-    def draw_roots(self, screen, time=0):
-        self.root_system.draw(screen, time)
+    def draw_roots(self, screen, camera, time=0):
+        self.root_system.draw(screen, camera, time)
+
 
 class PlantManager:
     def __init__(self, world):
@@ -301,17 +400,26 @@ class PlantManager:
                 depth_ratio = self.world.get_depth_ratio(terrain_y)
 
                 # Check if specific plant type can grow here
-                if seed.plant_type == 'kelp' and depth_ratio <= KELP_DEPTH_MAX:
-                    self.plants.append(Plant(seed.x, terrain_y, "kelp", soil_grid, seed.traits))
-                elif seed.plant_type == 'seagrass' and SEAGRASS_DEPTH_MIN <= depth_ratio <= SEAGRASS_DEPTH_MAX:
-                    self.plants.append(Plant(seed.x, terrain_y, "seagrass", soil_grid, seed.traits))
-                elif seed.plant_type == 'algae' and depth_ratio >= ALGAE_DEPTH_MIN:
-                    self.plants.append(Plant(seed.x, terrain_y, "algae", soil_grid, seed.traits))
+                if seed.plant_type == "kelp" and depth_ratio <= KELP_DEPTH_MAX:
+                    self.plants.append(
+                        Plant(seed.x, terrain_y, "kelp", soil_grid, seed.traits)
+                    )
+                elif (
+                    seed.plant_type == "seagrass"
+                    and SEAGRASS_DEPTH_MIN <= depth_ratio <= SEAGRASS_DEPTH_MAX
+                ):
+                    self.plants.append(
+                        Plant(seed.x, terrain_y, "seagrass", soil_grid, seed.traits)
+                    )
+                elif seed.plant_type == "algae" and depth_ratio >= ALGAE_DEPTH_MIN:
+                    self.plants.append(
+                        Plant(seed.x, terrain_y, "algae", soil_grid, seed.traits)
+                    )
 
         # Plant Updates
         for plant in self.plants[:]:
             alive = plant.update(dt, soil_grid)
-            
+
             if not alive:
                 # Return nutrients to soil on death
                 nutrients = plant.development.get_decomposition_return()
@@ -320,8 +428,10 @@ class PlantManager:
                     cell.nutrient = min(SOIL_MAX_NUTRIENT, cell.nutrient + nutrients)
                     # Spread to neighbors
                     for nb, _ in soil_grid.get_neighbors(cell.x, cell.y):
-                        nb.nutrient = min(SOIL_MAX_NUTRIENT, nb.nutrient + nutrients * 0.3)
-                
+                        nb.nutrient = min(
+                            SOIL_MAX_NUTRIENT, nb.nutrient + nutrients * 0.3
+                        )
+
                 self.plants.remove(plant)
                 continue
 
@@ -332,13 +442,15 @@ class PlantManager:
 
             # Bubbles
             if plant.development.is_mature and random.random() < BUBBLE_CHANCE:
-                self.bubbles.append({
-                    "x": plant.x + random.uniform(-10, 10),
-                    "y": plant.base_y - plant.development.current_height * 0.9,
-                    "vy": random.uniform(-1.0, -0.5),
-                    "life": random.uniform(2.0, 4.0),
-                    "size": random.randint(2, 5),
-                })
+                self.bubbles.append(
+                    {
+                        "x": plant.x + random.uniform(-10, 10),
+                        "y": plant.base_y - plant.development.current_height * 0.9,
+                        "vy": random.uniform(-1.0, -0.5),
+                        "life": random.uniform(2.0, 4.0),
+                        "size": random.randint(2, 5),
+                    }
+                )
 
         for bubble in self.bubbles[:]:
             bubble["y"] += bubble["vy"] * 60 * dt
@@ -346,17 +458,23 @@ class PlantManager:
             if bubble["life"] <= 0 or bubble["y"] < WATER_LINE_Y:
                 self.bubbles.remove(bubble)
 
-    def draw(self, screen, time):
+    def draw(self, screen, camera, time):
         # Draw seeds first so they appear behind plant bodies
         for seed in self.seeds:
-            seed.draw(screen)
-            
-        for plant in self.plants:
-            plant.draw_roots(screen, time)
+            seed.draw(screen, camera)
 
         for plant in self.plants:
-            plant.draw(screen, time, self.world.soil_grid)
+            plant.draw_roots(screen, camera, time)
+
+        for plant in self.plants:
+            plant.draw(screen, camera, time, self.world.soil_grid)
 
         for bubble in self.bubbles:
             alpha = max(0, min(255, int(255 * (bubble["life"] / 4.0))))
-            pygame.draw.circle(screen, (*BUBBLE_COLOR, alpha), (int(bubble["x"]), int(bubble["y"])), bubble["size"])
+            screen_b = camera.apply((bubble["x"], bubble["y"]))
+            pygame.draw.circle(
+                screen,
+                (*BUBBLE_COLOR, alpha),
+                (int(screen_b[0]), int(screen_b[1])),
+                bubble["size"],
+            )

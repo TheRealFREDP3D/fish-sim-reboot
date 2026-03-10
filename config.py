@@ -1,11 +1,17 @@
 """Configuration settings for the Underwater Plant Ecosystem Simulation"""
+
 from enum import Enum, auto
 
 # Screen settings
 SCREEN_WIDTH = 1200
 SCREEN_HEIGHT = 800
+WORLD_WIDTH = 4000
+WORLD_HEIGHT = 1200
 FPS = 60
 TITLE = "Underwater Plant Ecosystem"
+
+# Camera settings
+CAMERA_SMOOTHING = 0.1
 
 # Particles
 PARTICLE_COUNT = 180
@@ -130,7 +136,12 @@ FISH_LARVA_DURATION = 12.0
 FISH_JUVENILE_DURATION = 20.0
 FISH_ADULT_DURATION = 150.0
 FISH_ELDER_DURATION = 80.0
-FISH_MAX_AGE = FISH_LARVA_DURATION + FISH_JUVENILE_DURATION + FISH_ADULT_DURATION + FISH_ELDER_DURATION
+FISH_MAX_AGE = (
+    FISH_LARVA_DURATION
+    + FISH_JUVENILE_DURATION
+    + FISH_ADULT_DURATION
+    + FISH_ELDER_DURATION
+)
 
 # Species-Specific Modifiers
 CLEANER_FISH_SPEED_MULT = 0.85
@@ -141,7 +152,7 @@ PREDATOR_DASH_COOLDOWN = 3.5
 
 # Reproduction & Energy
 FISH_MAX_ENERGY = 50.0
-FISH_HUNGER_THRESHOLD = 30.0 # Will start looking for food sooner
+FISH_HUNGER_THRESHOLD = 30.0  # Will start looking for food sooner
 FISH_MATING_THRESHOLD = 35.0
 FISH_REPRODUCTION_COST = 12.0
 FISH_EGG_HATCH_TIME = 10.0
@@ -151,9 +162,10 @@ FISH_MAX_POPULATION = 40
 CLEANER_FISH_MAX_POPULATION = 15
 PREDATOR_MAX_POPULATION = 4
 
+
 class FishState(Enum):
     RESTING = auto()  # Near plants, low speed
     HUNTING = auto()  # Looking for food
     FLEEING = auto()  # Evading predator
-    MATING = auto()   # Looking for partner
+    MATING = auto()  # Looking for partner
     NESTING = auto()  # Pregnant, looking for plant base to lay egg

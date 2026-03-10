@@ -1,6 +1,7 @@
 import math
 import random
 import pygame
+# No typing imports needed
 
 
 class SteeringPhysics:
@@ -23,35 +24,38 @@ class SteeringPhysics:
     def seek(
         self, target_x: float, target_y: float, weight: float = 1.0
     ) -> pygame.Vector2:
-        """Generate a steering force towards a target.
-
-        Weight is applied before clamping so that max_force is always
-        respected as a true upper bound on the final output vector.
-        """
+        """Generate a steering force towards a target"""
         target = pygame.Vector2(target_x, target_y)
         dist = self.pos.distance_to(target)
 
         if dist > 0:
             desired = (target - self.pos).normalize() * self.max_speed
-            steer = (desired - self.vel) * weight  # apply weight first
+            steer = desired - self.vel
             if steer.length() > self.max_force:
-                steer.scale_to_length(self.max_force)  # then clamp
-            return steer
+                steer.scale_to_length(self.max_force)
+            return steer * weight
         return pygame.Vector2(0, 0)
 
     def update(self, dt: float, drag: float):
         """Standard Euler integration with drag"""
+        # Update velocity (dt is multiplied by 60 for consistency with previous fixed framerate logic)
         self.vel += self.acc * dt * 60
+
+        # Apply natural water drag
         self.vel *= drag
 
+        # Speed limit
         if self.vel.length() > self.max_speed:
             self.vel.scale_to_length(self.max_speed)
 
+        # Update position
         self.pos += self.vel * dt
 
+        # Update heading based on velocity
         if self.vel.length() > 1.0:
             self.heading = math.atan2(self.vel.y, self.vel.x)
 
+        # Reset acceleration
         self.acc = pygame.Vector2(0, 0)
 
     def bounce_bounds(self, min_x, min_y, max_x, max_y):
