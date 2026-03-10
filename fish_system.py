@@ -3,6 +3,7 @@ from fish_base import NeuralFish
 from environment_objects import PoopParticle, FishEgg
 from fish_traits import FishTraits
 from family import Family
+from brain_visualizer import BrainVisualizer
 
 
 class FishSystem:
@@ -26,6 +27,9 @@ class FishSystem:
         self.poops, self.eggs = [], []
         self.selected_fish = None
         self.families = []
+        
+        # Initialize brain visualizer
+        self.brain_visualizer = BrainVisualizer(SCREEN_WIDTH, SCREEN_HEIGHT)
 
     def handle_click(self, pos, camera):
         # Convert screen click to world coordinates
@@ -176,7 +180,10 @@ class FishSystem:
             self.families.append(family)
             p1.family, p2.family, child.family = family, family, family
 
-    def draw(self, screen, camera, time):
+    def draw(self, screen, camera, time, dt=0.0):
+        # Update brain visualizer
+        self.brain_visualizer.update(dt, self.selected_fish)
+        
         for e in self.eggs:
             e.draw(screen, camera)
         for p in self.poops:
@@ -184,4 +191,4 @@ class FishSystem:
         for f in self.fish + self.cleaner_fish + self.predators:
             f.draw(screen, camera, time, f == self.selected_fish)
         if self.selected_fish:
-            self.selected_fish.draw_brain(screen, time)
+            self.brain_visualizer.draw(screen, self.selected_fish, time)

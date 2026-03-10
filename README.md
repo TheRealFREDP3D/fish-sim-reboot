@@ -1,6 +1,6 @@
 # 🌊 Underwater Neural Ecosystem Simulation
 
-![Screenshot](doc/screenshot.png)
+![Brain Vizualizer](doc/brain-visualizer.png)
 
 A passion project by a self-taught hobbyist developer – an evolving Python/Pygame simulation of a living underwater lake ecosystem. Watch emergent behaviors unfold as neural network-driven fish interact with dynamic plants, roots, soil nutrients, and each other!
 
@@ -11,6 +11,8 @@ A passion project by a self-taught hobbyist developer – an evolving Python/Pyg
 I'm a self-taught programmer who started this as a fun way to explore artificial life, neural networks, procedural generation, and ecosystem dynamics. What began as a simple underwater scene with swaying plants has grown (organically!) into a complex simulation featuring:
 
 ### 🧠 Neural Fish AI
+
+![Screenshot](doc/screenshot.png)
 
 - Custom feed-forward neural networks (from scratch – no external ML libraries)
 - Real-time **brain visualization**: Click any fish to see its neural activity, inputs, hidden states, and outputs

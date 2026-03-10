@@ -53,7 +53,7 @@ class NeuralNet:
             sum_val = sum(hidden2[j] * self.w3[i][j] for j in range(self.hidden2_size)) + self.b3[i]
             outputs.append(self.tanh(sum_val))
         
-        return outputs, hidden2
+        return outputs, hidden, hidden2
     
     def mutate(self, mutation_rate=0.1, mutation_strength=0.2):
         """Create mutated copy for offspring"""

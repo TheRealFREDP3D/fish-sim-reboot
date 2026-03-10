@@ -1,6 +1,7 @@
 import pygame
 import math
 import random
+import collections
 from neural_net import NeuralNet
 from fish_traits import FishTraits
 from fish_physics import SteeringPhysics
@@ -41,12 +42,14 @@ class NeuralFish:
         # Store last neural activity for visualization
         self.last_inputs = [0.0] * self.INPUT_COUNT
         self.last_hidden = [0.0] * self.brain.hidden2_size
+        self.last_hidden1 = [0.0] * self.brain.hidden_size
         self.last_outputs = [0.0] * self.OUTPUT_COUNT
-
-        # Initialize fonts
-        self.font_title = pygame.font.Font(None, 32)
-        self.font_normal = pygame.font.Font(None, 24)
-        self.font_small = pygame.font.Font(None, 18)
+        self.output_history = collections.deque(maxlen=60)
+        
+        # Lifetime counters
+        self.food_eaten = 0
+        self.distance_traveled = 0.0
+        self.offspring_count = 0
 
     @property
     def pos(self):
@@ -141,9 +144,11 @@ class NeuralFish:
         ]
 
         self.last_inputs = radar + stats
-        outputs, hidden = self.brain.forward(self.last_inputs)
-        self.last_hidden = hidden
+        outputs, hidden1, hidden2 = self.brain.forward(self.last_inputs)
+        self.last_hidden1 = hidden1
+        self.last_hidden = hidden2
         self.last_outputs = outputs
+        self.output_history.append(list(outputs))
 
         # Influence Steering based on State
         max_speed_mod = 1.0
@@ -169,6 +174,7 @@ class NeuralFish:
                     < 40
                 ):
                     self.is_pregnant = False
+                    self.offspring_count += 1
                     partner = self.pregnancy_partner
                     self.pregnancy_partner = None
                     return (
@@ -239,6 +245,7 @@ class NeuralFish:
             self.world.get_terrain_height(self.physics.pos.x),
         )
         self.physics.update(dt, FISH_DRAG)
+        self.distance_traveled += self.physics.vel.length() * dt
 
         # Collision with food
         for t in targets[:]:
@@ -248,6 +255,7 @@ class NeuralFish:
             ty = getattr(t, "y", t.physics.pos.y if hasattr(t, "physics") else 0)
             if self.physics.pos.distance_to((tx, ty)) < 25:
                 self.energy = min(FISH_MAX_ENERGY, self.energy + 12.0)
+                self.food_eaten += 1
                 if hasattr(t, "reset"):
                     t.reset()
                 elif t in targets:
@@ -310,163 +318,8 @@ class NeuralFish:
             )
 
     def draw_brain(self, screen, time):
-        """High-contrast brain visualization"""
-        panel_width, panel_height = 540, 640
-        surface = pygame.Surface((panel_width, panel_height), pygame.SRCALPHA)
-        surface.fill((5, 10, 25, 245))
-        pygame.draw.rect(surface, (0, 200, 255), (0, 0, panel_width, panel_height), 4)
-
-        y_offset = 20
-        # Title
-        species = (
-            "Predator"
-            if self.is_predator
-            else ("Cleaner" if self.is_cleaner else "Common")
-        )
-        tag_color = (
-            (255, 100, 100)
-            if self.is_predator
-            else ((100, 200, 255) if self.is_cleaner else (255, 180, 50))
-        )
-        surface.blit(
-            self.font_title.render(f"{species} Fish Brain", True, tag_color),
-            (20, y_offset),
-        )
-        y_offset += 40
-
-        # Identity Block
-        life_stage = (
-            "Larva"
-            if self.age < FISH_LARVA_DURATION
-            else (
-                "Juvenile"
-                if self.age < FISH_LARVA_DURATION + FISH_JUVENILE_DURATION
-                else "Adult"
-            )
-        )
-        sex_icon = "♂ Male" if self.sex == "M" else "♀ Female"
-        maturity = "Mature" if self.is_mature else "Immature"
-        pregnancy_text = "PREGNANT" if self.is_pregnant else ""
-
-        id_text = f"{life_stage} {sex_icon} | {maturity}"
-        surface.blit(
-            self.font_normal.render(id_text, True, (255, 255, 255)), (20, y_offset)
-        )
-
-        if pregnancy_text:
-            preg_surf = self.font_normal.render(pregnancy_text, True, (255, 150, 150))
-            surface.blit(preg_surf, (panel_width - 140, y_offset))
-
-        y_offset += 25
-
-        # State display
-        surface.blit(
-            self.font_small.render(
-                f"CURRENT FOCUS: {self.state.name}", True, (200, 255, 200)
-            ),
-            (20, y_offset),
-        )
-        y_offset += 25
-
-        # --- Progress Bars ---
-        # 1. Life Progress (remaining)
-        current_max = FISH_MAX_AGE * self.traits.physical_traits.get(
-            "lifespan_mult", 1.0
-        )
-        life_ratio = max(0.0, 1.0 - (self.age / current_max))
-        surface.blit(
-            self.font_small.render(
-                f"LIFE ({int(life_ratio * 100)}%)", True, (200, 200, 200)
-            ),
-            (20, y_offset),
-        )
-        pygame.draw.rect(surface, (40, 40, 40), (100, y_offset + 2, 120, 12))
-        pygame.draw.rect(
-            surface, (150, 200, 255), (100, y_offset + 2, int(120 * life_ratio), 12)
-        )
-
-        # 2. Energy Bar
-        energy_ratio = max(0.0, min(1.0, self.energy / FISH_MAX_ENERGY))
-        surface.blit(
-            self.font_small.render("ENERGY", True, (200, 200, 200)), (250, y_offset)
-        )
-        pygame.draw.rect(surface, (40, 40, 40), (320, y_offset + 2, 120, 12))
-        pygame.draw.rect(
-            surface,
-            self._get_gradient_color(energy_ratio),
-            (320, y_offset + 2, int(120 * energy_ratio), 12),
-        )
-
-        y_offset += 35
-
-        # Network Visualization
-        surface.blit(
-            self.font_normal.render("NEURAL ACTIVITY MAP", True, (255, 255, 255)),
-            (20, y_offset),
-        )
-        y_offset += 40
-
-        # Draw connections and nodes (restored logic)
-        input_x, hidden_x, output_x = 60, 220, 380
-        input_spacing, node_radius = 28, 10
-        input_labels = [
-            "Food L",
-            "Food C",
-            "Food R",
-            "Threat L",
-            "Threat C",
-            "Threat R",
-            "Mate L",
-            "Mate C",
-            "Mate R",
-            "Energy",
-            "Stamina",
-            "Depth",
-            "Speed",
-            "Safety",
-        ]
-
-        # Draw Connections
-        for i, inp_val in enumerate(self.last_inputs):
-            iy = y_offset + i * input_spacing
-            for h, hid_val in enumerate(self.last_hidden):
-                hy = y_offset + 80 + h * 50
-                if abs(inp_val) > 0.1:
-                    a_color = self._get_activation_color(inp_val)
-                    pygame.draw.line(
-                        surface, (*a_color, 40), (input_x, iy), (hidden_x, hy), 1
-                    )
-
-        for h, hid_val in enumerate(self.last_hidden):
-            hy = y_offset + 80 + h * 50
-            for o, out_val in enumerate(self.last_outputs):
-                oy = y_offset + 180 + o * 120
-                if abs(hid_val) > 0.1:
-                    a_color = self._get_activation_color(hid_val)
-                    pygame.draw.line(
-                        surface, (*a_color, 80), (hidden_x, hy), (output_x, oy), 2
-                    )
-
-        # Draw Nodes
-        for i, (val, lbl) in enumerate(zip(self.last_inputs, input_labels)):
-            ny = y_offset + i * input_spacing
-            pygame.draw.circle(
-                surface, self._get_activation_color(val), (input_x, ny), node_radius
-            )
-            pygame.draw.circle(surface, (255, 255, 255), (input_x, ny), node_radius, 2)
-            surface.blit(
-                self.font_small.render(lbl, True, (220, 220, 220)),
-                (input_x + 18, ny - 6),
-            )
-
-        for h, val in enumerate(self.last_hidden):
-            ny = y_offset + 80 + h * 50
-            pygame.draw.circle(
-                surface,
-                self._get_activation_color(val),
-                (hidden_x, ny),
-                node_radius + 2,
-            )
+        # Delegated to BrainVisualizer
+        pass
 
     def _get_activation_color(self, value):
         """High-contrast color scale: Magenta (Neg) -> Grey (Neutral) -> Green (Pos)"""

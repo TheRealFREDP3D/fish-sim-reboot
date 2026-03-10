@@ -169,3 +169,7 @@ class FishState(Enum):
     FLEEING = auto()  # Evading predator
     MATING = auto()  # Looking for partner
     NESTING = auto()  # Pregnant, looking for plant base to lay egg
+
+# Brain Visualizer Panel
+BRAIN_PANEL_WIDTH = 420
+BRAIN_PANEL_HEIGHT = 800
