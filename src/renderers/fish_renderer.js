@@ -9,7 +9,8 @@ function drawFish(ctx, fish) {
     drawSleekBody(ctx, fish.bodyColor, fish.scale);
     drawBioluminescentStripe(ctx, fish.accentColor);
   } else {
-
+    // Fallback rendering for unknown or misconfigured species
+    drawSleekBody(ctx, fish.bodyColor, fish.scale);
   }
 
   ctx.restore();
