@@ -1,0 +1,5 @@
+/_DEV_
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md
+/__pycache__

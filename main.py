@@ -1,28 +1,34 @@
 """Underwater Plant Ecosystem Simulation - Now with neural fish and brain visualization!"""
+
 import pygame
 import sys
-from config import (
-    SCREEN_WIDTH, SCREEN_HEIGHT, FPS, TITLE
-)
+from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, TITLE
 from world import World
 from plants import PlantManager
 from particles import ParticleSystem
 from fish import FishSystem
+from camera import Camera
+
 
 class Simulation:
     def __init__(self):
         pygame.init()
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.DOUBLEBUF)
+        self.screen = pygame.display.set_mode(
+            (SCREEN_WIDTH, SCREEN_HEIGHT), pygame.DOUBLEBUF
+        )
         pygame.display.set_caption(TITLE)
         self.clock = pygame.time.Clock()
         self.running = True
         self.time = 0
 
         self.world = World()
+        self.camera = Camera()
         self.plant_manager = PlantManager(self.world)
         self.plant_manager.spawn_initial_seeds()
         self.particle_system = ParticleSystem()
-        self.fish_system = FishSystem(self.particle_system, self.plant_manager, self.world)
+        self.fish_system = FishSystem(
+            self.particle_system, self.plant_manager, self.world
+        )
 
         self.font = pygame.font.Font(None, 24)
 
@@ -35,12 +41,15 @@ class Simulation:
                     self.running = False
                 elif event.key == pygame.K_r:
                     self.world = World()
+                    self.camera = Camera()
                     self.plant_manager = PlantManager(self.world)
                     self.plant_manager.spawn_initial_seeds()
-                    self.fish_system = FishSystem(self.particle_system, self.plant_manager, self.world)
+                    self.fish_system = FishSystem(
+                        self.particle_system, self.plant_manager, self.world
+                    )
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Left click
-                    self.fish_system.handle_click(event.pos)
+                    self.fish_system.handle_click(event.pos, self.camera)
 
     def update(self):
         dt = self.clock.get_time() / 1000.0
@@ -51,13 +60,21 @@ class Simulation:
         self.plant_manager.update(dt)
         self.fish_system.update(dt)
 
+        # Update camera focus
+        if self.fish_system.selected_fish:
+            self.camera.follow(self.fish_system.selected_fish)
+        else:
+            self.camera.target = None
+
+        self.camera.update()
+
     def draw(self):
         self.screen.fill((0, 0, 0))
 
-        self.world.draw(self.screen)
-        self.particle_system.draw(self.screen)
-        self.plant_manager.draw(self.screen, self.time)
-        self.fish_system.draw(self.screen, self.time)
+        self.world.draw(self.screen, self.camera)
+        self.particle_system.draw(self.screen, self.camera)
+        self.plant_manager.draw(self.screen, self.camera, self.time)
+        self.fish_system.draw(self.screen, self.camera, self.time)
 
         # Instructions
         instructions = [
@@ -85,6 +102,7 @@ class Simulation:
         pygame.quit()
         sys.exit()
 
+
 def main():
     print("=" * 60)
     print("Underwater Neural Ecosystem Simulation")
@@ -100,6 +118,7 @@ def main():
     print("\nStarting simulation...")
     sim = Simulation()
     sim.run()
+
 
 if __name__ == "__main__":
     main()
