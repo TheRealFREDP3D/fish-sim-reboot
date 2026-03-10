@@ -149,6 +149,8 @@ class NeuralFish:
                 oy = getattr(
                     obj, "y", obj.physics.pos.y if hasattr(obj, "physics") else 0
                 )
+                dx = ox - self.physics.pos.x
+                dy = oy - self.physics.pos.y
                 dist = self.physics.pos.distance_to((ox, oy))
                 detection_range = FISH_SENSOR_RANGE
                 if is_threat_radar and self.is_hidden:

@@ -30,10 +30,10 @@ class SteeringPhysics:
 
         if dist > 0:
             desired = (target - self.pos).normalize() * self.max_speed
-            steer = (desired - self.vel) * weight
+            steer = desired - self.vel
             if steer.length() > self.max_force:
                 steer.scale_to_length(self.max_force)
-            return steer
+            return steer * weight
         return pygame.Vector2(0, 0)
 
     def update(self, dt: float, drag: float):
