@@ -57,7 +57,16 @@ class NeuralNet:
     
     def mutate(self, mutation_rate=0.1, mutation_strength=0.2):
         """Create mutated copy for offspring"""
-        child = copy.deepcopy(self)
+        # Create new network with same architecture
+        child = NeuralNet(self.input_size, self.hidden_size, self.output_size)
+        
+        # Copy weights and biases efficiently using list comprehensions
+        child.w1 = [row[:] for row in self.w1]
+        child.b1 = self.b1[:]
+        child.w2 = [row[:] for row in self.w2]
+        child.b2 = self.b2[:]
+        child.w3 = [row[:] for row in self.w3]
+        child.b3 = self.b3[:]
         
         def mutate_list(lst):
             for i in range(len(lst)):

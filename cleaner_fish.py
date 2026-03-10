@@ -1,4 +1,4 @@
-from fish import NeuralFish
+from fish_base import NeuralFish
 from config import CLEANER_FISH_SPEED_MULT
 
 
