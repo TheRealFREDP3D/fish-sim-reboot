@@ -1,7 +1,7 @@
 """Predator Fish - High-speed hunters with dash capabilities"""
 
 import math
-from fish import NeuralFish
+from fish_base import NeuralFish
 from config import *
 
 

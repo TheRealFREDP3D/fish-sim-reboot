@@ -6,7 +6,7 @@ from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, TITLE
 from world import World
 from plants import PlantManager
 from particles import ParticleSystem
-from fish import FishSystem
+from fish_system import FishSystem
 from camera import Camera
 
 

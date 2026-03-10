@@ -80,6 +80,11 @@ class SoilGrid:
         self.world = world
         self.cell_size = SOIL_CELL_SIZE
         self.cells = {}
+        # Performance optimizations
+        self._cell_list = []  # Flat list of (cx, cy, cell) tuples
+        self._neighbours = {}  # Cached neighbour references
+        self._update_slice = 0  # Current slice index for throttled updates
+        self.DIFFUSION_SLICES = 4  # Update full grid once every 4 frames
         self.generate_soil()
 
     def generate_soil(self):
@@ -99,6 +104,7 @@ class SoilGrid:
                     self.cells[(cx, cy)] = SoilCell(cx, cy, initial, False)
                 else:
                     self.cells[(cx, cy)] = SoilCell(cx, cy, 0.0, True)
+        self._rebuild_cell_list()
 
     def get_cell(self, cx, cy):
         return self.cells.get((cx, cy))
@@ -110,34 +116,54 @@ class SoilGrid:
         return (int(px // self.cell_size), int(py // self.cell_size))
 
     def get_neighbors(self, cx, cy):
-        res = []
-        for dx, dy in [(0, 1), (-1, 0), (1, 0), (0, -1)]:
-            c = self.get_cell(cx + dx, cy + dy)
-            if c:
-                res.append((c, (dx, dy)))
-        return res
+        return self._neighbours.get((cx, cy), [])
 
     def update(self, dt):
-        for cell in self.cells.values():
-            cell.update(dt)
-
-        # Soil Nutrient Diffusion
-        transfers = {}
-        for (cx, cy), c in self.cells.items():
-            if c.is_water and c.nutrient < 0.01:
+        # Throttled per-cell state update - only process current slice
+        slice_size = len(self._cell_list) // self.DIFFUSION_SLICES
+        start_idx = self._update_slice * slice_size
+        end_idx = start_idx + slice_size if self._update_slice < self.DIFFUSION_SLICES - 1 else len(self._cell_list)
+        
+        # Update cell state machines for current slice
+        # Scale dt by DIFFUSION_SLICES to account for skipped frames
+        effective_dt = dt * self.DIFFUSION_SLICES
+        
+        # Stage 1: Compute all diffusion deltas for current slice using snapshot values
+        diffusion_deltas = {}  # (cx, cy) -> nutrient_delta
+        for cx, cy, cell in self._cell_list[start_idx:end_idx]:
+            cell.update(effective_dt)
+            
+            # Skip water cells with negligible nutrients
+            if cell.is_water and cell.nutrient < 0.01:
                 continue
-            for dx, dy in [(0, 1), (1, 0)]:
-                nb = self.get_cell(cx + dx, cy + dy)
-                if nb:
-                    diff = (c.nutrient - nb.nutrient) * 0.02
-                    transfers[(cx, cy, dx, dy)] = diff
-
-        for (cx, cy, dx, dy), amt in transfers.items():
-            s = self.get_cell(cx, cy)
-            t = self.get_cell(cx + dx, cy + dy)
-            if s and t:
-                s.nutrient = max(0.0, min(SOIL_MAX_NUTRIENT, s.nutrient - amt))
-                t.nutrient = max(0.0, min(SOIL_MAX_NUTRIENT, t.nutrient + amt))
+                
+            # Process only two neighbour directions to avoid double-counting
+            # Use cached neighbor references to reduce dict access overhead
+            cached_neighbours = self.get_neighbors(cx, cy)
+            for nb_cell, (dx, dy) in cached_neighbours:
+                # Only process the two directions we want to avoid double-counting
+                if (dx, dy) in [(0, 1), (1, 0)]:
+                    if not (nb_cell.is_water and nb_cell.nutrient < 0.01):
+                        diff = (cell.nutrient - nb_cell.nutrient) * 0.02
+                        
+                        # Store delta for current cell
+                        if (cx, cy) not in diffusion_deltas:
+                            diffusion_deltas[(cx, cy)] = 0.0
+                        diffusion_deltas[(cx, cy)] -= diff
+                        
+                        # Store delta for neighbor
+                        if (cx + dx, cy + dy) not in diffusion_deltas:
+                            diffusion_deltas[(cx + dx, cy + dy)] = 0.0
+                        diffusion_deltas[(cx + dx, cy + dy)] += diff
+        
+        # Stage 2: Apply all computed deltas simultaneously
+        for (cx, cy), delta in diffusion_deltas.items():
+            cell = self.get_cell(cx, cy)
+            if cell:
+                cell.nutrient = max(0.0, min(SOIL_MAX_NUTRIENT, cell.nutrient + delta))
+        
+        # Advance to next slice
+        self._update_slice = (self._update_slice + 1) % self.DIFFUSION_SLICES
 
     def draw(self, screen, camera, time=0):
         # Only iterate over visible cells
@@ -190,3 +216,18 @@ class SoilGrid:
                         sx = px + self.cell_size // 2
                         sy = py + self.cell_size // 2
                         pygame.draw.circle(screen, s_color, (int(sx), int(sy)), 2)
+
+    def _rebuild_cell_list(self):
+        """Rebuild flat cell list and neighbour cache for performance optimization."""
+        # Build flat list of (cx, cy, cell) tuples
+        self._cell_list = [(cx, cy, cell) for (cx, cy), cell in self.cells.items()]
+        
+        # Build neighbour cache
+        self._neighbours = {}
+        for (cx, cy), cell in self.cells.items():
+            neighbours = []
+            for dx, dy in [(0, 1), (-1, 0), (1, 0), (0, -1)]:
+                nb = self.get_cell(cx + dx, cy + dy)
+                if nb:
+                    neighbours.append((nb, (dx, dy)))
+            self._neighbours[(cx, cy)] = neighbours
