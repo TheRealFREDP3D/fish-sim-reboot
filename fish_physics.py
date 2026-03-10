@@ -1,7 +1,7 @@
 import math
 import random
 import pygame
-from typing import Tuple, List
+# No typing imports needed
 
 
 class SteeringPhysics:
@@ -26,15 +26,14 @@ class SteeringPhysics:
     ) -> pygame.Vector2:
         """Generate a steering force towards a target"""
         target = pygame.Vector2(target_x, target_y)
-        desired = target - self.pos
-        dist = desired.length()
+        dist = self.pos.distance_to(target)
 
         if dist > 0:
-            desired = desired.normalize() * self.max_speed
-            steer = desired - self.vel
+            desired = (target - self.pos).normalize() * self.max_speed
+            steer = (desired - self.vel) * weight
             if steer.length() > self.max_force:
                 steer.scale_to_length(self.max_force)
-            return steer * weight
+            return steer
         return pygame.Vector2(0, 0)
 
     def update(self, dt: float, drag: float):
