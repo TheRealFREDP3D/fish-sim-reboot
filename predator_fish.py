@@ -1,9 +1,7 @@
 """Predator Fish - High-speed hunters with dash capabilities"""
 
-import pygame
 import math
-import random
-from fish import NeuralFish, FishState
+from fish import NeuralFish
 from config import *
 
 
@@ -17,6 +15,7 @@ class PredatorFish(NeuralFish):
         self.is_dashing = False
         self.dash_timer = 0
         self.dash_cooldown = 0
+        self.mate = None  # To satisfy FishSystem.update reproduction block
 
     def update(self, dt, all_fish, targets, particle_system, plant_manager):
         # 1. Target Selection (Hunt other fish)
@@ -26,10 +25,7 @@ class PredatorFish(NeuralFish):
         min_dist = 400
 
         for prey in prey_targets:
-            dist = math.hypot(
-                self.physics.pos.x - prey.physics.pos.x,
-                self.physics.pos.y - prey.physics.pos.y,
-            )
+            dist = self.physics.pos.distance_to(prey.physics.pos)
             if dist < min_dist:
                 min_dist = dist
                 closest_prey = prey
@@ -64,8 +60,8 @@ class PredatorFish(NeuralFish):
         self.dash_cooldown = max(0, self.dash_cooldown - dt)
 
         # 4. Standard Update (Energy, Aging, etc.)
-        # We pass an empty list for 'targets' because predators don't eat poop
-        res = super().update(dt, all_fish, [], particle_system, plant_manager)
+        # We pass prey_targets into super().update so that the predator's radar reflects prey
+        res = super().update(dt, all_fish, prey_targets, particle_system, plant_manager)
 
         # 5. Eating Logic (Collision with prey)
         for prey in prey_targets:
@@ -79,3 +75,41 @@ class PredatorFish(NeuralFish):
                 break
 
         return res
+
+    def try_reproduce(self):
+        """
+        Custom reproduction logic for predators.
+        Called by FishSystem.update in its dedicated predator reproduction block.
+        """
+        if (
+            not self.is_mature
+            or self.energy < FISH_MATING_THRESHOLD
+            or self.mating_cooldown > 0
+        ):
+            return False
+
+        # Scan world for a partner
+        # FishSystem links itself to world.fish_system during init
+        if not hasattr(self.world, "fish_system"):
+            return False
+
+        system = self.world.fish_system
+        for partner in system.predators:
+            if (
+                partner != self
+                and partner.is_mature
+                and partner.sex != self.sex
+                and partner.mating_cooldown <= 0
+                and partner.energy > FISH_MATING_THRESHOLD
+            ):
+                dist = self.physics.pos.distance_to(partner.physics.pos)
+                if dist < 50:
+                    # Successful mating
+                    self.mate = partner
+                    self.energy -= FISH_REPRODUCTION_COST
+                    partner.energy -= FISH_REPRODUCTION_COST
+                    self.mating_cooldown = 40.0
+                    partner.mating_cooldown = 40.0
+                    return True
+
+        return False

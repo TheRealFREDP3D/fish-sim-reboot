@@ -131,9 +131,7 @@ class NeuralFish:
         min_plant_dist = 9999
         self.closest_plant = None
         for plant in plant_manager.plants:
-            dist_to_base = math.hypot(
-                self.physics.pos.x - plant.x, self.physics.pos.y - plant.base_y
-            )
+            dist_to_base = self.physics.pos.distance_to((plant.x, plant.base_y))
             if dist_to_base < min_plant_dist:
                 min_plant_dist = dist_to_base
                 self.closest_plant = plant
@@ -151,8 +149,7 @@ class NeuralFish:
                 oy = getattr(
                     obj, "y", obj.physics.pos.y if hasattr(obj, "physics") else 0
                 )
-                dx, dy = ox - self.physics.pos.x, oy - self.physics.pos.y
-                dist = math.hypot(dx, dy)
+                dist = self.physics.pos.distance_to((ox, oy))
                 detection_range = FISH_SENSOR_RANGE
                 if is_threat_radar and self.is_hidden:
                     detection_range *= 0.5
@@ -172,7 +169,10 @@ class NeuralFish:
         mates = [
             f
             for f in all_fish
-            if f.is_cleaner == self.is_cleaner and f.sex != self.sex and f.is_mature
+            if f.is_cleaner == self.is_cleaner
+            and f.is_predator == self.is_predator
+            and f.sex != self.sex
+            and f.is_mature
         ]
         fill_radar(mates, 6)
         return [min(1.0, v) for v in radar]
@@ -234,9 +234,8 @@ class NeuralFish:
                     )
                 )
                 if (
-                    math.hypot(
-                        self.physics.pos.x - self.closest_plant.x,
-                        self.physics.pos.y - self.closest_plant.base_y,
+                    self.physics.pos.distance_to(
+                        (self.closest_plant.x, self.closest_plant.base_y)
                     )
                     < 40
                 ):
@@ -314,9 +313,11 @@ class NeuralFish:
 
         # Collision with food
         for t in targets[:]:
+            if self.is_predator:
+                break  # Predators handle eating via their own update logic
             tx = getattr(t, "x", t.physics.pos.x if hasattr(t, "physics") else 0)
             ty = getattr(t, "y", t.physics.pos.y if hasattr(t, "physics") else 0)
-            if math.hypot(self.physics.pos.x - tx, self.physics.pos.y - ty) < 25:
+            if self.physics.pos.distance_to((tx, ty)) < 25:
                 self.energy = min(FISH_MAX_ENERGY, self.energy + 12.0)
                 if hasattr(t, "reset"):
                     t.reset()
@@ -606,14 +607,9 @@ class FishSystem:
             return
         clicked = min(
             all_f,
-            key=lambda f: math.hypot(
-                f.physics.pos.x - world_x, f.physics.pos.y - world_y
-            ),
+            key=lambda f: f.physics.pos.distance_to((world_x, world_y)),
         )
-        if (
-            math.hypot(clicked.physics.pos.x - world_x, clicked.physics.pos.y - world_y)
-            < 40
-        ):
+        if clicked.physics.pos.distance_to((world_x, world_y)) < 40:
             self.selected_fish = clicked
         else:
             self.selected_fish = None
@@ -714,13 +710,7 @@ class FishSystem:
                 and partner.state == FishState.MATING
                 and partner.sex != f.sex
             ):
-                if (
-                    math.hypot(
-                        f.physics.pos.x - partner.physics.pos.x,
-                        f.physics.pos.y - partner.physics.pos.y,
-                    )
-                    < 45
-                ):
+                if f.physics.pos.distance_to(partner.physics.pos) < 45:
                     f.energy -= FISH_REPRODUCTION_COST
                     partner.energy -= FISH_REPRODUCTION_COST
                     f.mating_cooldown, partner.mating_cooldown = 40.0, 40.0

@@ -30,7 +30,9 @@ class World:
         self.initial_terrain = []
         self._generate_initial_profile()
         self.soil_grid = SoilGrid(self)
-        self.water_gradient_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.water_gradient_surface = pygame.Surface(
+            (SCREEN_WIDTH, WORLD_HEIGHT - WATER_LINE_Y)
+        )
         self.haze_surface = pygame.Surface(
             (SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA
         )
@@ -87,10 +89,10 @@ class World:
                 self.haze_surface, (*HAZE_COLOR, alpha), (0, y), (SCREEN_WIDTH, y)
             )
 
-        for y in range(SCREEN_HEIGHT):
-            # We use a screen-sized gradient that we'll blit appropriately
-            # Or better, we blit it based on camera Y if world height > screen height
-            ratio = y / SCREEN_HEIGHT
+        gradient_height = WORLD_HEIGHT - WATER_LINE_Y
+        for y in range(gradient_height):
+            # We use a world-depth gradient that we'll blit based on camera Y
+            ratio = y / gradient_height
             color = tuple(
                 int(
                     WATER_SURFACE_COLOR[i]
@@ -109,8 +111,8 @@ class World:
         # Water surface rendering
         water_y = WATER_LINE_Y - camera.y
         if water_y < SCREEN_HEIGHT:
-            # Draw water body
-            screen.blit(self.water_gradient_surface, (0, max(0, water_y)))
+            # Draw water body - blit handles negative destination y by clipping
+            screen.blit(self.water_gradient_surface, (0, water_y))
 
         # Terrain rendering with camera
         points = []

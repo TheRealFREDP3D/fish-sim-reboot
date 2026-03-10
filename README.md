@@ -1,6 +1,6 @@
 # 🌊 Underwater Neural Ecosystem Simulation
 
-![Screenshot](docs/current-screenshot.png)
+![Screenshot](doc/screenshot.png)
 
 A passion project by a self-taught hobbyist developer – an evolving Python/Pygame simulation of a living underwater lake ecosystem. Watch emergent behaviors unfold as neural network-driven fish interact with dynamic plants, roots, soil nutrients, and each other!
 
@@ -70,11 +70,11 @@ python main.py
 
 ## 🎮 Controls
 
-| Key          | Action                              |
-|--------------|-------------------------------------|
-| Left Click   | Select/deselect fish to view brain  |
-| R            | Regenerate world & ecosystem        |
-| ESC          | Quit                                |
+| Key        | Action                             |
+| ---------- | ---------------------------------- |
+| Left Click | Select/deselect fish to view brain |
+| R          | Regenerate world & ecosystem       |
+| ESC        | Quit                               |
 
 ## 🔧 Customization
 

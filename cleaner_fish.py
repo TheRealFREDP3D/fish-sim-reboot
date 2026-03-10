@@ -1,6 +1,4 @@
-import pygame
-import math
-from fish import NeuralFish, FishState
+from fish import NeuralFish
 from config import CLEANER_FISH_SPEED_MULT
 
 
@@ -23,7 +21,7 @@ class CleanerFish(NeuralFish):
         min_dist = 200  # Cleaning detection range
 
         for poop in targets:
-            dist = math.hypot(self.physics.pos.x - poop.x, self.physics.pos.y - poop.y)
+            dist = self.physics.pos.distance_to((poop.x, poop.y))
             if dist < min_dist:
                 min_dist = dist
                 closest_poop = poop
