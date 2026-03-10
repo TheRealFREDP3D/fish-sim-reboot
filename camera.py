@@ -39,12 +39,13 @@ class Camera:
             return pygame.Vector2(pos.x - self.x, pos.y - self.y)
         return (pos[0] - self.x, pos[1] - self.y)
 
-    def is_visible(self, pos, margin=100):
+    def is_visible(self, obj, margin=100):
         """Check if a point or rect is within the camera view (with margin)"""
-        return (
-            self.x - margin < pos[0] < self.x + self.width + margin
-            and self.y - margin < pos[1] < self.y + self.height + margin
-        )
+        view_rect_with_margin = self.get_view_rect().inflate(margin * 2, margin * 2)
+        if isinstance(obj, pygame.Rect):
+            return view_rect_with_margin.colliderect(obj)
+        # Assumes obj is a point-like object (tuple, list, Vector2)
+        return view_rect_with_margin.collidepoint(obj)
 
     def get_view_rect(self):
         return pygame.Rect(self.x, self.y, self.width, self.height)
