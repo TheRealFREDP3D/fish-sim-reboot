@@ -151,7 +151,7 @@ class NeuralFish:
                 )
                 dx = ox - self.physics.pos.x
                 dy = oy - self.physics.pos.y
-                dist = self.physics.pos.distance_to((ox, oy))
+                dist = math.hypot(dx, dy)
                 detection_range = FISH_SENSOR_RANGE
                 if is_threat_radar and self.is_hidden:
                     detection_range *= 0.5
