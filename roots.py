@@ -1,9 +1,11 @@
 """Root network system - directed graphs for nutrient transport"""
+
 import pygame
 import random
 import math
 from config import *
 from collections import deque
+
 
 class RootNode:
     def __init__(self, cell_x, cell_y, parent=None):
@@ -30,8 +32,11 @@ class RootNode:
         return depth
 
     def get_pixel_position(self, cell_size):
-        return (self.cell_x * cell_size + cell_size // 2,
-                self.cell_y * cell_size + cell_size // 2)
+        return (
+            self.cell_x * cell_size + cell_size // 2,
+            self.cell_y * cell_size + cell_size // 2,
+        )
+
 
 class RootSystem:
     def __init__(self, plant_base_x, plant_base_y, soil_grid):
@@ -89,13 +94,27 @@ class RootSystem:
             self.tips.append(new_node)
             self._cell_lookup.add((best_cell.x, best_cell.y))
 
-            if best_dir[1] > 0 and best_cell.nutrient > 0.4 and random.random() < ROOT_BRANCH_CHANCE:
+            if (
+                best_dir[1] > 0
+                and best_cell.nutrient > 0.4
+                and random.random() < ROOT_BRANCH_CHANCE
+            ):
                 tip.is_tip = True
 
     def _select_growth_tip(self):
         if not self.tips:
             return None
-        weights = [(sum(c.nutrient for c, _ in self.soil_grid.get_neighbors(t.cell_x, t.cell_y))**2) + 0.1 for t in self.tips]
+        weights = [
+            (
+                sum(
+                    c.nutrient
+                    for c, _ in self.soil_grid.get_neighbors(t.cell_x, t.cell_y)
+                )
+                ** 2
+            )
+            + 0.1
+            for t in self.tips
+        ]
         return random.choices(self.tips, weights=weights, k=1)[0]
 
     def _get_growth_candidates(self, tip):
@@ -103,14 +122,23 @@ class RootSystem:
         for dx, dy in [(0, 1), (-1, 1), (1, 1), (-1, 0), (1, 0), (0, -1)]:
             nx, ny = tip.cell_x + dx, tip.cell_y + dy
             cell = self.soil_grid.get_cell(nx, ny)
-            if cell and not cell.is_water and (nx, ny) not in self._cell_lookup and cell.nutrient > 0.02:
+            if (
+                cell
+                and not cell.is_water
+                and (nx, ny) not in self._cell_lookup
+                and cell.nutrient > 0.02
+            ):
                 candidates.append((cell, (dx, dy)))
         return candidates
 
     def _select_best_candidate(self, candidates):
         scored = []
         for cell, (dx, dy) in candidates:
-            score = cell.nutrient * 12 + (15 if dy > 0 else 2 if dy == 0 else -10) + random.uniform(0, 4)
+            score = (
+                cell.nutrient * 12
+                + (15 if dy > 0 else 2 if dy == 0 else -10)
+                + random.uniform(0, 4)
+            )
             scored.append((score, cell, (dx, dy)))
         if not scored:
             return None, None
@@ -129,13 +157,16 @@ class RootSystem:
         for tip in self.tips:
             node = tip
             while node and node not in visited:
-                to_process.append(node); visited.add(node); node = node.parent
+                to_process.append(node)
+                visited.add(node)
+                node = node.parent
 
         harvested = 0.0
         while to_process:
             node = to_process[-1]
             if all(child in processed for child in node.children):
-                to_process.pop(); processed.add(node)
+                to_process.pop()
+                processed.add(node)
                 if node.stored_nutrient > 0:
                     if node.parent:
                         delivered = max(0, node.stored_nutrient - ROOT_TRANSPORT_LOSS)
@@ -150,7 +181,7 @@ class RootSystem:
         self.total_harvested = 0.0
         return amt
 
-    def draw(self, screen, time):
+    def draw(self, screen, camera, time):
         for node in self.all_nodes:
             if node.parent:
                 depth_factor = 1.0 - (node.get_depth() / (ROOT_MAX_DEPTH * 1.2))
@@ -158,31 +189,37 @@ class RootSystem:
                 thickness = max(2, int(ROOT_BASE_THICKNESS * depth_factor))
 
                 base_color = ROOT_BASE_COLOR
+                p_pos = camera.apply(node.parent.get_pixel_position(self.cell_size))
+                n_pos = camera.apply(node.get_pixel_position(self.cell_size))
+
                 if node.stored_nutrient > 0:
                     # Enhanced pulsing glow
                     pulse = (math.sin(node.flow_pulse * 2) + 1) / 2
-                    active = tuple(int(base_color[i] + (ROOT_ACTIVE_COLOR[i] - base_color[i]) * pulse) for i in range(3))
+                    active = tuple(
+                        int(
+                            base_color[i]
+                            + (ROOT_ACTIVE_COLOR[i] - base_color[i]) * pulse
+                        )
+                        for i in range(3)
+                    )
                     # Thicker glowing outer line
                     glow_color = tuple(min(255, int(active[i] * 1.3)) for i in range(3))
-                    pygame.draw.line(screen, glow_color,
-                                     node.parent.get_pixel_position(self.cell_size),
-                                     node.get_pixel_position(self.cell_size),
-                                     thickness + 4)
+                    pygame.draw.line(screen, glow_color, p_pos, n_pos, thickness + 4)
                     color = active
                 else:
                     color = base_color
 
-                pygame.draw.line(screen, color,
-                                 node.parent.get_pixel_position(self.cell_size),
-                                 node.get_pixel_position(self.cell_size),
-                                 thickness)
+                pygame.draw.line(screen, color, p_pos, n_pos, thickness)
 
         # Smaller, pointier root tips
         for tip in self.tips:
             if tip.is_tip:
-                pos = tip.get_pixel_position(self.cell_size)
+                pos = camera.apply(tip.get_pixel_position(self.cell_size))
                 tip_brightness = min(1.0, tip.stored_nutrient * 4.0)
-                tip_color = tuple(int(ROOT_TIP_COLOR[i] * (0.8 + 0.2 * tip_brightness)) for i in range(3))
+                tip_color = tuple(
+                    int(ROOT_TIP_COLOR[i] * (0.8 + 0.2 * tip_brightness))
+                    for i in range(3)
+                )
 
                 # Smaller base circle
                 pygame.draw.circle(screen, tip_color, pos, 3)
@@ -192,18 +229,26 @@ class RootSystem:
                     # Direction toward most nutrient-rich neighbor (or down if none)
                     best_dx, best_dy = 0, 1
                     best_n = 0
-                    for nb, (dx, dy) in self.soil_grid.get_neighbors(tip.cell_x, tip.cell_y):
+                    for nb, (dx, dy) in self.soil_grid.get_neighbors(
+                        tip.cell_x, tip.cell_y
+                    ):
                         if nb.nutrient > best_n:
                             best_n = nb.nutrient
                             best_dx, best_dy = dx, dy
                     angle = math.atan2(best_dy, best_dx)
                     tip_len = 8
-                    p1 = (pos[0] + math.cos(angle + 2.2) * tip_len,
-                          pos[1] + math.sin(angle + 2.2) * tip_len)
-                    p2 = (pos[0] + math.cos(angle - 2.2) * tip_len,
-                          pos[1] + math.sin(angle - 2.2) * tip_len)
+                    p1 = (
+                        pos[0] + math.cos(angle + 2.2) * tip_len,
+                        pos[1] + math.sin(angle + 2.2) * tip_len,
+                    )
+                    p2 = (
+                        pos[0] + math.cos(angle - 2.2) * tip_len,
+                        pos[1] + math.sin(angle - 2.2) * tip_len,
+                    )
                     pygame.draw.polygon(screen, tip_color, [pos, p1, p2])
 
                     # Glow around tip
-                    glow = tuple(min(255, int(c + 120 * tip_brightness)) for c in tip_color)
+                    glow = tuple(
+                        min(255, int(c + 120 * tip_brightness)) for c in tip_color
+                    )
                     pygame.draw.circle(screen, glow, pos, 5, 2)
