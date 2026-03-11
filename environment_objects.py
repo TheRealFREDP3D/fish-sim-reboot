@@ -46,6 +46,7 @@ class FishEgg:
         parent2=None,
         is_cleaner=False,
         is_predator=False,
+        brain=None,
     ):
         self.x, self.y = x, y
         self.traits = traits
@@ -53,6 +54,7 @@ class FishEgg:
         self.parent2 = parent2
         self.is_cleaner = is_cleaner
         self.is_predator = is_predator
+        self.brain = brain
         self.timer = FISH_EGG_HATCH_TIME
         self.pulse_offset = random.uniform(0, math.pi * 2)
 

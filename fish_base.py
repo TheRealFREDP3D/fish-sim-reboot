@@ -25,6 +25,10 @@ class NeuralFish:
         start_x = random.uniform(100, WORLD_WIDTH - 100)
         start_y = random.uniform(WATER_LINE_Y + 100, WORLD_HEIGHT - 200)
         self.physics = SteeringPhysics(start_x, start_y, FISH_MAX_SPEED, FISH_MAX_FORCE)
+
+        # Apply physical trait multipliers
+        self.physics.max_speed *= self.traits.physical_traits.get("max_speed_mult", 1.0)
+        self.physics.max_force *= self.traits.physical_traits.get("turn_rate_mult", 1.0)
         self.age = 0.0
         self.energy = FISH_MAX_ENERGY * 0.8
         self.stamina = 100.0
@@ -45,7 +49,7 @@ class NeuralFish:
         self.last_hidden1 = [0.0] * self.brain.hidden_size
         self.last_outputs = [0.0] * self.OUTPUT_COUNT
         self.output_history = collections.deque(maxlen=60)
-        
+
         # Lifetime counters
         self.food_eaten = 0
         self.distance_traveled = 0.0
@@ -69,7 +73,7 @@ class NeuralFish:
                 self.is_hidden = True
                 self.security_level = max(0, 1.0 - (min_plant_dist / 160.0))
 
-        def fill_radar(objects, offset, is_threat_radar=False):
+        def fill_radar(objects, offset, is_threat_radar=False, bias_multiplier=1.0):
             for obj in objects:
                 if is_threat_radar and getattr(obj, "is_hidden", False):
                     continue
@@ -79,25 +83,52 @@ class NeuralFish:
                 oy = getattr(
                     obj, "y", obj.physics.pos.y if hasattr(obj, "physics") else 0
                 )
-                dx = ox - self.physics.pos.x
-                dy = oy - self.physics.pos.y
                 dist = self.physics.pos.distance_to((ox, oy))
                 detection_range = FISH_SENSOR_RANGE
                 if is_threat_radar and self.is_hidden:
                     detection_range *= 0.5
                 if dist < detection_range and dist > 0:
-                    angle = math.atan2(dy, dx) - self.physics.heading
+                    angle = math.atan2(oy - self.physics.pos.y, ox - self.physics.pos.x) - self.physics.heading
                     angle = (angle + math.pi) % (2 * math.pi) - math.pi
                     if abs(angle) < FISH_SENSOR_ARC:
                         sector = int(
                             (angle + FISH_SENSOR_ARC) / (2 * FISH_SENSOR_ARC) * 3
                         )
                         sector = max(0, min(2, sector))
-                        radar[offset + sector] += 1.0 - (dist / detection_range)
+                        radar[offset + sector] += (1.0 - (dist / detection_range)) * bias_multiplier
 
-        fill_radar(targets, 0)
+        # State biasing: amplify the radar signals relevant to current state
+        # so the neural net receives a clearer gradient toward the right behavior.
+        food_bias = 1.0
+        threat_bias = 1.0
+        mate_bias = 1.0
+
+        if self.state == FishState.HUNTING:
+            food_bias = 2.5
+        elif self.state == FishState.MATING:
+            mate_bias = 2.5
+        elif self.state == FishState.FLEEING:
+            threat_bias = 3.0
+        elif self.state == FishState.NESTING:
+            # Virtual "food" signal pointing toward closest plant for nesting
+            if self.closest_plant and min_plant_dist < 300:
+                dx = self.closest_plant.x - self.physics.pos.x
+                dy = self.closest_plant.base_y - self.physics.pos.y
+                dist = max(1, min_plant_dist)
+                angle = math.atan2(dy, dx) - self.physics.heading
+                angle = (angle + math.pi) % (2 * math.pi) - math.pi
+                if abs(angle) < FISH_SENSOR_ARC:
+                    sector = int((angle + FISH_SENSOR_ARC) / (2 * FISH_SENSOR_ARC) * 3)
+                    sector = max(0, min(2, sector))
+                    radar[6 + sector] += (1.0 - (dist / 300)) * 2.0
+        elif self.state == FishState.RESTING:
+            food_bias = 0.4
+            threat_bias = 0.6
+            mate_bias = 0.4
+
+        fill_radar(targets, 0, bias_multiplier=food_bias)
         threats = [f for f in all_fish if getattr(f, "is_predator", False)]
-        fill_radar(threats, 3, is_threat_radar=True)
+        fill_radar(threats, 3, is_threat_radar=True, bias_multiplier=threat_bias)
         mates = [
             f
             for f in all_fish
@@ -106,18 +137,29 @@ class NeuralFish:
             and f.sex != self.sex
             and f.is_mature
         ]
-        fill_radar(mates, 6)
+        fill_radar(mates, 6, bias_multiplier=mate_bias)
         return [min(1.0, v) for v in radar]
 
     def update(self, dt, all_fish, targets, particle_system, plant_manager):
         self.age += dt
-        self.energy -= 0.1 * dt
+        metabolism_rate = 0.1 * self.traits.physical_traits.get("metabolism_mult", 1.0)
+        self.energy -= metabolism_rate * dt
         self.mating_cooldown = max(0, self.mating_cooldown - dt)
         self.is_mature = self.age > (FISH_LARVA_DURATION + FISH_JUVENILE_DURATION)
 
+        # Stamina: drains at high speed, recovers at rest
+        speed_ratio = self.physics.vel.length() / max(1.0, self.physics.max_speed)
+        if speed_ratio > 0.8:
+            self.stamina = max(0.0, self.stamina - 15.0 * speed_ratio * dt)
+        elif speed_ratio < 0.3:
+            recovery = 8.0 * self.traits.physical_traits.get("stamina_mult", 1.0) * dt
+            self.stamina = min(100.0, self.stamina + recovery)
+
         radar = self.get_radar_inputs(all_fish, targets, plant_manager)
 
-        # State determination
+        # ── State determination ────────────────────────────────────────────────
+        # State sets input biases (see get_radar_inputs) and speed ceiling, but
+        # the NEURAL NET decides the actual heading and throttle.
         threat_level = sum(radar[3:6])
         if threat_level > 0.3:
             self.state = FishState.FLEEING
@@ -134,13 +176,13 @@ class NeuralFish:
         else:
             self.state = FishState.RESTING
 
-        # Neural Forward Pass
+        # ── Neural forward pass ───────────────────────────────────────────────
         stats = [
-            self.energy / FISH_MAX_ENERGY,
-            self.stamina / 100.0,
-            (self.physics.pos.y - WATER_LINE_Y) / (WORLD_HEIGHT - WATER_LINE_Y),
-            self.physics.vel.length() / FISH_MAX_SPEED,
-            self.security_level,
+            self.energy / FISH_MAX_ENERGY,          # 9:  energy level
+            self.stamina / 100.0,                   # 10: stamina level
+            (self.physics.pos.y - WATER_LINE_Y) / (WORLD_HEIGHT - WATER_LINE_Y),  # 11: depth
+            self.physics.vel.length() / self.physics.max_speed,  # 12: current speed ratio
+            self.security_level,                    # 13: plant cover
         ]
 
         self.last_inputs = radar + stats
@@ -150,51 +192,71 @@ class NeuralFish:
         self.last_outputs = outputs
         self.output_history.append(list(outputs))
 
-        # Influence Steering based on State
-        max_speed_mod = 1.0
+        steer_out = outputs[0]   # tanh → [-1, 1]: negative=left, positive=right
+        thrust_out = outputs[1]  # tanh → [-1, 1]: negative=brake/reverse, positive=forward
+
+        # ── Speed ceiling per state ────────────────────────────────────────────
+        # The neural net still controls exact throttle within this ceiling.
+        stamina_factor = max(0.3, self.stamina / 100.0)
         if self.state == FishState.FLEEING:
-            if self.closest_plant:
-                self.physics.apply_force(
-                    self.physics.seek(
-                        self.closest_plant.x, self.closest_plant.base_y, weight=2.0
-                    )
-                )
-            max_speed_mod = 1.3
+            speed_ceiling = self.physics.max_speed * 1.3 * stamina_factor
+        elif self.state == FishState.HUNTING:
+            speed_ceiling = self.physics.max_speed * 1.0
+        elif self.state == FishState.MATING:
+            speed_ceiling = self.physics.max_speed * 0.85
         elif self.state == FishState.NESTING:
-            if self.closest_plant:
-                self.physics.apply_force(
-                    self.physics.seek(
-                        self.closest_plant.x, self.closest_plant.base_y, weight=1.5
-                    )
-                )
-                if (
-                    self.physics.pos.distance_to(
-                        (self.closest_plant.x, self.closest_plant.base_y)
-                    )
-                    < 40
-                ):
-                    self.is_pregnant = False
-                    self.offspring_count += 1
-                    partner = self.pregnancy_partner
-                    self.pregnancy_partner = None
-                    return (
-                        "egg",
-                        self.physics.pos[0],
-                        self.physics.pos[1],
-                        self.pregnancy_traits,
-                        self,
-                        partner,
-                    )
-        elif self.state == FishState.RESTING:
-            max_speed_mod = 0.3
-            if self.closest_plant and not self.is_hidden:
-                self.physics.apply_force(
-                    self.physics.seek(
-                        self.closest_plant.x, self.closest_plant.base_y, weight=0.5
-                    )
+            speed_ceiling = self.physics.max_speed * 0.6
+        else:  # RESTING
+            speed_ceiling = self.physics.max_speed * 0.35
+
+        # ── Neural steering: heading delta driven directly by steer output ─────
+        # Turn rate scales with agility trait; full output = ~90°/s turn
+        turn_rate = 2.5 * self.traits.physical_traits.get("turn_rate_mult", 1.0)
+        heading_delta = steer_out * turn_rate * dt
+        new_heading = self.physics.heading + heading_delta
+
+        # ── Thrust: neural thrust_out maps to [0, speed_ceiling] ─────────────
+        # thrust_out in [-1,1]: negative values reduce speed (braking),
+        # positive values accelerate. We normalise to [0, 1] for force magnitude.
+        normalised_thrust = (thrust_out + 1.0) / 2.0   # now [0, 1]
+        target_speed = normalised_thrust * speed_ceiling
+
+        # Apply a steering force toward (new_heading, target_speed)
+        desired_vx = math.cos(new_heading) * target_speed
+        desired_vy = math.sin(new_heading) * target_speed
+        steer_force_x = (desired_vx - self.physics.vel.x) * 0.35
+        steer_force_y = (desired_vy - self.physics.vel.y) * 0.35
+
+        # Clamp to max_force so the fish can't teleport
+        steer_len = math.hypot(steer_force_x, steer_force_y)
+        if steer_len > self.physics.max_force:
+            scale = self.physics.max_force / steer_len
+            steer_force_x *= scale
+            steer_force_y *= scale
+
+        self.physics.apply_force((steer_force_x, steer_force_y))
+
+        # ── Nesting: lay egg when close to plant ─────────────────────────────
+        if self.is_pregnant and self.closest_plant:
+            dist_to_plant = self.physics.pos.distance_to(
+                (self.closest_plant.x, self.closest_plant.base_y)
+            )
+            if dist_to_plant < 40:
+                self.is_pregnant = False
+                self.offspring_count += 1
+                partner = self.pregnancy_partner
+                self.pregnancy_partner = None
+                return (
+                    "egg",
+                    self.physics.pos[0],
+                    self.physics.pos[1],
+                    self.pregnancy_traits,
+                    self,
+                    partner,
+                    getattr(self, 'pregnancy_brain', None),
                 )
 
-        # Family behavior
+        # ── Family cohesion ───────────────────────────────────────────────────
         if self.family and self.family.active:
             if self.is_mature and not self.is_pregnant:
                 child_positions = [
@@ -205,39 +267,11 @@ class NeuralFish:
                 if child_positions:
                     avg_x = sum(p[0] for p in child_positions) / len(child_positions)
                     avg_y = sum(p[1] for p in child_positions) / len(child_positions)
-                    self.physics.apply_force(
-                        self.physics.seek(avg_x, avg_y, weight=0.8)
-                    )
+                    # Gentle pull — doesn't override neural steering, just nudges
+                    family_force = self.physics.seek(avg_x, avg_y, weight=0.4)
+                    self.physics.apply_force(family_force)
 
-        # Apply Neural steering
-        steer_input, thrust_input = outputs[0], (outputs[1] + 1.0) / 2.0
-        desired_angle = self.physics.heading + steer_input * 0.8
-        self.physics.apply_force(
-            (
-                (
-                    (math.cos(desired_angle) * FISH_MAX_SPEED * max_speed_mod)
-                    - self.physics.vel.x
-                )
-                * 0.1,
-                (
-                    (math.sin(desired_angle) * FISH_MAX_SPEED * max_speed_mod)
-                    - self.physics.vel.y
-                )
-                * 0.1,
-            )
-        )
-        force_mag = (
-            thrust_input
-            * self.physics.max_force
-            * (1.8 if self.state == FishState.FLEEING else 1.0)
-        )
-        self.physics.apply_force(
-            (
-                math.cos(self.physics.heading) * force_mag,
-                math.sin(self.physics.heading) * force_mag,
-            )
-        )
-
+        # ── Bounds + physics integration ──────────────────────────────────────
         self.physics.bounce_bounds(
             0,
             WATER_LINE_Y + 20,
@@ -247,13 +281,14 @@ class NeuralFish:
         self.physics.update(dt, FISH_DRAG)
         self.distance_traveled += self.physics.vel.length() * dt
 
-        # Collision with food
+        # ── Food collision ────────────────────────────────────────────────────
         for t in targets[:]:
             if self.is_predator:
-                break  # Predators handle eating via their own update logic
+                break
             tx = getattr(t, "x", t.physics.pos.x if hasattr(t, "physics") else 0)
             ty = getattr(t, "y", t.physics.pos.y if hasattr(t, "physics") else 0)
-            if self.physics.pos.distance_to((tx, ty)) < 25:
+            collision_radius = 25 * self.traits.physical_traits.get("size_mult", 1.0)
+            if self.physics.pos.distance_to((tx, ty)) < collision_radius:
                 self.energy = min(FISH_MAX_ENERGY, self.energy + 12.0)
                 self.food_eaten += 1
                 if hasattr(t, "reset"):
@@ -318,12 +353,9 @@ class NeuralFish:
             )
 
     def draw_brain(self, screen, time):
-        # Delegated to BrainVisualizer
         pass
 
     def _get_activation_color(self, value):
-        """High-contrast color scale: Magenta (Neg) -> Grey (Neutral) -> Green (Pos)"""
-
         def lerp_color(c1, c2, t):
             return tuple(int(a + (b - a) * t) for a, b in zip(c1, c2))
 
