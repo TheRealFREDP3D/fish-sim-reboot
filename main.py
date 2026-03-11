@@ -54,6 +54,7 @@ class Simulation:
     def update(self):
         dt = self.clock.get_time() / 1000.0
         self.time += dt
+        self.dt = dt
 
         self.world.soil_grid.update(dt)
         self.particle_system.update(self.time)
@@ -74,7 +75,7 @@ class Simulation:
         self.world.draw(self.screen, self.camera)
         self.particle_system.draw(self.screen, self.camera)
         self.plant_manager.draw(self.screen, self.camera, self.time)
-        self.fish_system.draw(self.screen, self.camera, self.time)
+        self.fish_system.draw(self.screen, self.camera, self.time, self.dt)
 
         # Instructions
         instructions = [

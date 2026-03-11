@@ -145,6 +145,7 @@ FISH_MAX_AGE = (
 
 # Species-Specific Modifiers
 CLEANER_FISH_SPEED_MULT = 0.85
+CLEANER_FISH_CLEANING_ENERGY_THRESHOLD = 45.0  # Energy below which cleaner fish actively seek poop
 PREDATOR_SPEED_MULT = 0.95
 PREDATOR_DASH_SPEED_MULT = 2.4
 PREDATOR_DASH_DURATION = 0.8
@@ -169,3 +170,7 @@ class FishState(Enum):
     FLEEING = auto()  # Evading predator
     MATING = auto()  # Looking for partner
     NESTING = auto()  # Pregnant, looking for plant base to lay egg
+
+# Brain Visualizer Panel
+BRAIN_PANEL_WIDTH = 420
+BRAIN_PANEL_HEIGHT = 800

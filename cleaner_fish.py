@@ -1,24 +1,22 @@
 from fish_base import NeuralFish
-from config import CLEANER_FISH_SPEED_MULT
+from config import CLEANER_FISH_SPEED_MULT, CLEANER_FISH_CLEANING_ENERGY_THRESHOLD
 
 
 class CleanerFish(NeuralFish):
     def __init__(self, world, traits=None, brain=None):
-        # Initialize as a cleaner fish (affects base color and radar)
         super().__init__(world, traits=traits, brain=brain, is_cleaner=True)
-        # Apply speed modifier from config
         self.physics.max_speed *= CLEANER_FISH_SPEED_MULT
 
     def update(self, dt, all_fish, targets, particle_system, plant_manager):
         """
-        Specialized update:
-        1. Inherits standard neural steering.
-        2. Adds a specific 'cleaning' drive towards poop particles.
-        3. Benefits from 'is_hidden' logic when near plants.
+        Adds a supplementary poop-seeking force on top of the neural steering.
+        The neural net already receives food-sector radar signals from poop particles
+        (via get_radar_inputs), so this extra force is kept gentle to avoid
+        completely masking the network's own directional output.
         """
-        # 1. Sensory Check: Find the nearest poop (target)
+        # Find nearest poop within cleaning range
         closest_poop = None
-        min_dist = 200  # Cleaning detection range
+        min_dist = 200
 
         for poop in targets:
             dist = self.physics.pos.distance_to((poop.x, poop.y))
@@ -26,18 +24,10 @@ class CleanerFish(NeuralFish):
                 min_dist = dist
                 closest_poop = poop
 
-        # 2. Apply "Cleaning" Steering Force
-        if closest_poop and self.energy < 45:  # Only clean if not totally full
-            # Seek the poop particle with high priority
-            seek_force = self.physics.seek(closest_poop.x, closest_poop.y, weight=1.5)
+        # Apply a supplementary seek force (weight 0.6 — noticeable but not dominant)
+        # Only active when energy is below threshold so well-fed cleaners still roam freely
+        if closest_poop and self.energy < CLEANER_FISH_CLEANING_ENERGY_THRESHOLD:
+            seek_force = self.physics.seek(closest_poop.x, closest_poop.y, weight=0.6)
             self.physics.apply_force(seek_force)
 
-        # 3. Base Neural Logic
-        # This handles energy decay, age, fleeing from predators, and neural steering
-        res = super().update(dt, all_fish, targets, particle_system, plant_manager)
-
-        # 4. Hiding Mechanic (Passive)
-        # The base NeuralFish already sets self.is_hidden = True if near a plant.
-        # This reduces their detection range for predators in NeuralFish.get_radar_inputs.
-
-        return res
+        return super().update(dt, all_fish, targets, particle_system, plant_manager)

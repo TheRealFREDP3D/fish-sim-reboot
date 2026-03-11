@@ -3,6 +3,7 @@ from fish_base import NeuralFish
 from environment_objects import PoopParticle, FishEgg
 from fish_traits import FishTraits
 from family import Family
+from brain_visualizer import BrainVisualizer
 
 
 class FishSystem:
@@ -26,6 +27,9 @@ class FishSystem:
         self.poops, self.eggs = [], []
         self.selected_fish = None
         self.families = []
+
+        # Initialize brain visualizer
+        self.brain_visualizer = BrainVisualizer(SCREEN_WIDTH, SCREEN_HEIGHT)
 
     def handle_click(self, pos, camera):
         # Convert screen click to world coordinates
@@ -54,15 +58,18 @@ class FishSystem:
                 and predator.try_reproduce()
                 and len(self.predators) < PREDATOR_MAX_POPULATION
             ):
+                mate = predator.mate
                 egg = FishEgg(
                     predator.physics.pos.x,
                     predator.physics.pos.y,
                     predator.traits.mutate(),
                     parent1=predator,
-                    parent2=predator.mate,
+                    parent2=mate,
                     is_predator=True,
+                    brain=predator.brain.mutate(),
                 )
                 self.eggs.append(egg)
+                predator.mate = None  # Clear stale reference after egg is created
 
         # Update eggs
         for egg in self.eggs[:]:
@@ -110,6 +117,7 @@ class FishSystem:
                             res[5],
                             f.is_cleaner,
                             f.is_predator,
+                            res[6] if len(res) > 6 else None,
                         )
                     )
 
@@ -145,6 +153,7 @@ class FishSystem:
                     partner.energy -= FISH_REPRODUCTION_COST
                     f.mating_cooldown, partner.mating_cooldown = 40.0, 40.0
                     child_traits = FishTraits.blend(f.traits, partner.traits)
+                    child_brain = f.brain.mutate()
                     mother = f if f.sex == "F" else partner
                     father = partner if f.sex == "F" else f
                     mother.is_pregnant = True
@@ -152,21 +161,22 @@ class FishSystem:
                         child_traits,
                         father,
                     )
+                    mother.pregnancy_brain = child_brain
                     break
 
     def spawn_from_egg(self, egg):
         if egg.is_cleaner:
             from cleaner_fish import CleanerFish
 
-            child = CleanerFish(self.world, traits=egg.traits)
+            child = CleanerFish(self.world, traits=egg.traits, brain=egg.brain)
             self.cleaner_fish.append(child)
         elif egg.is_predator:
             from predator_fish import PredatorFish
 
-            child = PredatorFish(self.world, traits=egg.traits)
+            child = PredatorFish(self.world, traits=egg.traits, brain=egg.brain)
             self.predators.append(child)
         else:
-            child = NeuralFish(self.world, traits=egg.traits)
+            child = NeuralFish(self.world, traits=egg.traits, brain=egg.brain)
             self.fish.append(child)
 
         p1, p2 = egg.parent1, egg.parent2
@@ -176,7 +186,10 @@ class FishSystem:
             self.families.append(family)
             p1.family, p2.family, child.family = family, family, family
 
-    def draw(self, screen, camera, time):
+    def draw(self, screen, camera, time, dt=0.0):
+        # Update brain visualizer
+        self.brain_visualizer.update(dt, self.selected_fish)
+
         for e in self.eggs:
             e.draw(screen, camera)
         for p in self.poops:
@@ -184,4 +197,4 @@ class FishSystem:
         for f in self.fish + self.cleaner_fish + self.predators:
             f.draw(screen, camera, time, f == self.selected_fish)
         if self.selected_fish:
-            self.selected_fish.draw_brain(screen, time)
+            self.brain_visualizer.draw(screen, self.selected_fish, time)
