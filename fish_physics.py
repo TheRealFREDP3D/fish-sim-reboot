@@ -36,7 +36,7 @@ class SteeringPhysics:
             return steer * weight
         return pygame.Vector2(0, 0)
 
-    def update(self, dt: float, drag: float):
+    def update(self, dt: float, drag: float, speed_ceiling: float | None = None):
         """Standard Euler integration with drag"""
         # Update velocity (dt is multiplied by 60 for consistency with previous fixed framerate logic)
         self.vel += self.acc * dt * 60
@@ -44,9 +44,10 @@ class SteeringPhysics:
         # Apply natural water drag
         self.vel *= drag
 
-        # Speed limit
-        if self.vel.length() > self.max_speed:
-            self.vel.scale_to_length(self.max_speed)
+        # Speed limit (use speed_ceiling if provided, otherwise max_speed)
+        effective_max_speed = speed_ceiling if speed_ceiling is not None else self.max_speed
+        if self.vel.length() > effective_max_speed:
+            self.vel.scale_to_length(effective_max_speed)
 
         # Update position
         self.pos += self.vel * dt

@@ -120,7 +120,7 @@ class NeuralFish:
                 if abs(angle) < FISH_SENSOR_ARC:
                     sector = int((angle + FISH_SENSOR_ARC) / (2 * FISH_SENSOR_ARC) * 3)
                     sector = max(0, min(2, sector))
-                    radar[6 + sector] += (1.0 - (dist / 300)) * 2.0
+                    radar[sector] += (1.0 - (dist / 300)) * 2.0
         elif self.state == FishState.RESTING:
             food_bias = 0.4
             threat_bias = 0.6
@@ -211,7 +211,7 @@ class NeuralFish:
 
         # ── Neural steering: heading delta driven directly by steer output ─────
         # Turn rate scales with agility trait; full output = ~90°/s turn
-        turn_rate = 2.5 * self.traits.physical_traits.get("turn_rate_mult", 1.0)
+        turn_rate = FISH_TURN_RATE_SCALAR * self.traits.physical_traits.get("turn_rate_mult", 1.0)
         heading_delta = steer_out * turn_rate * dt
         new_heading = self.physics.heading + heading_delta
 
@@ -224,8 +224,8 @@ class NeuralFish:
         # Apply a steering force toward (new_heading, target_speed)
         desired_vx = math.cos(new_heading) * target_speed
         desired_vy = math.sin(new_heading) * target_speed
-        steer_force_x = (desired_vx - self.physics.vel.x) * 0.35
-        steer_force_y = (desired_vy - self.physics.vel.y) * 0.35
+        steer_force_x = (desired_vx - self.physics.vel.x) * FISH_STEERING_FORCE_FACTOR
+        steer_force_y = (desired_vy - self.physics.vel.y) * FISH_STEERING_FORCE_FACTOR
 
         # Clamp to max_force so the fish can't teleport
         steer_len = math.hypot(steer_force_x, steer_force_y)
@@ -278,7 +278,7 @@ class NeuralFish:
             WORLD_WIDTH,
             self.world.get_terrain_height(self.physics.pos.x),
         )
-        self.physics.update(dt, FISH_DRAG)
+        self.physics.update(dt, FISH_DRAG, speed_ceiling)
         self.distance_traveled += self.physics.vel.length() * dt
 
         # ── Food collision ────────────────────────────────────────────────────

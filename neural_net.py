@@ -55,6 +55,31 @@ class NeuralNet:
         
         return outputs, hidden, hidden2
     
+    @staticmethod
+    def blend(parent1, parent2):
+        """Create a new network by blending weights from two parents."""
+        if parent1.input_size != parent2.input_size:
+            raise ValueError("Cannot blend networks with different architectures")
+        
+        child = NeuralNet(parent1.input_size, parent1.hidden_size, parent1.output_size)
+        
+        def blend_matrix(m1, m2):
+            """Element-wise average of two matrices."""
+            return [[(m1[i][j] + m2[i][j]) * 0.5 for j in range(len(m1[0]))] for i in range(len(m1))]
+        
+        def blend_vector(v1, v2):
+            """Element-wise average of two vectors."""
+            return [(v1[i] + v2[i]) * 0.5 for i in range(len(v1))]
+        
+        child.w1 = blend_matrix(parent1.w1, parent2.w1)
+        child.b1 = blend_vector(parent1.b1, parent2.b1)
+        child.w2 = blend_matrix(parent1.w2, parent2.w2)
+        child.b2 = blend_vector(parent1.b2, parent2.b2)
+        child.w3 = blend_matrix(parent1.w3, parent2.w3)
+        child.b3 = blend_vector(parent1.b3, parent2.b3)
+        
+        return child
+    
     def mutate(self, mutation_rate=0.1, mutation_strength=0.2):
         """Create mutated copy for offspring"""
         # Create new network with same architecture

@@ -356,7 +356,6 @@ class BrainVisualizer:
 
         # ── Nodes ──────────────────────────────────────────────────────────────
         # Ripple phase for active nodes
-        t = self.anim_t
 
         INPUT_GROUPS = [
             ("Food",   slice(0, 3),  (0, 180, 130)),
@@ -438,8 +437,7 @@ class BrainVisualizer:
             act = h1[i] if i < len(h1) else 0.0
             draw_node(pos, act, r=5)
 
-        # H2
-        H2_LABELS = ["H2-0", "H2-1", "H2-2", "H2-3", "H2-4", "H2-5"]
+                # H2 — no labels (6 nodes, sparse)
         for i, pos in enumerate(pos_h2):
             act = h2[i] if i < len(h2) else 0.0
             draw_node(pos, act, r=6)

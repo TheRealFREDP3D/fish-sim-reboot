@@ -59,6 +59,8 @@ class FishSystem:
                 and len(self.predators) < PREDATOR_MAX_POPULATION
             ):
                 mate = predator.mate
+                # Blend brains from both parents for genetic diversity
+                blended_brain = NeuralNet.blend(predator.brain, mate.brain)
                 egg = FishEgg(
                     predator.physics.pos.x,
                     predator.physics.pos.y,
@@ -66,7 +68,7 @@ class FishSystem:
                     parent1=predator,
                     parent2=mate,
                     is_predator=True,
-                    brain=predator.brain.mutate(),
+                    brain=blended_brain.mutate(),
                 )
                 self.eggs.append(egg)
                 predator.mate = None  # Clear stale reference after egg is created
@@ -153,7 +155,9 @@ class FishSystem:
                     partner.energy -= FISH_REPRODUCTION_COST
                     f.mating_cooldown, partner.mating_cooldown = 40.0, 40.0
                     child_traits = FishTraits.blend(f.traits, partner.traits)
-                    child_brain = f.brain.mutate()
+                    # Blend brains from both parents for genetic diversity
+                    blended_brain = NeuralNet.blend(f.brain, partner.brain)
+                    child_brain = blended_brain.mutate()
                     mother = f if f.sex == "F" else partner
                     father = partner if f.sex == "F" else f
                     mother.is_pregnant = True

@@ -41,7 +41,7 @@ class PredatorFish(NeuralFish):
                 min_dist < 150
                 and self.dash_cooldown <= 0
                 and not self.is_dashing
-                and self.stamina > 20.0
+                and self.stamina > PREDATOR_DASH_STAMINA_THRESHOLD
             ):
                 self.is_dashing = True
                 self.dash_timer = PREDATOR_DASH_DURATION
@@ -50,12 +50,12 @@ class PredatorFish(NeuralFish):
         # 3. Dash: boost force along current heading (neural net already set heading)
         if self.is_dashing:
             self.dash_timer -= dt
-            self.stamina = max(0.0, self.stamina - 30.0 * dt)
+            self.stamina = max(0.0, self.stamina - PREDATOR_DASH_STAMINA_DRAIN * dt)
 
             if self.stamina <= 0:
                 self.is_dashing = False
             else:
-                dash_force = self.physics.max_force * 3.5
+                dash_force = self.physics.max_force * PREDATOR_DASH_FORCE_MULT
                 self.physics.apply_force(
                     (
                         math.cos(self.physics.heading) * dash_force,
