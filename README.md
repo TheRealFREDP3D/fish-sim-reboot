@@ -6,7 +6,7 @@ A sophisticated underwater ecosystem simulation featuring neural network-driven 
 
 ## 🌊 Features
 
-[Brain Visualizer](brain_visualizer.py)
+![Brain Vizualizer](doc/brain-visualizer-improved.png)
 
 ### **Neural Fish System**
 
