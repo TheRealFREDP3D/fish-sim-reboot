@@ -12,26 +12,26 @@ from config import (
 )
 
 # ── Palette ────────────────────────────────────────────────────────────────────
-BG          = (18, 28, 38)          # deep ocean slate
-BG_SECTION  = (24, 36, 50)         # slightly lighter panel sections
-BORDER      = (40, 60, 80)         # subtle border
-DIVIDER     = (35, 52, 70)         # section dividers
+BG          = (12, 20, 28)          # deeper ocean slate
+BG_SECTION  = (20, 30, 42)         # slightly lighter panel sections
+BORDER      = (35, 55, 75)         # subtle border
+DIVIDER     = (30, 48, 65)         # section dividers
 
-TEXT_PRIMARY   = (220, 230, 235)   # near-white, warm
-TEXT_SECONDARY = (130, 155, 175)   # muted blue-grey
-TEXT_LABEL     = (80, 110, 135)    # dim labels
+TEXT_PRIMARY   = (240, 250, 255)   # brighter near-white
+TEXT_SECONDARY = (160, 180, 200)   # brighter blue-grey
+TEXT_LABEL     = (100, 130, 155)    # brighter labels
 
-TEAL      = (0, 210, 185)          # bioluminescent accent
-TEAL_DIM  = (0, 120, 105)
-AMBER     = (255, 185, 60)
-AMBER_DIM = (140, 95, 20)
-RED_ACC   = (230, 90, 90)
-RED_DIM   = (120, 40, 40)
+TEAL      = (0, 240, 220)          # brighter bioluminescent accent
+TEAL_DIM  = (0, 140, 120)
+AMBER     = (255, 200, 80)         # brighter amber
+AMBER_DIM = (160, 110, 30)
+RED_ACC   = (255, 120, 120)        # brighter red
+RED_DIM   = (150, 60, 60)
 
 # Node activation colours: teal=positive, slate=neutral, amber=negative
-COL_POS     = (0, 210, 185)
-COL_NEU     = (55, 75, 95)
-COL_NEG     = (255, 140, 50)
+COL_POS     = (0, 240, 220)        # brighter positive
+COL_NEU     = (70, 90, 110)        # brighter neutral
+COL_NEG     = (255, 180, 80)       # brighter negative
 
 # Species accent colours
 SPECIES_ACCENT = {
@@ -134,12 +134,21 @@ class BrainVisualizer:
             return
 
         surf = pygame.Surface((self.PANEL_W, self.panel_h), pygame.SRCALPHA)
-        surf.fill((*BG, 245))
+        
+        # Animated background with subtle pulse
+        bg_pulse = 0.92 + 0.08 * math.sin(self.anim_t * 2)
+        bg_color = tuple(int(c * bg_pulse) for c in BG)
+        surf.fill((*bg_color, 248))
 
         accent = SPECIES_ACCENT.get((selected_fish.is_cleaner, selected_fish.is_predator), AMBER)
         accent_dim = SPECIES_ACCENT_DIM.get((selected_fish.is_cleaner, selected_fish.is_predator), AMBER_DIM)
 
-        # Left accent stripe
+        # Enhanced left accent stripe with glow
+        glow_pulse = 0.8 + 0.2 * math.sin(self.anim_t * 3)
+        glow_surf = pygame.Surface((8, self.panel_h), pygame.SRCALPHA)
+        glow_alpha = int(60 * glow_pulse)
+        pygame.draw.rect(glow_surf, (*accent, glow_alpha), (0, 0, 8, self.panel_h))
+        surf.blit(glow_surf, (-4, 0))
         pygame.draw.rect(surf, accent, (0, 0, 3, self.panel_h))
 
         y = 18
@@ -218,32 +227,54 @@ class BrainVisualizer:
         PAD    = 16
         LW     = 62     # label column width
         BAR_W  = self.PANEL_W - PAD * 2 - LW - 32
-        BAR_H  = 10
-        RADIUS = 5
+        BAR_H  = 12     # Taller bars
+        RADIUS = 6
 
         lifespan = FISH_MAX_AGE * fish.traits.physical_traits.get("lifespan_mult", 1.0)
         bars = [
-            ("LIFE",    max(0.0, 1.0 - fish.age / lifespan), (90, 160, 230)),
+            ("LIFE",    max(0.0, 1.0 - fish.age / lifespan), (100, 180, 255)),
             ("ENERGY",  max(0.0, min(1.0, fish.energy / FISH_MAX_ENERGY)), accent),
-            ("STAMINA", fish.stamina / 100.0, (110, 210, 140)),
+            ("STAMINA", fish.stamina / 100.0, (140, 230, 160)),
         ]
 
         for label, ratio, color in bars:
             # Label
             tl = self.f_tiny.render(label, True, TEXT_LABEL)
-            surf.blit(tl, (PAD, y + 1))
+            surf.blit(tl, (PAD, y + 2))
 
             bx = PAD + LW
-            # Track
+            # Enhanced track with subtle gradient
             draw_capsule(surf, BG_SECTION, bx, y, BAR_W, BAR_H, RADIUS)
-            # Fill
+            
+            # Add subtle inner highlight
+            highlight_surf = pygame.Surface((BAR_W - 4, BAR_H - 4), pygame.SRCALPHA)
+            highlight_surf.fill((*TEXT_PRIMARY, 15))
+            surf.blit(highlight_surf, (bx + 2, y + 2))
+            
+            # Enhanced fill with glow effect
             fill_w = max(RADIUS * 2, int(BAR_W * ratio))
+            
+            # Glow for high values
+            if ratio > 0.7:
+                glow_surf = pygame.Surface((fill_w + 8, BAR_H + 8), pygame.SRCALPHA)
+                glow_alpha = int((ratio - 0.7) * 100)
+                pygame.draw.rect(glow_surf, (*color, glow_alpha), 
+                               (0, 0, fill_w + 8, BAR_H + 8), border_radius=RADIUS + 2)
+                surf.blit(glow_surf, (bx - 4, y - 4))
+            
             draw_capsule(surf, color, bx, y, fill_w, BAR_H, RADIUS)
-            # Percentage
+            
+            # Add shimmer effect
+            shimmer = 0.8 + 0.2 * math.sin(self.anim_t * 3 + bx * 0.1)
+            shimmer_surf = pygame.Surface((fill_w - 4, BAR_H - 4), pygame.SRCALPHA)
+            shimmer_surf.fill((*TEXT_PRIMARY, int(20 * shimmer)))
+            surf.blit(shimmer_surf, (bx + 2, y + 2))
+            
+            # Brighter percentage
             pct = self.f_tiny.render(f"{int(ratio * 100)}%", True, TEXT_SECONDARY)
-            surf.blit(pct, (bx + BAR_W + 6, y + 1))
+            surf.blit(pct, (bx + BAR_W + 6, y + 2))
 
-            y += 20
+            y += 22
 
         return y + 6
 
@@ -281,60 +312,47 @@ class BrainVisualizer:
         out  = fish.last_outputs  if len(fish.last_outputs) == 2  else [0.0] * 2
 
         # ── Connections ────────────────────────────────────────────────────────
-        # Draw faint background wires first, then bright active ones on top
-        def draw_connections(src_pos, dst_pos, src_acts, threshold=0.15):
+        # Draw faint background wires first, then bright active ones on top.
+        # This helper is reused for all connection passes (in→h1, h1→h2, h2→out).
+        def draw_connections(src_pos, dst_pos, src_acts, threshold=0.15, dim_color=(30, 48, 65)):
+            """
+            Draw connections from each source node to each destination node.
+
+            - If |activation| < threshold: draw a thin dim wire.
+            - Otherwise: draw a brighter, thicker wire based on activation_color().
+            """
             for i, sp in enumerate(src_pos):
                 act = src_acts[i] if i < len(src_acts) else 0.0
                 strength = abs(act)
-                if strength < threshold:
-                    # draw dim wire
-                    pygame.draw.line(surf, (*DIVIDER, 80), sp, dst_pos[0], 1)
-                    continue
-                col = activation_color(act)
-                alpha = int(60 + strength * 160)
-                thick = 1 if strength < 0.4 else 2
-                for dp in dst_pos:
-                    # simple straight line — clean and fast
-                    pygame.draw.line(surf, col, sp, dp, thick)
 
-        # All faint wires (background layer)
-        for sp in pos_in:
-            for dp in pos_h1:
-                pygame.draw.line(surf, (30, 48, 65), sp, dp, 1)
-        for sp in pos_h1:
-            for dp in pos_h2:
-                pygame.draw.line(surf, (30, 48, 65), sp, dp, 1)
-        for sp in pos_h2:
-            for dp in pos_out:
-                pygame.draw.line(surf, (30, 48, 65), sp, dp, 1)
+                for dp in dst_pos:
+                    if strength < threshold:
+                        # dim background wire
+                        pygame.draw.line(surf, dim_color, sp, dp, 1)
+                    else:
+                        # Enhanced active connections with glow
+                        col = activation_color(act)
+                        thick = 2 + int(strength * 3)  # Thicker for more visibility
+                        
+                        # Add subtle glow for strong connections
+                        if strength > 0.5:
+                            glow_surf = pygame.Surface((abs(dp[0] - sp[0]) + 20, abs(dp[1] - sp[1]) + 20), pygame.SRCALPHA)
+                            glow_alpha = int(strength * 40)
+                            pygame.draw.line(glow_surf, (*col, glow_alpha), 
+                                           (10, 10), (dp[0] - sp[0] + 10, dp[1] - sp[1] + 10), thick + 2)
+                            surf.blit(glow_surf, (min(sp[0], dp[0]) - 10, min(sp[1], dp[1]) - 10))
+                        
+                        pygame.draw.line(surf, col, sp, dp, thick)
+
+        # All faint wires (background layer) — use a huge threshold so all wires stay dim
+        draw_connections(pos_in,  pos_h1, inp, threshold=1e9)
+        draw_connections(pos_h1, pos_h2, h1, threshold=1e9)
+        draw_connections(pos_h2, pos_out, h2, threshold=1e9)
 
         # Active wires (foreground layer)
-        for i, sp in enumerate(pos_in):
-            act = inp[i]
-            if abs(act) < 0.12:
-                continue
-            col = activation_color(act)
-            thick = 1 + int(abs(act) * 2)
-            for dp in pos_h1:
-                pygame.draw.line(surf, col, sp, dp, thick)
-
-        for i, sp in enumerate(pos_h1):
-            act = h1[i] if i < len(h1) else 0.0
-            if abs(act) < 0.12:
-                continue
-            col = activation_color(act)
-            thick = 1 + int(abs(act) * 2)
-            for dp in pos_h2:
-                pygame.draw.line(surf, col, sp, dp, thick)
-
-        for i, sp in enumerate(pos_h2):
-            act = h2[i] if i < len(h2) else 0.0
-            if abs(act) < 0.12:
-                continue
-            col = activation_color(act)
-            thick = 1 + int(abs(act) * 2)
-            for dp in pos_out:
-                pygame.draw.line(surf, col, sp, dp, thick)
+        draw_connections(pos_in,  pos_h1, inp, threshold=0.12)
+        draw_connections(pos_h1, pos_h2, h1, threshold=0.12)
+        draw_connections(pos_h2, pos_out, h2, threshold=0.12)
 
         # ── Nodes ──────────────────────────────────────────────────────────────
         # Ripple phase for active nodes
@@ -356,25 +374,38 @@ class BrainVisualizer:
         def draw_node(pos, act, r=5, label=None, label_left=False):
             col = activation_color(act)
             strength = abs(act)
-            # Outer glow for strongly active nodes
-            if strength > 0.3:
-                glow_r = r + 3 + int(strength * 4)
-                glow_alpha = int(strength * 60)
-                glow_surf = pygame.Surface((glow_r * 2 + 4, glow_r * 2 + 4), pygame.SRCALPHA)
-                pygame.draw.circle(glow_surf, (*col, glow_alpha),
-                                   (glow_r + 2, glow_r + 2), glow_r)
-                surf.blit(glow_surf, (pos[0] - glow_r - 2, pos[1] - glow_r - 2))
-            # Filled circle
-            pygame.draw.circle(surf, col, pos, r)
-            # White ring
-            pygame.draw.circle(surf, (200, 220, 230), pos, r, 1)
+            
+            # Enhanced glow for active nodes with pulsing effect
+            if strength > 0.2:
+                # Pulsing glow based on animation time
+                pulse = 0.8 + 0.2 * math.sin(self.anim_t * 4 + pos[0] * 0.01 + pos[1] * 0.01)
+                glow_r = r + 4 + int(strength * 6 * pulse)
+                glow_alpha = int(strength * 80 * pulse)
+                glow_surf = pygame.Surface((glow_r * 2 + 8, glow_r * 2 + 8), pygame.SRCALPHA)
+                
+                # Multi-layer glow for more depth
+                for i in range(3):
+                    layer_alpha = glow_alpha // (i + 1)
+                    layer_r = glow_r - i * 2
+                    if layer_r > 0:
+                        pygame.draw.circle(glow_surf, (*col, layer_alpha),
+                                           (glow_r + 4, glow_r + 4), layer_r)
+                surf.blit(glow_surf, (pos[0] - glow_r - 4, pos[1] - glow_r - 4))
+            
+            # Larger, brighter filled circle
+            node_r = r + int(strength * 2)
+            pygame.draw.circle(surf, col, pos, node_r)
+            
+            # Brighter white ring with glow
+            pygame.draw.circle(surf, (255, 255, 255), pos, node_r, 2)
+            
             # Label
             if label:
                 tl = self.f_tiny.render(label, True, TEXT_LABEL)
                 if label_left:
-                    surf.blit(tl, (pos[0] - tl.get_width() - r - 2, pos[1] - 6))
+                    surf.blit(tl, (pos[0] - tl.get_width() - node_r - 2, pos[1] - 6))
                 else:
-                    surf.blit(tl, (pos[0] + r + 3, pos[1] - 6))
+                    surf.blit(tl, (pos[0] + node_r + 3, pos[1] - 6))
 
         # Draw input nodes with group labels
         group_start_y = {}
