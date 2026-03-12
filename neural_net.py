@@ -58,7 +58,9 @@ class NeuralNet:
     @staticmethod
     def blend(parent1, parent2):
         """Create a new network by blending weights from two parents."""
-        if parent1.input_size != parent2.input_size:
+        if (parent1.input_size != parent2.input_size or
+            parent1.hidden_size != parent2.hidden_size or
+            parent1.output_size != parent2.output_size):
             raise ValueError("Cannot blend networks with different architectures")
         
         child = NeuralNet(parent1.input_size, parent1.hidden_size, parent1.output_size)
