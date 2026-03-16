@@ -3,9 +3,7 @@
 import math
 from fish_base import NeuralFish, get_life_stage_size_mult
 from config import *
-from config import (
-    PREDATOR_SIZE_ADVANTAGE_MULTIPLIER, PREY_PREDATOR_MIN_DISTANCE
-)
+from config import PREDATOR_SIZE_ADVANTAGE_MULTIPLIER, PREY_PREDATOR_MIN_DISTANCE
 
 
 class PredatorFish(NeuralFish):
@@ -32,12 +30,11 @@ class PredatorFish(NeuralFish):
                 prey.append(f)
         return prey
 
-    def update(self, dt, all_fish, targets, particle_system, plant_manager,
-               time_system=None):
+    def update(
+        self, dt, all_fish, targets, particle_system, plant_manager, time_system=None
+    ):
         # Seasonal activity scaling (slower in winter)
-        activity_mod = (
-            time_system.predator_activity_modifier if time_system else 1.0
-        )
+        activity_mod = time_system.predator_activity_modifier if time_system else 1.0
 
         # Only hunt when hungry — same hunger threshold as other fish
         is_hungry = self.energy < FISH_HUNGER_THRESHOLD
@@ -66,7 +63,7 @@ class PredatorFish(NeuralFish):
                 and self.dash_cooldown <= 0
                 and not self.is_dashing
                 and self.stamina > PREDATOR_DASH_STAMINA_THRESHOLD
-                and activity_mod > 0.5   # no dashing in deep winter
+                and activity_mod > 0.5  # no dashing in deep winter
             ):
                 self.is_dashing = True
                 self.dash_timer = PREDATOR_DASH_DURATION
@@ -80,10 +77,12 @@ class PredatorFish(NeuralFish):
                 self.is_dashing = False
             else:
                 dash_force = self.physics.max_force * PREDATOR_DASH_FORCE_MULT
-                self.physics.apply_force((
-                    math.cos(self.physics.heading) * dash_force,
-                    math.sin(self.physics.heading) * dash_force,
-                ))
+                self.physics.apply_force(
+                    (
+                        math.cos(self.physics.heading) * dash_force,
+                        math.sin(self.physics.heading) * dash_force,
+                    )
+                )
 
             if self.dash_timer <= 0:
                 self.is_dashing = False
@@ -91,7 +90,11 @@ class PredatorFish(NeuralFish):
         self.dash_cooldown = max(0, self.dash_cooldown - dt)
 
         res = super().update(
-            dt, all_fish, prey_targets, particle_system, plant_manager,
+            dt,
+            all_fish,
+            prey_targets,
+            particle_system,
+            plant_manager,
             time_system=time_system,
         )
 

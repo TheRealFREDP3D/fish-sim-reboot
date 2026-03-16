@@ -10,7 +10,9 @@ from neural_net import NeuralNet
 class FishSystem:
     def __init__(self, particle_system, plant_manager, world):
         self.world, self.particle_system, self.plant_manager = (
-            world, particle_system, plant_manager,
+            world,
+            particle_system,
+            plant_manager,
         )
         self.world.fish_system = self
 
@@ -89,16 +91,19 @@ class FishSystem:
         pred_activity = time_system.predator_activity_modifier if time_system else 1.0
 
         sim_groups = [
-            (self.fish,        plankton,                          True),
-            (self.cleaner_fish, self.poops,                       True),
-            (self.predators,   self.fish + self.cleaner_fish,     False),
+            (self.fish, plankton, True),
+            (self.cleaner_fish, self.poops, True),
+            (self.predators, self.fish + self.cleaner_fish, False),
         ]
 
         for f_list, targets, can_mate in sim_groups:
             for f in f_list[:]:
                 res = f.update(
-                    dt, all_fish, targets,
-                    self.particle_system, self.plant_manager,
+                    dt,
+                    all_fish,
+                    targets,
+                    self.particle_system,
+                    self.plant_manager,
                     time_system=time_system,
                 )
 
@@ -107,13 +112,20 @@ class FishSystem:
                 elif isinstance(res, tuple) and res[0] == "egg":
                     self.eggs.append(
                         FishEgg(
-                            res[1], res[2], res[3], res[4], res[5],
-                            f.is_cleaner, f.is_predator,
+                            res[1],
+                            res[2],
+                            res[3],
+                            res[4],
+                            res[5],
+                            f.is_cleaner,
+                            f.is_predator,
                             res[6] if len(res) > 6 else None,
                         )
                     )
 
-                lifespan = FISH_MAX_AGE * f.traits.physical_traits.get("lifespan_mult", 1.0)
+                lifespan = FISH_MAX_AGE * f.traits.physical_traits.get(
+                    "lifespan_mult", 1.0
+                )
                 if f.energy <= 0 or f.age > lifespan:
                     if f == self.selected_fish:
                         self.selected_fish = None
@@ -151,7 +163,8 @@ class FishSystem:
                     father = partner if f.sex == "F" else f
                     mother.is_pregnant = True
                     mother.pregnancy_traits, mother.pregnancy_partner = (
-                        child_traits, father,
+                        child_traits,
+                        father,
                     )
                     mother.pregnancy_brain = child_brain
                     break
@@ -164,17 +177,34 @@ class FishSystem:
 
         if egg.is_cleaner:
             from cleaner_fish import CleanerFish
-            child = CleanerFish(self.world, traits=egg.traits, brain=egg.brain,
-                                start_x=spawn_x, start_y=spawn_y)
+
+            child = CleanerFish(
+                self.world,
+                traits=egg.traits,
+                brain=egg.brain,
+                start_x=spawn_x,
+                start_y=spawn_y,
+            )
             self.cleaner_fish.append(child)
         elif egg.is_predator:
             from predator_fish import PredatorFish
-            child = PredatorFish(self.world, traits=egg.traits, brain=egg.brain,
-                                 start_x=spawn_x, start_y=spawn_y)
+
+            child = PredatorFish(
+                self.world,
+                traits=egg.traits,
+                brain=egg.brain,
+                start_x=spawn_x,
+                start_y=spawn_y,
+            )
             self.predators.append(child)
         else:
-            child = NeuralFish(self.world, traits=egg.traits, brain=egg.brain,
-                               start_x=spawn_x, start_y=spawn_y)
+            child = NeuralFish(
+                self.world,
+                traits=egg.traits,
+                brain=egg.brain,
+                start_x=spawn_x,
+                start_y=spawn_y,
+            )
             self.fish.append(child)
 
         p1, p2 = egg.parent1, egg.parent2

@@ -152,5 +152,7 @@ class FishEgg:
         if hatch_progress > 0.8:
             shimmer_a = int((hatch_progress - 0.8) / 0.2 * 200 * pulse)
             shimmer_surf = pygame.Surface((60, 60), pygame.SRCALPHA)
-            pygame.draw.circle(shimmer_surf, (255, 255, 200, shimmer_a), (30, 30), int(egg_r + 6), 3)
+            pygame.draw.circle(
+                shimmer_surf, (255, 255, 200, shimmer_a), (30, 30), int(egg_r + 6), 3
+            )
             screen.blit(shimmer_surf, (int(pos[0]) - 30, int(pos[1]) - 30))

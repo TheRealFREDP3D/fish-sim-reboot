@@ -9,8 +9,10 @@ import math
 from config import (
     DAY_DURATION,
     SEASON_DURATION,
-    DAWN_START, DAWN_END,
-    DUSK_START, DUSK_END,
+    DAWN_START,
+    DAWN_END,
+    DUSK_START,
+    DUSK_END,
     SEASON_NAMES,
     SEASON_COLORS,
 )
@@ -19,12 +21,12 @@ from config import (
 class TimeSystem:
     def __init__(self):
         # Start at early morning so the player sees a dawn immediately
-        self.time_of_day = 0.22        # 0.0–1.0, fraction of a full day
+        self.time_of_day = 0.22  # 0.0–1.0, fraction of a full day
         self.day_count = 0
-        self.season_time = 0.0         # seconds elapsed in current season
-        self.season_index = 0          # 0=Spring 1=Summer 2=Autumn 3=Winter
+        self.season_time = 0.0  # seconds elapsed in current season
+        self.season_index = 0  # 0=Spring 1=Summer 2=Autumn 3=Winter
         self.paused = False
-        self.speed_mult = 1.0          # can be raised for fast-forward
+        self.speed_mult = 1.0  # can be raised for fast-forward
 
     # ── Update ────────────────────────────────────────────────────────────────
 
@@ -100,7 +102,7 @@ class TimeSystem:
         """How efficiently plants convert nutrients. 0 at night, 1 at noon."""
         ll = self.light_level
         # Season modifier
-        mods = {0: 1.0, 1: 1.2, 2: 0.7, 3: 0.3}   # Spring/Summer/Autumn/Winter
+        mods = {0: 1.0, 1: 1.2, 2: 0.7, 3: 0.3}  # Spring/Summer/Autumn/Winter
         return ll * mods[self.season_index]
 
     @property
@@ -208,16 +210,15 @@ class TimeSystem:
         hour = int(self.time_of_day * 24)
         minute = int((self.time_of_day * 24 - hour) * 60)
         phase = (
-            "Night" if self.is_night else
-            "Dawn"  if self.is_dawn  else
-            "Dusk"  if self.is_dusk  else
-            "Day"
+            "Night"
+            if self.is_night
+            else "Dawn" if self.is_dawn else "Dusk" if self.is_dusk else "Day"
         )
         return {
-            "time":    f"{hour:02d}:{minute:02d}  ({phase})",
-            "season":  self.season_name,
-            "day":     f"Day {self.day_count + 1}",
-            "light":   self.light_level,
+            "time": f"{hour:02d}:{minute:02d}  ({phase})",
+            "season": self.season_name,
+            "day": f"Day {self.day_count + 1}",
+            "light": self.light_level,
         }
 
     def cycle_speed(self):
@@ -231,6 +232,7 @@ class TimeSystem:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _smoothstep(t):
     t = max(0.0, min(1.0, t))

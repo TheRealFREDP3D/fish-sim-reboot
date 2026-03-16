@@ -41,10 +41,12 @@ class Seed:
                 "seed_efficiency": random.uniform(0.9, 1.1),
                 # New traits for new species
                 "glow_intensity": random.uniform(0.8, 1.2),  # For bioluminescent plants
-                "spread_factor": random.uniform(0.8, 1.2),   # For spreading plants like lily pads
+                "spread_factor": random.uniform(
+                    0.8, 1.2
+                ),  # For spreading plants like lily pads
                 "filter_efficiency": random.uniform(0.9, 1.1),  # For tube sponges
                 "branch_density": random.uniform(0.8, 1.2),  # For fan coral
-                "pulse_speed": random.uniform(0.9, 1.1),     # For anemones
+                "pulse_speed": random.uniform(0.9, 1.1),  # For anemones
             }
         else:
             self.traits = traits.copy()
@@ -73,7 +75,7 @@ class Seed:
 
         # Prevent germination / settling in winter
         if time_system and time_system.season_index == 3:
-            return False   # stay as seed
+            return False  # stay as seed
 
         # Horizontal drift
         drift = math.sin(self.age * 1.5 + self.phase) * 0.4

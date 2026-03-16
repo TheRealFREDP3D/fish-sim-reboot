@@ -21,19 +21,19 @@ from config import (
 # Each type: (base_color, fertile_tint, depleted_tint, nutrient_bias, grain_size, grain_count)
 SOIL_TYPES = {
     "sand": {
-        "base":      (210, 195, 155),
-        "fertile":   (200, 185, 130),
-        "depleted":  (225, 215, 185),
-        "nutrient_bias": 0.55,   # Sandy soil drains nutrients fast
+        "base": (210, 195, 155),
+        "fertile": (200, 185, 130),
+        "depleted": (225, 215, 185),
+        "nutrient_bias": 0.55,  # Sandy soil drains nutrients fast
         "grain_size": (1.5, 3.0),
         "grain_count": 5,
         "diffusion_rate": 0.04,  # Fast lateral diffusion
         "description": "Coarse, pale, fast-draining",
     },
     "silt": {
-        "base":      (160, 140, 110),
-        "fertile":   (140, 120,  80),
-        "depleted":  (180, 165, 140),
+        "base": (160, 140, 110),
+        "fertile": (140, 120, 80),
+        "depleted": (180, 165, 140),
         "nutrient_bias": 0.90,
         "grain_size": (1.0, 2.0),
         "grain_count": 4,
@@ -41,39 +41,39 @@ SOIL_TYPES = {
         "description": "Fine, brownish, moderately fertile",
     },
     "clay": {
-        "base":      (130, 90, 70),
-        "fertile":   (110, 75,  50),
-        "depleted":  (155, 120, 100),
-        "nutrient_bias": 1.10,   # Clay retains nutrients well
+        "base": (130, 90, 70),
+        "fertile": (110, 75, 50),
+        "depleted": (155, 120, 100),
+        "nutrient_bias": 1.10,  # Clay retains nutrients well
         "grain_size": (0.8, 1.5),
         "grain_count": 3,
         "diffusion_rate": 0.01,  # Slow diffusion — nutrients stay put
         "description": "Dense, reddish-brown, nutrient-retaining",
     },
     "organic": {
-        "base":      (70, 60, 45),
-        "fertile":   (55, 48,  30),
-        "depleted":  (100, 85, 65),
-        "nutrient_bias": 1.30,   # Rich dark organic matter
+        "base": (70, 60, 45),
+        "fertile": (55, 48, 30),
+        "depleted": (100, 85, 65),
+        "nutrient_bias": 1.30,  # Rich dark organic matter
         "grain_size": (1.5, 2.5),
         "grain_count": 4,
         "diffusion_rate": 0.02,
         "description": "Dark, nutrient-rich humus",
     },
     "rocky": {
-        "base":      (100, 95, 90),
-        "fertile":   (90,  88,  80),
-        "depleted":  (120, 115, 110),
-        "nutrient_bias": 0.35,   # Rocks hold little nutrition
+        "base": (100, 95, 90),
+        "fertile": (90, 88, 80),
+        "depleted": (120, 115, 110),
+        "nutrient_bias": 0.35,  # Rocks hold little nutrition
         "grain_size": (2.0, 4.5),
         "grain_count": 3,
         "diffusion_rate": 0.005,
         "description": "Hard, grey, poor in nutrients",
     },
     "peat": {
-        "base":      (55, 50, 38),
-        "fertile":   (42, 38,  22),
-        "depleted":  (80, 72,  58),
+        "base": (55, 50, 38),
+        "fertile": (42, 38, 22),
+        "depleted": (80, 72, 58),
         "nutrient_bias": 1.20,
         "grain_size": (1.2, 2.2),
         "grain_count": 5,
@@ -85,10 +85,14 @@ SOIL_TYPES = {
 # Depth-based soil type probability weights
 # (depth_ratio_min, depth_ratio_max, {type: weight})
 DEPTH_SOIL_WEIGHTS = [
-    (0.00, 0.15, {"sand": 70, "silt": 20, "rocky": 10}),                          # shallow
-    (0.15, 0.35, {"sand": 30, "silt": 40, "clay": 20, "organic": 10}),            # mid-shallow
-    (0.35, 0.60, {"silt": 25, "clay": 35, "organic": 25, "peat": 10, "rocky": 5}),# mid-deep
-    (0.60, 1.00, {"clay": 20, "organic": 30, "peat": 20, "rocky": 30}),           # deep
+    (0.00, 0.15, {"sand": 70, "silt": 20, "rocky": 10}),  # shallow
+    (0.15, 0.35, {"sand": 30, "silt": 40, "clay": 20, "organic": 10}),  # mid-shallow
+    (
+        0.35,
+        0.60,
+        {"silt": 25, "clay": 35, "organic": 25, "peat": 10, "rocky": 5},
+    ),  # mid-deep
+    (0.60, 1.00, {"clay": 20, "organic": 30, "peat": 20, "rocky": 30}),  # deep
 ]
 
 
@@ -134,12 +138,14 @@ class SoilCell:
         g_min, g_max = self._type_data["grain_size"]
         self.grains = []
         for _ in range(gc):
-            self.grains.append({
-                "ox": random.uniform(1, SOIL_CELL_SIZE - 1),
-                "oy": random.uniform(1, SOIL_CELL_SIZE - 1),
-                "size": random.uniform(g_min, g_max),
-                "color_mod": random.uniform(0.75, 1.25),
-            })
+            self.grains.append(
+                {
+                    "ox": random.uniform(1, SOIL_CELL_SIZE - 1),
+                    "oy": random.uniform(1, SOIL_CELL_SIZE - 1),
+                    "size": random.uniform(g_min, g_max),
+                    "color_mod": random.uniform(0.75, 1.25),
+                }
+            )
 
         # Special detail for rocky soil: crack lines
         self.cracks = []
@@ -155,11 +161,13 @@ class SoilCell:
         self.flecks = []
         if self.soil_type in ("organic", "peat"):
             for _ in range(random.randint(2, 4)):
-                self.flecks.append((
-                    random.uniform(1, SOIL_CELL_SIZE - 1),
-                    random.uniform(1, SOIL_CELL_SIZE - 1),
-                    random.uniform(0.8, 1.5),
-                ))
+                self.flecks.append(
+                    (
+                        random.uniform(1, SOIL_CELL_SIZE - 1),
+                        random.uniform(1, SOIL_CELL_SIZE - 1),
+                        random.uniform(0.8, 1.5),
+                    )
+                )
 
     def deplete(self, amount):
         if self.is_water:
@@ -186,8 +194,7 @@ class SoilCell:
         fertile = self._type_data["fertile"]
         depleted = self._type_data["depleted"]
         base = tuple(
-            int(depleted[i] + (fertile[i] - depleted[i]) * t)
-            for i in range(3)
+            int(depleted[i] + (fertile[i] - depleted[i]) * t) for i in range(3)
         )
         noise = math.sin(self.x * 0.5 + self.noise_offset + time * 0.15) * 0.5 + 0.5
         shade = tuple(int(c * (0.88 + 0.12 * noise)) for c in base)
@@ -227,19 +234,23 @@ class SoilGrid:
                 if py < WATER_LINE_Y:
                     continue
                 ty = self.world.get_initial_terrain_height(px)
-                depth_ratio = max(0.0, min(1.0,
-                    (ty - WATER_LINE_Y) / max(1, WORLD_HEIGHT - WATER_LINE_Y)
-                ))
+                depth_ratio = max(
+                    0.0,
+                    min(1.0, (ty - WATER_LINE_Y) / max(1, WORLD_HEIGHT - WATER_LINE_Y)),
+                )
                 if py >= ty:
                     noise_val = noise_field.get(cx, 0.5)
                     # Add vertical noise variation
-                    noise_val = (noise_val + math.sin(cy * 0.13 + cx * 0.05) * 0.25) % 1.0
+                    noise_val = (
+                        noise_val + math.sin(cy * 0.13 + cx * 0.05) * 0.25
+                    ) % 1.0
                     soil_type = _get_soil_type_for_depth(depth_ratio, noise_val)
                     type_data = SOIL_TYPES[soil_type]
                     base_n = SOIL_BASE_NUTRIENT * type_data["nutrient_bias"]
-                    initial = max(0.1, min(SOIL_MAX_NUTRIENT,
-                        base_n + random.uniform(-0.12, 0.12)
-                    ))
+                    initial = max(
+                        0.1,
+                        min(SOIL_MAX_NUTRIENT, base_n + random.uniform(-0.12, 0.12)),
+                    )
                     self.cells[(cx, cy)] = SoilCell(cx, cy, initial, False, soil_type)
                 else:
                     self.cells[(cx, cy)] = SoilCell(cx, cy, 0.0, True, "silt")
@@ -303,71 +314,96 @@ class SoilGrid:
     def draw(self, screen, camera, time=0):
         view = camera.get_view_rect()
         start_cx = max(0, int(view.left // self.cell_size))
-        end_cx = min(WORLD_WIDTH // self.cell_size, int(view.right // self.cell_size) + 1)
+        end_cx = min(
+            WORLD_WIDTH // self.cell_size, int(view.right // self.cell_size) + 1
+        )
         start_cy = max(0, int(view.top // self.cell_size))
-        end_cy = min(WORLD_HEIGHT // self.cell_size, int(view.bottom // self.cell_size) + 1)
+        end_cy = min(
+            WORLD_HEIGHT // self.cell_size, int(view.bottom // self.cell_size) + 1
+        )
 
         for cx in range(start_cx, end_cx + 1):
             for cy in range(start_cy, end_cy + 1):
                 cell = self.get_cell(cx, cy)
                 if cell and not cell.is_water:
-                    px, py = camera.apply((
-                        cx * self.cell_size + cell.jitter_x,
-                        cy * self.cell_size + cell.jitter_y,
-                    ))
+                    px, py = camera.apply(
+                        (
+                            cx * self.cell_size + cell.jitter_x,
+                            cy * self.cell_size + cell.jitter_y,
+                        )
+                    )
                     px, py = int(px), int(py)
                     color = cell.get_color(time)
 
                     # Main cell body
-                    rect = pygame.Rect(px - 1, py - 1, self.cell_size + 2, self.cell_size + 2)
+                    rect = pygame.Rect(
+                        px - 1, py - 1, self.cell_size + 2, self.cell_size + 2
+                    )
                     pygame.draw.rect(screen, color, rect, border_radius=2)
 
                     # Soil-type specific detail rendering
                     if cell.soil_type == "rocky":
                         # Flat grey highlight on upper edge
                         hl = tuple(min(255, c + 30) for c in color)
-                        pygame.draw.line(screen, hl, (px, py), (px + self.cell_size, py), 1)
+                        pygame.draw.line(
+                            screen, hl, (px, py), (px + self.cell_size, py), 1
+                        )
                         # Crack details
                         dark = tuple(max(0, c - 40) for c in color)
                         for x0, y0, x1, y1 in cell.cracks:
-                            pygame.draw.line(screen, dark,
+                            pygame.draw.line(
+                                screen,
+                                dark,
                                 (int(px + x0), int(py + y0)),
-                                (int(px + x1), int(py + y1)), 1)
+                                (int(px + x1), int(py + y1)),
+                                1,
+                            )
 
                     elif cell.soil_type in ("organic", "peat"):
                         # Dark flecks of decomposed matter
                         fleck_col = tuple(max(0, c - 35) for c in color)
                         for fx, fy, fs in cell.flecks:
-                            pygame.draw.circle(screen, fleck_col,
-                                (int(px + fx), int(py + fy)), int(fs))
+                            pygame.draw.circle(
+                                screen, fleck_col, (int(px + fx), int(py + fy)), int(fs)
+                            )
 
                     elif cell.soil_type == "sand":
                         # Brighter sparkle grains
                         for grain in cell.grains:
                             g_col = tuple(
-                                max(0, min(255, int(c * grain["color_mod"]))) for c in color
+                                max(0, min(255, int(c * grain["color_mod"])))
+                                for c in color
                             )
                             gx = px + grain["ox"]
                             gy = py + grain["oy"]
-                            pygame.draw.circle(screen, g_col, (int(gx), int(gy)), int(grain["size"]))
+                            pygame.draw.circle(
+                                screen, g_col, (int(gx), int(gy)), int(grain["size"])
+                            )
 
                     elif cell.soil_type == "clay":
                         # Slight horizontal lamination lines
                         if cy % 2 == 0:
                             lam = tuple(max(0, c - 18) for c in color)
-                            pygame.draw.line(screen, lam,
+                            pygame.draw.line(
+                                screen,
+                                lam,
                                 (px, py + self.cell_size // 2),
-                                (px + self.cell_size, py + self.cell_size // 2), 1)
+                                (px + self.cell_size, py + self.cell_size // 2),
+                                1,
+                            )
 
                     else:
                         # silt / default: subtle grains
                         for grain in cell.grains:
                             g_col = tuple(
-                                max(0, min(255, int(c * grain["color_mod"]))) for c in color
+                                max(0, min(255, int(c * grain["color_mod"])))
+                                for c in color
                             )
                             gx = px + grain["ox"]
                             gy = py + grain["oy"]
-                            pygame.draw.circle(screen, g_col, (int(gx), int(gy)), int(grain["size"]))
+                            pygame.draw.circle(
+                                screen, g_col, (int(gx), int(gy)), int(grain["size"])
+                            )
 
                     # Nutrient sparkle for very fertile cells (all types)
                     if cell.nutrient > 1.1:

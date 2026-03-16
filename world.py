@@ -57,7 +57,7 @@ class World:
             (
                 rng.uniform(0, WORLD_WIDTH),
                 rng.uniform(0, WATER_LINE_Y - 10),
-                rng.uniform(0.4, 1.0),    # size factor
+                rng.uniform(0.4, 1.0),  # size factor
                 rng.uniform(0, math.pi * 2),  # twinkle phase
             )
             for _ in range(STAR_COUNT)
@@ -78,33 +78,33 @@ class World:
 
     def cleanup(self):
         """Clean up pygame surfaces to prevent memory leaks."""
-        if hasattr(self, '_star_surfs'):
+        if hasattr(self, "_star_surfs"):
             for _, surface in self._star_surfs:
                 if surface:
                     surface = None
             self._star_surfs.clear()
-        
-        if hasattr(self, 'water_gradient_surface'):
+
+        if hasattr(self, "water_gradient_surface"):
             self.water_gradient_surface = None
-            
-        if hasattr(self, 'haze_surface'):
+
+        if hasattr(self, "haze_surface"):
             self.haze_surface = None
 
     # ── Terrain generation ─────────────────────────────────────────────────
 
     def _generate_initial_profile(self):
-        beach_end   = BEACH_SLOPE_END + random.uniform(-50, 100)
-        drop_end    = STEEP_DROP_END  + random.uniform(-100, 200)
+        beach_end = BEACH_SLOPE_END + random.uniform(-50, 100)
+        drop_end = STEEP_DROP_END + random.uniform(-100, 200)
         noise_scale = random.uniform(0.01, 0.04)
-        noise_amp   = random.uniform(10, 30)
+        noise_amp = random.uniform(10, 30)
 
         for x in range(WORLD_WIDTH + 1):
             if x < beach_end:
                 base_y = WATER_LINE_Y + (x / beach_end * 150)
             elif x < drop_end:
                 progress = (x - beach_end) / (drop_end - beach_end)
-                base_y   = (WATER_LINE_Y + 150) + (
-                    progress ** 2 * (TERRAIN_BASE_HEIGHT - 200)
+                base_y = (WATER_LINE_Y + 150) + (
+                    progress**2 * (TERRAIN_BASE_HEIGHT - 200)
                 )
             else:
                 base_y = TERRAIN_BASE_HEIGHT - 50 + math.sin(x * 0.005) * 40
@@ -117,14 +117,14 @@ class World:
         return self.initial_terrain[idx]
 
     def get_terrain_height(self, x):
-        cell_x  = int(x // SOIL_CELL_SIZE)
+        cell_x = int(x // SOIL_CELL_SIZE)
         # Add bounds checking for cell_x
         max_cells = WORLD_WIDTH // SOIL_CELL_SIZE
         if cell_x < 0 or cell_x > max_cells:
             return WORLD_HEIGHT - 10
-            
+
         start_row = int(WATER_LINE_Y // SOIL_CELL_SIZE)
-        max_row   = int(WORLD_HEIGHT  // SOIL_CELL_SIZE)
+        max_row = int(WORLD_HEIGHT // SOIL_CELL_SIZE)
         for cy in range(start_row, max_row):
             cell = self.soil_grid.get_cell(cell_x, cy)
             if cell and not cell.is_water:
@@ -165,17 +165,17 @@ class World:
     def update(self, dt, time_system):
         if not time_system:
             return
-            
+
         season_idx = time_system.season_index
-        chance     = SEASONAL_PARTICLE_CHANCE.get(season_idx, 0.0)
+        chance = SEASONAL_PARTICLE_CHANCE.get(season_idx, 0.0)
         if chance > 0 and random.random() < chance * 60 * dt:
             self._spawn_season_particle(season_idx)
 
         for p in self.season_particles[:]:
-            p["x"]   += p["vx"] * dt * 60
-            p["y"]   += p["vy"] * dt * 60
+            p["x"] += p["vx"] * dt * 60
+            p["y"] += p["vy"] * dt * 60
             p["life"] -= dt
-            p["rot"]   = p.get("rot", 0) + p.get("spin", 0) * dt
+            p["rot"] = p.get("rot", 0) + p.get("spin", 0) * dt
             if p["life"] <= 0 or p["y"] > SCREEN_HEIGHT:
                 self.season_particles.remove(p)
 
@@ -185,41 +185,46 @@ class World:
                 cx = random.randint(0, WORLD_WIDTH // SOIL_CELL_SIZE)
                 cy = random.randint(
                     int(WATER_LINE_Y // SOIL_CELL_SIZE),
-                    int(WORLD_HEIGHT  // SOIL_CELL_SIZE) - 1,
+                    int(WORLD_HEIGHT // SOIL_CELL_SIZE) - 1,
                 )
                 cell = self.soil_grid.get_cell(cx, cy)
                 if cell and not cell.is_water:
                     from config import SOIL_MAX_NUTRIENT
+
                     cell.nutrient = min(SOIL_MAX_NUTRIENT, cell.nutrient + upwell * 10)
 
     def _spawn_season_particle(self, season_idx):
-        if season_idx == 2:   # Autumn leaf
+        if season_idx == 2:  # Autumn leaf
             color = random.choice(LEAF_COLORS)
-            self.season_particles.append({
-                "x":    random.uniform(0, SCREEN_WIDTH),
-                "y":    -10,
-                "vx":   random.uniform(-0.5, 0.5),
-                "vy":   random.uniform(0.4, 1.0),
-                "life": random.uniform(6, 14),
-                "size": random.randint(4, 8),
-                "color": color,
-                "rot":  random.uniform(0, 360),
-                "spin": random.uniform(-60, 60),
-                "type": "leaf",
-            })
+            self.season_particles.append(
+                {
+                    "x": random.uniform(0, SCREEN_WIDTH),
+                    "y": -10,
+                    "vx": random.uniform(-0.5, 0.5),
+                    "vy": random.uniform(0.4, 1.0),
+                    "life": random.uniform(6, 14),
+                    "size": random.randint(4, 8),
+                    "color": color,
+                    "rot": random.uniform(0, 360),
+                    "spin": random.uniform(-60, 60),
+                    "type": "leaf",
+                }
+            )
         elif season_idx == 3:  # Winter snow
-            self.season_particles.append({
-                "x":    random.uniform(0, SCREEN_WIDTH),
-                "y":    -6,
-                "vx":   random.uniform(-0.2, 0.2),
-                "vy":   random.uniform(0.2, 0.6),
-                "life": random.uniform(8, 20),
-                "size": random.randint(2, 4),
-                "color": SNOW_COLOR,
-                "rot":  0,
-                "spin": 0,
-                "type": "snow",
-            })
+            self.season_particles.append(
+                {
+                    "x": random.uniform(0, SCREEN_WIDTH),
+                    "y": -6,
+                    "vx": random.uniform(-0.2, 0.2),
+                    "vy": random.uniform(0.2, 0.6),
+                    "life": random.uniform(8, 20),
+                    "size": random.randint(2, 4),
+                    "color": SNOW_COLOR,
+                    "rot": 0,
+                    "spin": 0,
+                    "type": "snow",
+                }
+            )
 
     # ── Drawing ────────────────────────────────────────────────────────────
 
@@ -239,7 +244,7 @@ class World:
                     if screen_sx < -4 or screen_sx > SCREEN_WIDTH + 4:
                         continue
                     twinkle = 0.7 + 0.3 * math.sin(anim_t * 2.0 + sphase)
-                    a       = int(star_alpha * twinkle)
+                    a = int(star_alpha * twinkle)
                     r, star_surf = self._star_surfs[idx]
                     # Reuse the cached surface — just fill with new alpha
                     star_surf.fill((0, 0, 0, 0))
@@ -250,7 +255,7 @@ class World:
         water_y = WATER_LINE_Y - camera.y
         if water_y < SCREEN_HEIGHT:
             if time_system:
-                ll        = time_system.light_level
+                ll = time_system.light_level
                 tint_surf = pygame.Surface(
                     self.water_gradient_surface.get_size(), pygame.SRCALPHA
                 )
@@ -263,10 +268,10 @@ class World:
                 screen.blit(self.water_gradient_surface, (0, water_y))
 
         # ── Terrain ────────────────────────────────────────────────────────
-        points  = []
-        step    = 20
+        points = []
+        step = 20
         start_x = int(camera.x // step) * step
-        end_x   = int((camera.x + SCREEN_WIDTH) // step) * step + step
+        end_x = int((camera.x + SCREEN_WIDTH) // step) * step + step
 
         for x in range(start_x, end_x + step, step):
             world_x = max(0, min(WORLD_WIDTH, x))
@@ -275,7 +280,7 @@ class World:
         if points:
             poly_points = points + [
                 (points[-1][0], SCREEN_HEIGHT),
-                (points[0][0],  SCREEN_HEIGHT),
+                (points[0][0], SCREEN_HEIGHT),
             ]
             pygame.draw.polygon(screen, TERRAIN_COLOR, poly_points)
 
@@ -288,22 +293,22 @@ class World:
             # Reuse pre-allocated ray surface
             self._ray_surface.fill((0, 0, 0, 0))
             for i in range(LIGHT_RAY_COUNT):
-                world_center_x  = (i + 0.5) * (WORLD_WIDTH / LIGHT_RAY_COUNT)
+                world_center_x = (i + 0.5) * (WORLD_WIDTH / LIGHT_RAY_COUNT)
                 screen_center_x = world_center_x - camera.x * 0.5
-                offset          = math.sin(anim_t * 0.3 + i * 2) * 120
-                ray_x           = screen_center_x + offset
+                offset = math.sin(anim_t * 0.3 + i * 2) * 120
+                ray_x = screen_center_x + offset
 
                 if ray_x < -200 or ray_x > SCREEN_WIDTH + 200:
                     continue
 
-                width_top    = 10 + math.sin(anim_t + i) * 5
+                width_top = 10 + math.sin(anim_t + i) * 5
                 width_bottom = 80 + math.sin(anim_t * 0.7 + i) * 30
                 for layer in range(3):
                     l_alpha = int(
                         (ray_alpha / (layer + 1)) + math.sin(anim_t * 1.5 + i) * 10
                     )
-                    l_alpha   = max(0, min(255, l_alpha))
-                    l_width_t = width_top    + layer * 15
+                    l_alpha = max(0, min(255, l_alpha))
+                    l_width_t = width_top + layer * 15
                     l_width_b = width_bottom + layer * 40
                     pts = [
                         (ray_x - l_width_t, water_y),
@@ -320,13 +325,13 @@ class World:
 
         # ── Surface glints ─────────────────────────────────────────────────
         if time_system is None or time_system.light_level > 0.2:
-            anim_t        = pygame.time.get_ticks() * 0.001
+            anim_t = pygame.time.get_ticks() * 0.001
             glint_strength = time_system.light_level if time_system else 1.0
             if water_y > -20 and water_y < SCREEN_HEIGHT:
                 for i in range(0, SCREEN_WIDTH, 40):
                     world_i = i + camera.x
-                    wave    = math.sin(anim_t * 2.0 + world_i * 0.05) * 4
-                    y_pos   = water_y + wave
+                    wave = math.sin(anim_t * 2.0 + world_i * 0.05) * 4
+                    y_pos = water_y + wave
                     glint_alpha = int(
                         (120 + math.sin(anim_t * 3 + world_i) * 100) * glint_strength
                     )
@@ -353,17 +358,22 @@ class World:
     def _draw_season_particles(self, screen):
         for p in self.season_particles:
             if p["type"] == "leaf":
-                surf    = pygame.Surface((p["size"] * 2, p["size"]), pygame.SRCALPHA)
-                pygame.draw.ellipse(surf, (*p["color"], 200),
-                                    (0, 0, p["size"] * 2, p["size"]))
+                surf = pygame.Surface((p["size"] * 2, p["size"]), pygame.SRCALPHA)
+                pygame.draw.ellipse(
+                    surf, (*p["color"], 200), (0, 0, p["size"] * 2, p["size"])
+                )
                 rotated = pygame.transform.rotate(surf, p["rot"])
                 screen.blit(
                     rotated,
-                    (int(p["x"]) - rotated.get_width()  // 2,
-                     int(p["y"]) - rotated.get_height() // 2),
+                    (
+                        int(p["x"]) - rotated.get_width() // 2,
+                        int(p["y"]) - rotated.get_height() // 2,
+                    ),
                 )
             else:  # snow
                 pygame.draw.circle(
-                    screen, (*p["color"], 180),
-                    (int(p["x"]), int(p["y"])), p["size"],
+                    screen,
+                    (*p["color"], 180),
+                    (int(p["x"]), int(p["y"])),
+                    p["size"],
                 )

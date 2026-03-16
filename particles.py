@@ -36,7 +36,7 @@ class EatEffect:
             {
                 "angle": random.uniform(0, math.pi * 2),
                 "speed": random.uniform(20, 55),
-                "size":  random.uniform(1.5, 3.5),
+                "size": random.uniform(1.5, 3.5),
             }
             for _ in range(7)
         ]
@@ -55,8 +55,9 @@ class EatEffect:
 
         ring_r = int(4 + t * 18)
         ring_surf = pygame.Surface((ring_r * 2 + 4, ring_r * 2 + 4), pygame.SRCALPHA)
-        pygame.draw.circle(ring_surf, (*self.color, max(0, alpha)),
-                           (ring_r + 2, ring_r + 2), ring_r, 2)
+        pygame.draw.circle(
+            ring_surf, (*self.color, max(0, alpha)), (ring_r + 2, ring_r + 2), ring_r, 2
+        )
         screen.blit(ring_surf, (sx - ring_r - 2, sy - ring_r - 2))
 
         for spark in self.sparks:
@@ -74,8 +75,9 @@ class EatEffect:
                 (int(spark["size"] + 1), int(spark["size"] + 1)),
                 int(spark["size"]),
             )
-            screen.blit(spark_surf,
-                        (int(px) - int(spark["size"]), int(py) - int(spark["size"])))
+            screen.blit(
+                spark_surf, (int(px) - int(spark["size"]), int(py) - int(spark["size"]))
+            )
 
 
 class MatingBurstEffect:
@@ -90,11 +92,16 @@ class MatingBurstEffect:
             {
                 "angle": random.uniform(0, math.pi * 2),
                 "speed": random.uniform(30, 80),
-                "size":  random.uniform(2.0, 5.0),
-                "color": random.choice([
-                    (255, 100, 150), (255, 180, 200), (255, 80, 120),
-                    (255, 220, 240), (255, 140, 180),
-                ]),
+                "size": random.uniform(2.0, 5.0),
+                "color": random.choice(
+                    [
+                        (255, 100, 150),
+                        (255, 180, 200),
+                        (255, 80, 120),
+                        (255, 220, 240),
+                        (255, 140, 180),
+                    ]
+                ),
             }
             for _ in range(14)
         ]
@@ -114,8 +121,13 @@ class MatingBurstEffect:
         # Expanding ring
         ring_r = int(8 + t * 40)
         ring_surf = pygame.Surface((ring_r * 2 + 4, ring_r * 2 + 4), pygame.SRCALPHA)
-        pygame.draw.circle(ring_surf, (255, 120, 180, max(0, alpha // 2)),
-                           (ring_r + 2, ring_r + 2), ring_r, 3)
+        pygame.draw.circle(
+            ring_surf,
+            (255, 120, 180, max(0, alpha // 2)),
+            (ring_r + 2, ring_r + 2),
+            ring_r,
+            3,
+        )
         screen.blit(ring_surf, (sx - ring_r - 2, sy - ring_r - 2))
 
         for spark in self.sparks:
@@ -127,8 +139,9 @@ class MatingBurstEffect:
             if r < 1:
                 continue
             spark_surf = pygame.Surface((r * 2 + 2, r * 2 + 2), pygame.SRCALPHA)
-            pygame.draw.circle(spark_surf, (*spark["color"], spark_alpha),
-                               (r + 1, r + 1), r)
+            pygame.draw.circle(
+                spark_surf, (*spark["color"], spark_alpha), (r + 1, r + 1), r
+            )
             screen.blit(spark_surf, (int(px) - r, int(py) - r))
 
 
@@ -156,7 +169,7 @@ class Particle:
         self.speed_y = (
             random.uniform(0.05, 0.2) if self.is_plankton else random.uniform(0.05, 0.3)
         )
-        self.phase      = random.uniform(0, math.pi * 2)
+        self.phase = random.uniform(0, math.pi * 2)
         self.spin_phase = random.uniform(0, math.pi * 2)
         self.spin_speed = random.uniform(0.5, 1.5)
 
@@ -199,7 +212,7 @@ class Particle:
     def _draw_plankton_shape(self, surface, color, cx, cy, r, spin):
         """Draw a distinctive plankton organism shape."""
         if self.variant == 0:
-            arm   = r
+            arm = r
             thick = max(1, int(r * 0.55))
             pygame.draw.rect(surface, color, (cx - arm, cy - thick, arm * 2, thick * 2))
             pygame.draw.rect(surface, color, (cx - thick, cy - arm, thick * 2, arm * 2))
@@ -211,15 +224,15 @@ class Particle:
         elif self.variant == 1:
             points = []
             for i in range(12):
-                a  = spin + i * math.pi / 6
+                a = spin + i * math.pi / 6
                 ri = r if i % 2 == 0 else r * 0.45
                 points.append((cx + math.cos(a) * ri, cy + math.sin(a) * ri))
             if len(points) >= 3:
                 pygame.draw.polygon(surface, color, points)
 
         else:
-            body_w  = max(2, int(r * 1.4))
-            body_h  = max(2, int(r * 0.7))
+            body_w = max(2, int(r * 1.4))
+            body_h = max(2, int(r * 0.7))
             tail_len = int(r * 1.2)
             cos_s, sin_s = math.cos(spin), math.sin(spin)
             body_pts = []
@@ -232,7 +245,7 @@ class Particle:
                 body_pts.append((rx, ry))
             if len(body_pts) >= 3:
                 pygame.draw.polygon(surface, color, body_pts)
-            tail_end   = (
+            tail_end = (
                 cx - math.cos(spin) * (body_w + tail_len),
                 cy - math.sin(spin) * (body_w + tail_len),
             )
@@ -266,6 +279,7 @@ class ParticleSystem:
 
     def spawn_plankton_at(self, x, y, color_hint=None):
         from config import PLANKTON_HARD_CAP
+
         plankton_count = sum(1 for p in self.particles if p.is_plankton)
         if plankton_count >= PLANKTON_HARD_CAP:
             return
@@ -297,22 +311,24 @@ class ParticleSystem:
         self.mating_effects.append(MatingBurstEffect(x, y))
         # Spawn a cluster of heart particles
         from environment_objects import HeartParticle
+
         for _ in range(6):
             self._heart_particles.append(HeartParticle(x, y))
 
     def spawn_heart(self, x, y):
         """Spawn a single heart for fish currently in MATING state (called per-frame, rarely)."""
         from environment_objects import HeartParticle
+
         self._heart_particles.append(HeartParticle(x, y))
 
     def add_bubble(self, x, y):
         p = Particle(is_plankton=False)
-        p.x       = x
-        p.y       = y
+        p.x = x
+        p.y = y
         p.speed_y = -random.uniform(0.5, 1.2)
         p.speed_x = random.uniform(-0.2, 0.2)
-        p.color   = (200, 230, 255)
-        p.size    = random.randint(1, 3)
+        p.color = (200, 230, 255)
+        p.size = random.randint(1, 3)
         self.particles.append(p)
 
     # ── Update / Draw ──────────────────────────────────────────────────────
@@ -322,28 +338,29 @@ class ParticleSystem:
         for particle in self.particles:
             particle.update(time, depth_bias=depth_bias)
 
-        self.eat_effects = [e for e in self.eat_effects if e.update(
-            1 / 60)]  # approximate; real dt passed from fish_system
+        self.eat_effects = [
+            e for e in self.eat_effects if e.update(1 / 60)
+        ]  # approximate; real dt passed from fish_system
         self.mating_effects = [e for e in self.mating_effects if e.update(1 / 60)]
         self._heart_particles = [h for h in self._heart_particles if h.update(1 / 60)]
 
     def update_with_dt(self, dt, time_system=None):
-        """Preferred update — accepts real dt."""
+        """Preferred update — accepts real dt with optimized particle management."""
         depth_bias = time_system.plankton_depth_bias if time_system else 0.0
         for particle in self.particles:
             particle.update(pygame.time.get_ticks() * 0.001, depth_bias=depth_bias)
+
+        # In-place filtering for better performance
         self.eat_effects = [e for e in self.eat_effects if e.update(dt)]
         self.mating_effects = [e for e in self.mating_effects if e.update(dt)]
         self._heart_particles = [h for h in self._heart_particles if h.update(dt)]
 
     def draw(self, screen, camera, time_system=None):
         self.particle_surface.fill((0, 0, 0, 0))
-        view   = camera.get_view_rect()
+        view = camera.get_view_rect()
         margin = 60
 
-        biolumin_alpha = (
-            time_system.get_bioluminescence_alpha() if time_system else 0
-        )
+        biolumin_alpha = time_system.get_bioluminescence_alpha() if time_system else 0
         time_val = pygame.time.get_ticks() * 0.001
 
         for particle in self.particles:
@@ -356,19 +373,21 @@ class ParticleSystem:
             sx, sy = int(screen_pos[0]), int(screen_pos[1])
 
             if particle.is_plankton:
-                pulse    = (math.sin(time_val * 3.0 + particle.phase) + 1) * 0.5
-                base_r   = PLANKTON_BASE_RADIUS_MIN + particle.nutrition * (
+                pulse = (math.sin(time_val * 3.0 + particle.phase) + 1) * 0.5
+                base_r = PLANKTON_BASE_RADIUS_MIN + particle.nutrition * (
                     PLANKTON_BASE_RADIUS_MAX - PLANKTON_BASE_RADIUS_MIN
                 )
-                r        = max(1, int(base_r + pulse * 0.8))
+                r = max(1, int(base_r + pulse * 0.8))
 
                 brightness = 0.7 + 0.3 * particle.nutrition * (0.8 + 0.2 * pulse)
                 col = tuple(min(255, int(c * brightness)) for c in particle.color)
 
                 if biolumin_alpha > 0:
-                    glow_r     = r + 3 + int(pulse * 2)
-                    glow_alpha = min(255, int(biolumin_alpha * 1.4 * particle.nutrition))
-                    glow_col   = (
+                    glow_r = r + 3 + int(pulse * 2)
+                    glow_alpha = min(
+                        255, int(biolumin_alpha * 1.4 * particle.nutrition)
+                    )
+                    glow_col = (
                         min(255, col[0] + 40),
                         min(255, col[1] + 80),
                         min(255, col[2] + 60),
@@ -377,8 +396,10 @@ class ParticleSystem:
                         (glow_r * 2 + 2, glow_r * 2 + 2), pygame.SRCALPHA
                     )
                     pygame.draw.circle(
-                        glow_surf, (*glow_col, glow_alpha),
-                        (glow_r + 1, glow_r + 1), glow_r
+                        glow_surf,
+                        (*glow_col, glow_alpha),
+                        (glow_r + 1, glow_r + 1),
+                        glow_r,
                     )
                     self.particle_surface.blit(
                         glow_surf, (sx - glow_r - 1, sy - glow_r - 1)
@@ -392,9 +413,7 @@ class ParticleSystem:
                 )
                 nucleus_r = max(1, r // 3)
                 bright_col = tuple(min(255, c + 80) for c in col)
-                pygame.draw.circle(
-                    shape_surf, (*bright_col, 255), (cx, cy), nucleus_r
-                )
+                pygame.draw.circle(shape_surf, (*bright_col, 255), (cx, cy), nucleus_r)
                 self.particle_surface.blit(
                     shape_surf, (sx - shape_size // 2, sy - shape_size // 2)
                 )
