@@ -4,6 +4,7 @@ from environment_objects import PoopParticle, FishEgg
 from fish_traits import FishTraits
 from family import Family
 from brain_visualizer import BrainVisualizer
+from neural_net import NeuralNet
 
 
 class FishSystem:
@@ -13,7 +14,6 @@ class FishSystem:
             particle_system,
             plant_manager,
         )
-        # Link world to system so predators can find mates in population lists
         self.world.fish_system = self
 
         self.fish = [NeuralFish(world) for _ in range(FISH_MAX_POPULATION // 2)]
@@ -28,27 +28,23 @@ class FishSystem:
         self.selected_fish = None
         self.families = []
 
-        # Initialize brain visualizer
         self.brain_visualizer = BrainVisualizer(SCREEN_WIDTH, SCREEN_HEIGHT)
 
     def handle_click(self, pos, camera):
-        # Convert screen click to world coordinates
         world_x = pos[0] + camera.x
         world_y = pos[1] + camera.y
-
         all_f = self.fish + self.cleaner_fish + self.predators
         if not all_f:
             return
         clicked = min(
-            all_f,
-            key=lambda f: f.physics.pos.distance_to((world_x, world_y)),
+            all_f, key=lambda f: f.physics.pos.distance_to((world_x, world_y))
         )
         if clicked.physics.pos.distance_to((world_x, world_y)) < 40:
             self.selected_fish = clicked
         else:
             self.selected_fish = None
 
-    def update(self, dt):
+    def update(self, dt, time_system=None):
         all_fish = self.fish + self.cleaner_fish + self.predators
 
         # 1. Predator Reproduction Cycle
@@ -59,7 +55,6 @@ class FishSystem:
                 and len(self.predators) < PREDATOR_MAX_POPULATION
             ):
                 mate = predator.mate
-                # Blend brains from both parents for genetic diversity
                 blended_brain = NeuralNet.blend(predator.brain, mate.brain)
                 egg = FishEgg(
                     predator.physics.pos.x,
@@ -71,21 +66,21 @@ class FishSystem:
                     brain=blended_brain.mutate(),
                 )
                 self.eggs.append(egg)
-                predator.mate = None  # Clear stale reference after egg is created
+                predator.mate = None
 
-        # Update eggs
+        # 2. Update eggs — hatch and spawn at egg location
         for egg in self.eggs[:]:
             if egg.update(dt, self.world):
                 self.eggs.remove(egg)
                 self.spawn_from_egg(egg)
 
-        # 3. Handle Family Units
+        # 3. Family Units
         for family in self.families[:]:
             family.update(dt)
             if not family.active:
                 self.families.remove(family)
 
-        # 4. Handle Sediment/Fertilizer
+        # 4. Sediment/Fertilizer
         for p in self.poops[:]:
             if not p.update(dt, self.world):
                 self.poops.remove(p)
@@ -93,7 +88,8 @@ class FishSystem:
         # 5. Core Simulation Loop
         plankton = [p for p in self.particle_system.particles if p.is_plankton]
 
-        # Mapping populations to their targets and reproductive capability
+        pred_activity = time_system.predator_activity_modifier if time_system else 1.0
+
         sim_groups = [
             (self.fish, plankton, True),
             (self.cleaner_fish, self.poops, True),
@@ -103,10 +99,14 @@ class FishSystem:
         for f_list, targets, can_mate in sim_groups:
             for f in f_list[:]:
                 res = f.update(
-                    dt, all_fish, targets, self.particle_system, self.plant_manager
+                    dt,
+                    all_fish,
+                    targets,
+                    self.particle_system,
+                    self.plant_manager,
+                    time_system=time_system,
                 )
 
-                # Handle physical results (Poop or Eggs)
                 if isinstance(res, PoopParticle):
                     self.poops.append(res)
                 elif isinstance(res, tuple) and res[0] == "egg":
@@ -123,7 +123,6 @@ class FishSystem:
                         )
                     )
 
-                # Handle death
                 lifespan = FISH_MAX_AGE * f.traits.physical_traits.get(
                     "lifespan_mult", 1.0
                 )
@@ -133,13 +132,16 @@ class FishSystem:
                     f_list.remove(f)
                     continue
 
-                # Handle mating attempts (within subspecies)
                 if can_mate and f.state == FishState.MATING:
                     self.try_mate(f, f_list)
 
-        # Maintain base population
         if len(self.fish) < 6:
             self.fish.append(NeuralFish(self.world))
+
+        # 6. Update eat effects with real dt
+        self.particle_system.eat_effects = [
+            e for e in self.particle_system.eat_effects if e.update(dt)
+        ]
 
     def try_mate(self, f, f_list):
         if f.is_pregnant:
@@ -155,7 +157,6 @@ class FishSystem:
                     partner.energy -= FISH_REPRODUCTION_COST
                     f.mating_cooldown, partner.mating_cooldown = 40.0, 40.0
                     child_traits = FishTraits.blend(f.traits, partner.traits)
-                    # Blend brains from both parents for genetic diversity
                     blended_brain = NeuralNet.blend(f.brain, partner.brain)
                     child_brain = blended_brain.mutate()
                     mother = f if f.sex == "F" else partner
@@ -169,18 +170,41 @@ class FishSystem:
                     break
 
     def spawn_from_egg(self, egg):
+        """Spawn a juvenile fish at the egg's position."""
+        # Clamp spawn position to valid water bounds
+        spawn_x = max(50, min(WORLD_WIDTH - 50, egg.x))
+        spawn_y = max(WATER_LINE_Y + 30, min(WORLD_HEIGHT - 100, egg.y))
+
         if egg.is_cleaner:
             from cleaner_fish import CleanerFish
 
-            child = CleanerFish(self.world, traits=egg.traits, brain=egg.brain)
+            child = CleanerFish(
+                self.world,
+                traits=egg.traits,
+                brain=egg.brain,
+                start_x=spawn_x,
+                start_y=spawn_y,
+            )
             self.cleaner_fish.append(child)
         elif egg.is_predator:
             from predator_fish import PredatorFish
 
-            child = PredatorFish(self.world, traits=egg.traits, brain=egg.brain)
+            child = PredatorFish(
+                self.world,
+                traits=egg.traits,
+                brain=egg.brain,
+                start_x=spawn_x,
+                start_y=spawn_y,
+            )
             self.predators.append(child)
         else:
-            child = NeuralFish(self.world, traits=egg.traits, brain=egg.brain)
+            child = NeuralFish(
+                self.world,
+                traits=egg.traits,
+                brain=egg.brain,
+                start_x=spawn_x,
+                start_y=spawn_y,
+            )
             self.fish.append(child)
 
         p1, p2 = egg.parent1, egg.parent2
@@ -190,15 +214,16 @@ class FishSystem:
             self.families.append(family)
             p1.family, p2.family, child.family = family, family, family
 
-    def draw(self, screen, camera, time, dt=0.0):
-        # Update brain visualizer
+    def draw(self, screen, camera, time, dt=0.0, time_system=None):
         self.brain_visualizer.update(dt, self.selected_fish)
+
+        biolum = time_system.get_bioluminescence_alpha() if time_system else 0
 
         for e in self.eggs:
             e.draw(screen, camera)
         for p in self.poops:
             p.draw(screen, camera)
         for f in self.fish + self.cleaner_fish + self.predators:
-            f.draw(screen, camera, time, f == self.selected_fish)
+            f.draw(screen, camera, time, f == self.selected_fish, biolum_alpha=biolum)
         if self.selected_fish:
             self.brain_visualizer.draw(screen, self.selected_fish, time)

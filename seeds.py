@@ -15,6 +15,15 @@ from config import (
     SEAGRASS_DEPTH_MIN,
     SEAGRASS_DEPTH_MAX,
     ALGAE_DEPTH_MIN,
+    RED_SEAWEED_DEPTH_MIN,
+    RED_SEAWEED_DEPTH_MAX,
+    LILY_PAD_DEPTH_MAX,
+    TUBE_SPONGE_DEPTH_MIN,
+    TUBE_SPONGE_DEPTH_MAX,
+    FAN_CORAL_DEPTH_MIN,
+    FAN_CORAL_DEPTH_MAX,
+    ANEMONE_DEPTH_MIN,
+    ANEMONE_DEPTH_MAX,
 )
 
 
@@ -30,6 +39,14 @@ class Seed:
                 "growth_rate_mult": random.uniform(0.9, 1.1),
                 "root_aggression": random.uniform(0.8, 1.2),
                 "seed_efficiency": random.uniform(0.9, 1.1),
+                # New traits for new species
+                "glow_intensity": random.uniform(0.8, 1.2),  # For bioluminescent plants
+                "spread_factor": random.uniform(
+                    0.8, 1.2
+                ),  # For spreading plants like lily pads
+                "filter_efficiency": random.uniform(0.9, 1.1),  # For tube sponges
+                "branch_density": random.uniform(0.8, 1.2),  # For fan coral
+                "pulse_speed": random.uniform(0.9, 1.1),  # For anemones
             }
         else:
             self.traits = traits.copy()
@@ -52,9 +69,13 @@ class Seed:
                 new_traits[key] = value
         return new_traits
 
-    def update(self, dt, world):
+    def update(self, dt, world, time_system=None):
         """Update position with gentle drifting and water resistance"""
         self.age += dt
+
+        # Prevent germination / settling in winter
+        if time_system and time_system.season_index == 3:
+            return False  # stay as seed
 
         # Horizontal drift
         drift = math.sin(self.age * 1.5 + self.phase) * 0.4
@@ -88,6 +109,29 @@ class Seed:
                 return True
             elif self.plant_type == "algae" and depth_ratio >= ALGAE_DEPTH_MIN:
                 return True
+            # NEW SPECIES CONDITIONS
+            elif (
+                self.plant_type == "red_seaweed"
+                and RED_SEAWEED_DEPTH_MIN <= depth_ratio <= RED_SEAWEED_DEPTH_MAX
+            ):
+                return True
+            elif self.plant_type == "lily_pad" and depth_ratio <= LILY_PAD_DEPTH_MAX:
+                return True
+            elif (
+                self.plant_type == "tube_sponge"
+                and TUBE_SPONGE_DEPTH_MIN <= depth_ratio <= TUBE_SPONGE_DEPTH_MAX
+            ):
+                return True
+            elif (
+                self.plant_type == "fan_coral"
+                and FAN_CORAL_DEPTH_MIN <= depth_ratio <= FAN_CORAL_DEPTH_MAX
+            ):
+                return True
+            elif (
+                self.plant_type == "anemone"
+                and ANEMONE_DEPTH_MIN <= depth_ratio <= ANEMONE_DEPTH_MAX
+            ):
+                return True
 
             # Wrong depth or habitat - bounce and keep drifting
             self.vy = -0.3
@@ -106,6 +150,11 @@ class Seed:
             "kelp": (60, 150, 60),
             "seagrass": (100, 220, 100),
             "algae": (40, 110, 40),
+            "red_seaweed": (160, 50, 50),
+            "lily_pad": (50, 140, 50),
+            "tube_sponge": (180, 160, 120),
+            "fan_coral": (220, 120, 170),
+            "anemone": (140, 80, 200),
         }[self.plant_type]
 
         # Slight tint based on max_height_factor
