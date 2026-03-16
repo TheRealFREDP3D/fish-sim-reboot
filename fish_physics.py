@@ -1,6 +1,7 @@
 import math
 import random
 import pygame
+
 # No typing imports needed
 
 
@@ -45,7 +46,9 @@ class SteeringPhysics:
         self.vel *= drag
 
         # Speed limit (use speed_ceiling if provided, otherwise max_speed)
-        effective_max_speed = speed_ceiling if speed_ceiling is not None else self.max_speed
+        effective_max_speed = (
+            speed_ceiling if speed_ceiling is not None else self.max_speed
+        )
         if self.vel.length() > effective_max_speed:
             self.vel.scale_to_length(effective_max_speed)
 
