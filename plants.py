@@ -36,7 +36,7 @@ from seeds import Seed
 from plant_development import PlantDevelopment
 
 PLANT_HARD_CAP  = 60
-SEED_HARD_CAP   = 40
+SEED_HARD_CAP   = 60  # increased from 40
 
 # Map each plant type to its dominant color for plankton tinting
 _PLANT_PLANKTON_COLOR = {
@@ -206,17 +206,12 @@ class Plant:
     # ── Plankton production ────────────────────────────────────────────────
 
     def try_produce_plankton(self, dt, particle_system, time):
-        """
-        Mature plants continuously shed plankton from their tips.
-        Returns True if a particle was spawned this frame.
-        """
         if not self.development.is_mature:
             return False
         self._plankton_timer -= dt
         if self._plankton_timer > 0:
             return False
 
-        # Reset timer with some jitter so plants don't synchronise
         self._plankton_timer = (1.0 / PLANKTON_PER_PLANT_CHANCE) + random.uniform(-2, 2)
 
         tip_x, tip_y = self.get_tip_position(time)
@@ -246,7 +241,12 @@ class Plant:
         need_mult  = self.development.get_root_growth_multiplier(
             self.development.energy, self.development.current_height
         )
-        self.root_system.adjust_growth_rate(ROOT_BASE_GROWTH_RATE * base_mult * need_mult)
+        # Roots don't grow in winter or when dormant/seed
+        if self.development.stage not in ("seed", "dormant") and season_index != 3:
+            self.root_system.adjust_growth_rate(ROOT_BASE_GROWTH_RATE * base_mult * need_mult)
+        else:
+            self.root_system.adjust_growth_rate(0.0)
+
         self.root_system.update(dt, self.development.current_height)
         nutrients = self.root_system.harvest_nutrients()
 
@@ -273,11 +273,20 @@ class Plant:
                 "vx": random.uniform(-0.5, 0.5), "vy": random.uniform(-0.8, -0.4),
                 "life": random.uniform(6, 12), "rot": 0, "spin": random.uniform(-5, 5),
             })
-        for leaf in self.floating_leaves[:]:
-            leaf["x"] += leaf["vx"];  leaf["y"] += leaf["vy"]
-            leaf["life"] -= dt;       leaf["rot"]  += leaf["spin"] * dt
-            if leaf["life"] <= 0:
-                self.floating_leaves.remove(leaf)
+        # Update floating leaves more efficiently
+        self.floating_leaves = [
+            {
+                "x": leaf["x"] + leaf["vx"],
+                "y": leaf["y"] + leaf["vy"],
+                "vx": leaf["vx"],
+                "vy": leaf["vy"],
+                "life": leaf["life"] - dt,
+                "rot": leaf["rot"] + leaf["spin"] * dt,
+                "spin": leaf["spin"]
+            }
+            for leaf in self.floating_leaves
+            if leaf["life"] > dt  # Only keep leaves that will survive this frame
+        ]
 
         if self.development.stage == "decomposing" and random.random() < 0.1:
             self.decomposition_particles.append({
@@ -286,10 +295,18 @@ class Plant:
                 "vx": random.uniform(-0.3, 0.3), "vy": random.uniform(-0.2, 0.2),
                 "life": 2.0,
             })
-        for p in self.decomposition_particles[:]:
-            p["x"] += p["vx"]; p["y"] += p["vy"]; p["life"] -= dt
-            if p["life"] <= 0:
-                self.decomposition_particles.remove(p)
+        # Update decomposition particles more efficiently
+        self.decomposition_particles = [
+            {
+                "x": p["x"] + p["vx"],
+                "y": p["y"] + p["vy"],
+                "vx": p["vx"],
+                "vy": p["vy"],
+                "life": p["life"] - dt
+            }
+            for p in self.decomposition_particles
+            if p["life"] > dt  # Only keep particles that will survive this frame
+        ]
 
         return alive
 
@@ -320,6 +337,15 @@ class Plant:
             pygame.draw.circle(screen, (220, 240, 160, 220), pos, 3)
             return
 
+        # Dormant plants draw as a small withered stub
+        if self.development.stage == "dormant":
+            pos = camera.apply((self.x, self.base_y))
+            stub_h = max(4, int(self.development.current_height * 0.3))
+            stub_top = camera.apply((self.x, self.base_y - stub_h))
+            pygame.draw.line(screen, (80, 65, 50), pos, stub_top, 3)
+            pygame.draw.circle(screen, (70, 60, 45), (int(stub_top[0]), int(stub_top[1])), 3)
+            return
+
         color  = self.get_organic_color()
         height = self.development.current_height
 
@@ -341,8 +367,10 @@ class Plant:
                 my = self.base_y + mark["oy"]
                 screen_pos = camera.apply((mx, my))
                 alpha = int(255 * (mark["life"] / GRAZING_VISUAL_DURATION))
-                pygame.draw.circle(screen, (90, 60, 40, alpha),
-                                   (int(screen_pos[0]), int(screen_pos[1])), 4)
+                # Use surface with SRCALPHA for proper alpha blending
+                bite_surf = pygame.Surface((12, 12), pygame.SRCALPHA)
+                pygame.draw.circle(bite_surf, (90, 60, 40, alpha), (6, 6), 4)
+                screen.blit(bite_surf, (int(screen_pos[0]) - 6, int(screen_pos[1]) - 6))
 
         if biolum_alpha > 10 and self.development.is_mature:
             self._draw_bioluminescence(screen, camera, time, biolum_alpha)
@@ -621,17 +649,36 @@ class PlantManager:
         self.seeds          = []
         self.bubbles        = []
         self._renewal_timer = 0.0
+        self._last_renewal_season = -1
 
     def spawn_initial_seeds(self):
+        """Spawn a generous initial seed bank and a handful of established plants."""
         species_weights = [
             ("kelp", 15), ("seagrass", 20), ("algae", 15),
             ("red_seaweed", 12), ("lily_pad", 8),
             ("tube_sponge", 10), ("fan_coral", 12), ("anemone", 15),
         ]
-        for _ in range(30):
+        # More initial seeds — 40 instead of 30
+        for _ in range(40):
             pt = random.choices([s[0] for s in species_weights],
                                 weights=[s[1] for s in species_weights])[0]
             self.seeds.append(Seed(pt))
+
+        # Also spawn a small number of pre-established plants so the world
+        # never starts completely empty while seeds are waiting to germinate.
+        soil_grid = self.world.soil_grid
+        for pt, _ in species_weights:
+            for _ in range(2):
+                seed = Seed(pt)
+                terrain_y   = self.world.get_terrain_height(seed.x)
+                depth_ratio = self.world.get_depth_ratio(terrain_y)
+                if _is_valid_depth(pt, depth_ratio):
+                    plant = Plant(seed.x, terrain_y, pt, soil_grid, seed.traits, self.world)
+                    # Fast-forward to seedling/mature stage so the world looks alive
+                    plant.development.stage = "seedling"
+                    plant.development.energy = 4.0
+                    plant.development.current_height = plant.max_height * 0.4
+                    self.plants.append(plant)
 
     # ── Update ────────────────────────────────────────────────────────────
 
@@ -646,25 +693,52 @@ class PlantManager:
         n_seeds  = len(self.seeds)
         total    = n_plants + n_seeds
 
-        # Renewal: spawn new seeds when world is sparse
-        if total < 20:
+        # ── Emergency renewal: inject seeds whenever the ecosystem is critically low ──
+        # Allow renewal in any non-summer season (seeds wait out winter safely)
+        RENEWAL_THRESHOLD = 12
+        if total < RENEWAL_THRESHOLD:
             self._renewal_timer += dt
-            if self._renewal_timer >= 8.0:
+            # Inject faster in Spring, slower other seasons
+            renewal_interval = 4.0 if season_idx == 0 else 8.0
+            if self._renewal_timer >= renewal_interval:
                 self._renewal_timer = 0.0
                 species_counts = {}
                 for p in self.plants:
                     species_counts[p.plant_type] = species_counts.get(p.plant_type, 0) + 1
                 all_sp  = ["kelp", "seagrass", "algae", "red_seaweed",
                             "lily_pad", "tube_sponge", "fan_coral", "anemone"]
-                weights = [max(1, 4 - species_counts.get(s, 0)) for s in all_sp]
-                self.seeds.append(Seed(random.choices(all_sp, weights=weights)[0]))
+                # Weight toward under-represented species
+                weights = [max(1, 5 - species_counts.get(s, 0)) for s in all_sp]
+                new_seed = Seed(random.choices(all_sp, weights=weights)[0])
+                self.seeds.append(new_seed)
+                n_seeds += 1
+                total   += 1
         else:
             self._renewal_timer = 0.0
 
-        # Update seeds
+        # If critically low AND in Spring, also directly spawn a plant to jumpstart recovery
+        if n_plants < 5 and season_idx == 0 and random.random() < 0.005 * dt * 60:
+            all_sp = ["kelp", "seagrass", "algae", "red_seaweed",
+                      "lily_pad", "tube_sponge", "fan_coral", "anemone"]
+            pt = random.choice(all_sp)
+            x  = random.uniform(100, WORLD_WIDTH - 100)
+            terrain_y   = self.world.get_terrain_height(x)
+            depth_ratio = self.world.get_depth_ratio(terrain_y)
+            if _is_valid_depth(pt, depth_ratio) and n_plants < PLANT_HARD_CAP:
+                from seeds import Seed as _Seed
+                tmp_seed = _Seed(pt)
+                tmp_seed.x = x
+                plant = Plant(x, terrain_y, pt, soil_grid, tmp_seed.traits, self.world)
+                plant.development.stage  = "seedling"
+                plant.development.energy = 3.0
+                self.plants.append(plant)
+                n_plants += 1
+
+        # Update seeds — seeds settle and germinate according to seasonal rules
         for seed in self.seeds[:]:
             if seed.update(dt, self.world, time_system):
                 self.seeds.remove(seed)
+                n_seeds -= 1
                 if n_plants < PLANT_HARD_CAP:
                     terrain_y   = self.world.get_terrain_height(seed.x)
                     depth_ratio = self.world.get_depth_ratio(terrain_y)
@@ -690,18 +764,19 @@ class PlantManager:
                     for nb, _ in soil_grid.get_neighbors(cell.x, cell.y):
                         nb.nutrient = min(SOIL_MAX_NUTRIENT, nb.nutrient + nutrients * 0.3)
                 self.plants.remove(plant)
+                n_plants -= 1
                 continue
 
-            # Plant → plankton production
+            # Plant → plankton production (only when mature)
             if particle_system is not None and plant.development.is_mature:
                 plant.try_produce_plankton(dt, particle_system, time)
 
-            # Seed production
-            if total < PLANT_HARD_CAP + SEED_HARD_CAP:
+            # Seed production — Summer (1) and Autumn (2)
+            n_seeds = len(self.seeds)
+            if season_idx in (1, 2) and (n_plants + n_seeds) < PLANT_HARD_CAP + SEED_HARD_CAP:
                 new_seed = plant.try_produce_seed(time, seed_mod, season_idx)
                 if new_seed and n_seeds < SEED_HARD_CAP:
                     self.seeds.append(new_seed)
-                    n_seeds += 1
 
             # Bubble emissions
             bc = BUBBLE_CHANCE

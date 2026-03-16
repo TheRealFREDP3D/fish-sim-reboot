@@ -179,19 +179,19 @@ ROOT_MAX_GROWTH_MULTIPLIER    = 3.5
 # ── Plant lifecycle ───────────────────────────────────────────────────────────
 SEED_GROWTH_ENERGY          = 1.0
 MATURE_ENERGY_THRESHOLD     = 3.5
-PLANT_BASE_MAINTENANCE      = 0.15
+PLANT_BASE_MAINTENANCE      = 0.12   # reduced from 0.15 for better longevity
 PLANT_SIZE_MAINTENANCE_FACTOR = 0.35
-PLANT_MAX_AGE               = 60.0
+PLANT_MAX_AGE               = 70.0   # increased from 60.0
 SEED_PRODUCTION_ENERGY      = 5.5
-SEED_PRODUCTION_COST        = 3.0
-FLOWERING_ENERGY_THRESHOLD  = 7.0
-FLOWERING_DURATION          = 12.0
+SEED_PRODUCTION_COST        = 2.0    # reduced from 3.0 — seeding less costly
+FLOWERING_ENERGY_THRESHOLD  = 6.0   # reduced from 7.0 — easier to flower
+FLOWERING_DURATION          = 14.0   # slightly longer flowering window
 DECOMPOSITION_NUTRIENT_RETURN = 0.8
 DECOMPOSITION_DURATION      = 8.0
 
 # ── Plant population caps ─────────────────────────────────────────────────────
 PLANT_HARD_CAP = 60
-SEED_HARD_CAP  = 40
+SEED_HARD_CAP  = 60   # increased from 40 — allow more seeds to accumulate
 
 # ── Plankton spawning from plants ─────────────────────────────────────────────
 PLANKTON_PER_PLANT_CHANCE  = 0.012   # probability per mature plant per second
@@ -262,6 +262,23 @@ BRAIN_PANEL_HEIGHT = 800
 DAY_DURATION    = 120.0
 SEASON_DURATION = DAY_DURATION * 7
 
+# ── Named constants for magic numbers ────────────────────────────────────────
+INFINITE_COOLDOWN = 999.0
+GERMINATION_FAILURE_ENERGY_THRESHOLD = 0.5
+GERMINATION_FAILURE_TIME = 60.0
+SEEDLING_DEATH_TIME = 25.0
+DORMANT_ENERGY_MINIMUM = 0.05
+DORMANT_DEATH_TIME = 30.0
+SPRING_GERMINATION_BASE_CHANCE = 0.015
+SUMMER_GERMINATION_BASE_CHANCE = 0.006
+SEED_ENERGY_THRESHOLD = 0.6
+FLOWERING_BASE_CHANCE = 0.015
+AUTUMN_SEED_BASE_PROBABILITY = 0.004
+SUMMER_SEED_BASE_PROBABILITY = 0.001
+SEED_ENERGY_COST = 2.0
+PREDATOR_SIZE_ADVANTAGE_MULTIPLIER = 1.2
+PREY_PREDATOR_MIN_DISTANCE = 400
+
 DAWN_START = 0.18
 DAWN_END   = 0.27
 DUSK_START = 0.73
@@ -297,31 +314,35 @@ LEAF_COLORS = [(180, 80, 20), (210, 130, 30), (160, 60, 10), (200, 160, 40)]
 SNOW_COLOR  = (220, 235, 255)
 
 # ── Enhanced seasonal plant behavior ──────────────────────────────────────────
+# Significantly raised survival chances so plants persist through winter
 WINTER_SURVIVAL_CHANCE = {
-    "kelp":         0.15,
-    "seagrass":     0.35,
-    "algae":        0.05,
-    "red_seaweed":  0.10,
-    "lily_pad":     0.70,
-    "tube_sponge":  0.45,
-    "fan_coral":    0.25,
-    "anemone":      0.60,
+    "kelp":         0.30,   # was 0.15
+    "seagrass":     0.55,   # was 0.35
+    "algae":        0.15,   # was 0.05
+    "red_seaweed":  0.25,   # was 0.10
+    "lily_pad":     0.80,   # was 0.70
+    "tube_sponge":  0.60,   # was 0.45
+    "fan_coral":    0.40,   # was 0.25
+    "anemone":      0.70,   # was 0.60
 }
 
 SPRING_GERMINATION_BOOST = 4.0
 WINTER_PHOTOSYNTHESIS_BASE = 0.08
 
+# Flowering preferences per season (0=Spring, 1=Summer, 2=Autumn, 3=Winter)
+# Summer now also has a moderate preference so plants can flower+seed in Summer too
 FLOWERING_SEASON_PREFERENCE = {
-    0: 0.4,
-    1: 1.8,
-    2: 0.6,
-    3: 0.0,
+    0: 0.3,   # Spring: rare flowering
+    1: 1.4,   # Summer: good flowering (was 1.8 — still high but allows summer seeding)
+    2: 1.0,   # Autumn: solid flowering (was 0.6)
+    3: 0.0,   # Winter: none
 }
 
 _SEASON_AGE_RATE     = {0: 0.8, 1: 0.7, 2: 1.2, 3: 2.0}
 _SEASON_PHOTO_MOD    = {0: 1.0, 1: 1.1, 2: 0.8, 3: 0.25}
-_SEASON_CAN_SEED     = {0: True, 1: True, 2: True, 3: False}
-_SEASON_SEED_COOLDOWN = {0: 20.0, 1: 35.0, 2: 12.0, 3: 999.0}
+# Allow seeding in Summer (1) and Autumn (2); not Spring (saves energy for growth) or Winter
+_SEASON_CAN_SEED     = {0: False, 1: True, 2: True, 3: False}
+_SEASON_SEED_COOLDOWN = {0: INFINITE_COOLDOWN, 1: 30.0, 2: 10.0, 3: INFINITE_COOLDOWN}
 
 # ── Fish-Plant Interaction Mechanics ──────────────────────────────────────────
 PLANT_COVER_RADIUS = 85.0

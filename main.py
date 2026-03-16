@@ -42,7 +42,6 @@ class Simulation:
         self.camera          = Camera()
         self.particle_system = ParticleSystem()
 
-        # Wire particle_system onto world so PlantManager can access it
         self.world.particle_system = self.particle_system
 
         self.plant_manager = PlantManager(self.world)
@@ -61,7 +60,6 @@ class Simulation:
         self.camera          = Camera()
         self.particle_system = ParticleSystem()
 
-        # Re-wire after reset
         self.world.particle_system = self.particle_system
 
         self.plant_manager = PlantManager(self.world)
@@ -92,7 +90,6 @@ class Simulation:
         self.time += dt
         self.dt   = dt
 
-        # Arrow key camera panning
         keys = pygame.key.get_pressed()
         dx = (keys[pygame.K_RIGHT] - keys[pygame.K_LEFT])
         dy = (keys[pygame.K_DOWN]  - keys[pygame.K_UP])
@@ -101,7 +98,8 @@ class Simulation:
         self.time_system.update(dt)
         self.world.soil_grid.update(dt)
         self.world.update(dt, self.time_system)
-        self.particle_system.update(self.time, self.time_system)
+        # Use the dt-aware update for particles so effects animate correctly
+        self.particle_system.update_with_dt(dt, self.time_system)
         self.plant_manager.update(dt, time_system=self.time_system)
         self.fish_system.update(dt, time_system=self.time_system)
 
@@ -228,6 +226,7 @@ def main():
     print("  Four seasons: Spring / Summer / Autumn / Winter")
     print("  Seasonal mating drives, metabolism, seed dispersal")
     print("  Autumn leaf and winter snow surface particles")
+    print("  Mating glow + hearts; egg-laying burst; family bond lines")
     print("\nControls:")
     print("  Left Click  — Select/deselect fish to view brain")
     print("  Arrow Keys  — Pan camera")

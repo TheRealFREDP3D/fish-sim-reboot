@@ -3,15 +3,13 @@ from config import CLEANER_FISH_SPEED_MULT, CLEANER_FISH_CLEANING_ENERGY_THRESHO
 
 
 class CleanerFish(NeuralFish):
-    def __init__(self, world, traits=None, brain=None):
-        super().__init__(world, traits=traits, brain=brain, is_cleaner=True)
+    def __init__(self, world, traits=None, brain=None, start_x=None, start_y=None):
+        super().__init__(world, traits=traits, brain=brain, is_cleaner=True,
+                         start_x=start_x, start_y=start_y)
         self.physics.max_speed *= CLEANER_FISH_SPEED_MULT
 
     def update(self, dt, all_fish, targets, particle_system, plant_manager,
                time_system=None):
-        """
-        Adds a supplementary poop-seeking force on top of the neural steering.
-        """
         closest_poop = None
         min_dist = 200
 

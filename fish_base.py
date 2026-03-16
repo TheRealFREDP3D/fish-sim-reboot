@@ -9,10 +9,8 @@ from config import *
 from family import Family
 from environment_objects import PoopParticle
 
-# Pre-allocated shared glow surface — large enough for any fish glow.
-# Allocated once at module load, reused every draw call.
 _GLOW_SURF_SIZE = 60
-_glow_surf = None  # initialised lazily after pygame.init()
+_glow_surf = None
 
 
 def _get_glow_surf():
@@ -23,19 +21,45 @@ def _get_glow_surf():
     return _glow_surf
 
 
+def get_life_stage_size_mult(age):
+    larva_end   = FISH_LARVA_DURATION
+    juv_end     = larva_end + FISH_JUVENILE_DURATION
+    adult_end   = juv_end   + FISH_ADULT_DURATION
+
+    if age < larva_end:
+        return 0.35
+    elif age < juv_end:
+        if FISH_JUVENILE_DURATION <= 0:
+            return 0.55
+        t = (age - larva_end) / FISH_JUVENILE_DURATION
+        return 0.35 + t * 0.40
+    elif age < adult_end:
+        if FISH_ADULT_DURATION <= 0:
+            return 0.875
+        t = (age - juv_end) / FISH_ADULT_DURATION
+        return 0.75 + t * 0.25
+    else:
+        return 1.0
+
+
 class NeuralFish:
     INPUT_COUNT  = 15
     OUTPUT_COUNT = 2
 
-    def __init__(self, world, traits=None, brain=None, is_cleaner=False):
+    def __init__(self, world, traits=None, brain=None, is_cleaner=False,
+                 start_x=None, start_y=None):
         self.world       = world
         self.is_cleaner  = is_cleaner
         self.is_predator = False
         self.traits      = traits if traits else FishTraits()
         self.brain       = brain  if brain  else NeuralNet(self.INPUT_COUNT, 12, self.OUTPUT_COUNT)
 
-        start_x = random.uniform(100, WORLD_WIDTH - 100)
-        start_y = random.uniform(WATER_LINE_Y + 100, WORLD_HEIGHT - 200)
+        # Use provided spawn position (e.g. egg location) or random
+        if start_x is None:
+            start_x = random.uniform(100, WORLD_WIDTH - 100)
+        if start_y is None:
+            start_y = random.uniform(WATER_LINE_Y + 100, WORLD_HEIGHT - 200)
+
         self.physics = SteeringPhysics(start_x, start_y, FISH_MAX_SPEED, FISH_MAX_FORCE)
 
         self.physics.max_speed *= self.traits.physical_traits.get("max_speed_mult", 1.0)
@@ -64,25 +88,21 @@ class NeuralFish:
         self.distance_traveled = 0.0
         self.offspring_count   = 0
 
+        # Mating display state
+        self._mating_glow_timer = 0.0
+        self._heart_timer = 0.0
+
     @property
     def pos(self):
         return self.physics.pos
 
+    def get_current_size_mult(self):
+        return (get_life_stage_size_mult(self.age)
+                * self.traits.physical_traits.get("size_mult", 1.0))
+
     # ── Radar / sensory inputs ─────────────────────────────────────────────
 
     def get_radar_inputs(self, all_fish, targets, plant_manager):
-        """
-        Returns a 15-element input vector:
-          [0-2]  food radar   (L/C/R)
-          [3-5]  threat radar (L/C/R)
-          [6-8]  mate radar   (L/C/R)
-          [9]    energy
-          [10]   stamina
-          [11]   depth
-          [12]   speed
-          [13]   cover quality
-          [14]   plant food average
-        """
         radar = [0.0] * 9
         self.is_hidden = False
         min_plant_dist = 9999
@@ -178,7 +198,6 @@ class NeuralFish:
             6, bias_multiplier=mate_bias,
         )
 
-        # Build and return the complete 15-element input vector
         stats = [
             self.energy / FISH_MAX_ENERGY,
             self.stamina / 100.0,
@@ -187,7 +206,7 @@ class NeuralFish:
             cover_quality,
             sum(plant_food) / 3.0,
         ]
-        return radar + stats  # 9 + 6 = 15
+        return radar + stats
 
     # ── Update ─────────────────────────────────────────────────────────────
 
@@ -214,14 +233,10 @@ class NeuralFish:
             recovery = 8.0 * self.traits.physical_traits.get("stamina_mult", 1.0) * dt
             self.stamina = min(100.0, self.stamina + recovery)
 
-        # Build the complete 15-element input vector once
         full_inputs = self.get_radar_inputs(all_fish, targets, plant_manager)
-
-        # Extract named slices for state logic (indices match get_radar_inputs layout)
         threat_level  = sum(full_inputs[3:6])
         cover_quality = full_inputs[13]
 
-        # Grazing
         self.grazing_cooldown = getattr(self, "grazing_cooldown", 0.0)
         self.grazing_cooldown = max(0.0, self.grazing_cooldown - dt)
 
@@ -240,11 +255,9 @@ class NeuralFish:
                                                        self.physics.pos.y - 8)
                         break
 
-        # Shelter stamina recovery
         if cover_quality > 0.3:
             self.stamina = min(100.0, self.stamina + 18.0 * cover_quality * dt)
 
-        # State machine
         mating_drive  = time_system.mating_drive_modifier if time_system else 1.0
         eff_mating_th = FISH_MATING_THRESHOLD / mating_drive
 
@@ -263,7 +276,16 @@ class NeuralFish:
         else:
             self.state = FishState.RESTING
 
-        # Store inputs and run the network
+        # ── Mating display timers ───────────────────────────────────────────
+        if self.state == FishState.MATING:
+            self._mating_glow_timer += dt
+            self._heart_timer = max(0.0, self._heart_timer - dt)
+            if self._heart_timer <= 0 and hasattr(particle_system, "spawn_heart"):
+                particle_system.spawn_heart(self.physics.pos.x, self.physics.pos.y)
+                self._heart_timer = 1.2 + random.uniform(0, 0.6)
+        else:
+            self._mating_glow_timer = max(0.0, self._mating_glow_timer - dt * 3)
+
         self.last_inputs = full_inputs
         outputs, hidden1, hidden2 = self.brain.forward(self.last_inputs)
         self.last_hidden1 = hidden1
@@ -316,6 +338,10 @@ class NeuralFish:
                 self.offspring_count  += 1
                 partner                = self.pregnancy_partner
                 self.pregnancy_partner = None
+                if hasattr(particle_system, "spawn_mating_burst"):
+                    particle_system.spawn_mating_burst(
+                        self.physics.pos.x, self.physics.pos.y
+                    )
                 return (
                     "egg",
                     self.physics.pos[0],
@@ -326,7 +352,7 @@ class NeuralFish:
                     getattr(self, "pregnancy_brain", None),
                 )
 
-        # Family cohesion
+        # ── Family cohesion ────────────────────────────────────────────────
         if self.family and self.family.active:
             if self.is_mature and not self.is_pregnant:
                 child_positions = [
@@ -337,7 +363,24 @@ class NeuralFish:
                 if child_positions:
                     avg_x = sum(p[0] for p in child_positions) / len(child_positions)
                     avg_y = sum(p[1] for p in child_positions) / len(child_positions)
-                    self.physics.apply_force(self.physics.seek(avg_x, avg_y, weight=0.4))
+                    dist_to_kids = self.physics.pos.distance_to((avg_x, avg_y))
+                    cohesion_weight = min(1.8, 0.5 + dist_to_kids / 120.0)
+                    self.physics.apply_force(
+                        self.physics.seek(avg_x, avg_y, weight=cohesion_weight)
+                    )
+            else:
+                parent_positions = [
+                    (p.physics.pos.x, p.physics.pos.y)
+                    for p in self.family.parents
+                ]
+                if parent_positions and not self.is_mature:
+                    avg_x = sum(p[0] for p in parent_positions) / len(parent_positions)
+                    avg_y = sum(p[1] for p in parent_positions) / len(parent_positions)
+                    dist_to_parent = self.physics.pos.distance_to((avg_x, avg_y))
+                    child_weight = min(2.5, 0.8 + dist_to_parent / 80.0)
+                    self.physics.apply_force(
+                        self.physics.seek(avg_x, avg_y, weight=child_weight)
+                    )
 
         self.physics.bounce_bounds(
             0, WATER_LINE_Y + 20, WORLD_WIDTH,
@@ -346,24 +389,18 @@ class NeuralFish:
         self.physics.update(dt, FISH_DRAG, speed_ceiling)
         self.distance_traveled += self.physics.vel.length() * dt
 
-        # ── Food collision (plankton eating) ───────────────────────────────
+        # ── Food collision ─────────────────────────────────────────────────
         for t in targets[:]:
             if self.is_predator:
                 break
             tx = getattr(t, "x", t.physics.pos.x if hasattr(t, "physics") else 0)
             ty = getattr(t, "y", t.physics.pos.y if hasattr(t, "physics") else 0)
-            # Larger collision radius — plankton are now bigger and worth seeking
             collision_radius = 30 * self.traits.physical_traits.get("size_mult", 1.0)
             if self.physics.pos.distance_to((tx, ty)) < collision_radius:
-                energy_gain = 12.0
-                # Nutrition bonus if plankton has a nutrition attribute
-                nutrition = getattr(t, "nutrition", 1.0)
-                energy_gain *= nutrition
-
+                energy_gain = 12.0 * getattr(t, "nutrition", 1.0)
                 self.energy = min(FISH_MAX_ENERGY, self.energy + energy_gain)
                 self.food_eaten += 1
 
-                # Spawn eat effect at plankton position
                 eat_color = (
                     min(255, int(t.color[0] + 80)) if hasattr(t, "color") else 120,
                     min(255, int(t.color[1] + 80)) if hasattr(t, "color") else 230,
@@ -389,12 +426,28 @@ class NeuralFish:
             return
 
         angle      = self.physics.heading
-        size       = self.traits.physical_traits.get("size_mult", 1.0) * 4
+        size       = self.get_current_size_mult() * 4
         color      = self.get_color()
         tail_angle = angle + math.pi + math.sin(time * 10) * 0.4
         screen_pos = camera.apply(pos)
 
-        # ── Bioluminescence glow (reuses shared surface) ───────────────────
+        # ── Mating glow ────────────────────────────────────────────────────
+        if self._mating_glow_timer > 0:
+            pulse = (math.sin(time * 6.0) + 1) * 0.5
+            glow_intensity = min(1.0, self._mating_glow_timer / 0.5) * (0.6 + 0.4 * pulse)
+            glow_r = int(size * 4 + 10 * pulse)
+            glow_r = min(glow_r, _GLOW_SURF_SIZE - 1)
+            gs = _get_glow_surf()
+            gs.fill((0, 0, 0, 0))
+            glow_alpha = int(glow_intensity * 140)
+            pygame.draw.circle(gs, (255, 100, 160, glow_alpha),
+                               (_GLOW_SURF_SIZE, _GLOW_SURF_SIZE), glow_r)
+            pygame.draw.circle(gs, (255, 180, 210, glow_alpha // 2),
+                               (_GLOW_SURF_SIZE, _GLOW_SURF_SIZE), glow_r + 6)
+            screen.blit(gs, (int(screen_pos[0]) - _GLOW_SURF_SIZE,
+                              int(screen_pos[1]) - _GLOW_SURF_SIZE))
+
+        # ── Bioluminescence glow ───────────────────────────────────────────
         if biolum_alpha > 10:
             if self.is_predator:
                 glow_col = BIOLUM_COLORS["predator"]
@@ -450,6 +503,18 @@ class NeuralFish:
         pygame.draw.circle(screen, (255, 255, 255), (int(eye_x), int(eye_y)), 2)
         pygame.draw.circle(screen, (0, 0, 0),       (int(eye_x), int(eye_y)), 1)
 
+        # ── Family bond lines to immature children ─────────────────────────
+        if self.family and self.family.active and self.is_mature:
+            for child in self.family.children:
+                if not child.is_mature:
+                    child_screen = camera.apply(child.physics.pos)
+                    dist = self.physics.pos.distance_to(child.physics.pos)
+                    bond_alpha = int(80 * (1.0 - min(1.0, dist / 200.0)))
+                    if bond_alpha > 10:
+                        pygame.draw.line(screen, (255, 220, 255),
+                                         (int(screen_pos[0]), int(screen_pos[1])),
+                                         (int(child_screen[0]), int(child_screen[1])), 1)
+
         # Selection ring
         if selected:
             pygame.draw.circle(
@@ -457,10 +522,15 @@ class NeuralFish:
                 (int(screen_pos[0]), int(screen_pos[1])), int(size) + 15, 2,
             )
 
+        # ── Mating state ♥ label ───────────────────────────────────────────
+        if self.state == FishState.MATING and self._mating_glow_timer > 0.3:
+            heart_y = int(screen_pos[1]) - int(size * 4) - 8
+            sym_font = pygame.font.Font(None, 18)
+            sym = sym_font.render("♥", True, (255, 100, 150))
+            screen.blit(sym, (int(screen_pos[0]) - sym.get_width() // 2, heart_y))
+
     def draw_brain(self, screen, time):
         pass
-
-    # ── Colour helpers ─────────────────────────────────────────────────────
 
     def _get_activation_color(self, value):
         def lerp_color(c1, c2, t):

@@ -78,6 +78,60 @@ class EatEffect:
                         (int(px) - int(spark["size"]), int(py) - int(spark["size"])))
 
 
+class MatingBurstEffect:
+    """Pink/red burst when two fish mate and lay eggs."""
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.age = 0.0
+        self.duration = 0.9
+        self.sparks = [
+            {
+                "angle": random.uniform(0, math.pi * 2),
+                "speed": random.uniform(30, 80),
+                "size":  random.uniform(2.0, 5.0),
+                "color": random.choice([
+                    (255, 100, 150), (255, 180, 200), (255, 80, 120),
+                    (255, 220, 240), (255, 140, 180),
+                ]),
+            }
+            for _ in range(14)
+        ]
+
+    def update(self, dt):
+        self.age += dt
+        return self.age < self.duration
+
+    def draw(self, screen, camera):
+        if not camera.is_visible((self.x, self.y), 100):
+            return
+        t = self.age / self.duration
+        alpha = int(255 * (1.0 - t) ** 1.2)
+        screen_pos = camera.apply((self.x, self.y))
+        sx, sy = int(screen_pos[0]), int(screen_pos[1])
+
+        # Expanding ring
+        ring_r = int(8 + t * 40)
+        ring_surf = pygame.Surface((ring_r * 2 + 4, ring_r * 2 + 4), pygame.SRCALPHA)
+        pygame.draw.circle(ring_surf, (255, 120, 180, max(0, alpha // 2)),
+                           (ring_r + 2, ring_r + 2), ring_r, 3)
+        screen.blit(ring_surf, (sx - ring_r - 2, sy - ring_r - 2))
+
+        for spark in self.sparks:
+            dist = spark["speed"] * t
+            px = sx + math.cos(spark["angle"]) * dist
+            py = sy + math.sin(spark["angle"]) * dist
+            spark_alpha = max(0, int(alpha * 0.9))
+            r = int(spark["size"] * (1.0 - t * 0.5))
+            if r < 1:
+                continue
+            spark_surf = pygame.Surface((r * 2 + 2, r * 2 + 2), pygame.SRCALPHA)
+            pygame.draw.circle(spark_surf, (*spark["color"], spark_alpha),
+                               (r + 1, r + 1), r)
+            screen.blit(spark_surf, (int(px) - r, int(py) - r))
+
+
 class Particle:
     """Single floating particle (sediment or plankton)"""
 
@@ -107,7 +161,6 @@ class Particle:
         self.spin_speed = random.uniform(0.5, 1.5)
 
         if self.is_plankton:
-            # Pick one of the distinct plankton palette colors, then add small variation
             base = random.choice(PLANKTON_COLORS)
             v = random.randint(-20, 20)
             self.color = tuple(max(0, min(255, c + v)) for c in base)
@@ -146,7 +199,6 @@ class Particle:
     def _draw_plankton_shape(self, surface, color, cx, cy, r, spin):
         """Draw a distinctive plankton organism shape."""
         if self.variant == 0:
-            # Cross / plus shape (diatom)
             arm   = r
             thick = max(1, int(r * 0.55))
             pygame.draw.rect(surface, color, (cx - arm, cy - thick, arm * 2, thick * 2))
@@ -157,7 +209,6 @@ class Particle:
             pygame.draw.circle(surface, color, (cx, cy + arm), thick)
 
         elif self.variant == 1:
-            # 6-pointed star (radiolarian)
             points = []
             for i in range(12):
                 a  = spin + i * math.pi / 6
@@ -167,7 +218,6 @@ class Particle:
                 pygame.draw.polygon(surface, color, points)
 
         else:
-            # Teardrop (copepod)
             body_w  = max(2, int(r * 1.4))
             body_h  = max(2, int(r * 0.7))
             tail_len = int(r * 1.2)
@@ -202,22 +252,19 @@ class ParticleSystem:
         self.particles = []
         for _ in range(SEDIMENT_COUNT * 3):
             self.particles.append(Particle(is_plankton=False))
-        # Seed a small initial plankton population — plants will grow it over time
         for _ in range(PLANKTON_COUNT):
             self.particles.append(Particle(is_plankton=True))
         self.particle_surface = pygame.Surface(
             (SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA
         )
         self.eat_effects: list[EatEffect] = []
+        self.mating_effects: list[MatingBurstEffect] = []
+        # Hearts are imported lazily to avoid circular imports
+        self._heart_particles: list = []
 
     # ── Public helpers called by other systems ─────────────────────────────
 
     def spawn_plankton_at(self, x, y, color_hint=None):
-        """
-        Spawn one plankton particle near (x, y).
-        Called by PlantManager when a mature plant produces plankton.
-        color_hint: optional base RGB tuple biased toward the plant's color.
-        """
         from config import PLANKTON_HARD_CAP
         plankton_count = sum(1 for p in self.particles if p.is_plankton)
         if plankton_count >= PLANKTON_HARD_CAP:
@@ -225,12 +272,10 @@ class ParticleSystem:
 
         p = Particle(is_plankton=True)
         p.reset(spawn_x=x, spawn_y=y)
-        # Give a slight upward drift so it rises away from the plant tip
         p.speed_y = random.uniform(-0.6, -0.1)
         p.speed_x = random.uniform(-0.4, 0.4)
 
         if color_hint is not None:
-            # Blend toward the plant's color for a visual origin cue
             base = random.choice(PLANKTON_COLORS)
             blend = 0.35
             blended = tuple(
@@ -246,6 +291,19 @@ class ParticleSystem:
         if color is None:
             color = (120, 230, 160)
         self.eat_effects.append(EatEffect(x, y, color))
+
+    def spawn_mating_burst(self, x, y):
+        """Call when two fish successfully mate / lay eggs."""
+        self.mating_effects.append(MatingBurstEffect(x, y))
+        # Spawn a cluster of heart particles
+        from environment_objects import HeartParticle
+        for _ in range(6):
+            self._heart_particles.append(HeartParticle(x, y))
+
+    def spawn_heart(self, x, y):
+        """Spawn a single heart for fish currently in MATING state (called per-frame, rarely)."""
+        from environment_objects import HeartParticle
+        self._heart_particles.append(HeartParticle(x, y))
 
     def add_bubble(self, x, y):
         p = Particle(is_plankton=False)
@@ -263,6 +321,20 @@ class ParticleSystem:
         depth_bias = time_system.plankton_depth_bias if time_system else 0.0
         for particle in self.particles:
             particle.update(time, depth_bias=depth_bias)
+
+        self.eat_effects = [e for e in self.eat_effects if e.update(
+            1 / 60)]  # approximate; real dt passed from fish_system
+        self.mating_effects = [e for e in self.mating_effects if e.update(1 / 60)]
+        self._heart_particles = [h for h in self._heart_particles if h.update(1 / 60)]
+
+    def update_with_dt(self, dt, time_system=None):
+        """Preferred update — accepts real dt."""
+        depth_bias = time_system.plankton_depth_bias if time_system else 0.0
+        for particle in self.particles:
+            particle.update(pygame.time.get_ticks() * 0.001, depth_bias=depth_bias)
+        self.eat_effects = [e for e in self.eat_effects if e.update(dt)]
+        self.mating_effects = [e for e in self.mating_effects if e.update(dt)]
+        self._heart_particles = [h for h in self._heart_particles if h.update(dt)]
 
     def draw(self, screen, camera, time_system=None):
         self.particle_surface.fill((0, 0, 0, 0))
@@ -285,7 +357,6 @@ class ParticleSystem:
 
             if particle.is_plankton:
                 pulse    = (math.sin(time_val * 3.0 + particle.phase) + 1) * 0.5
-                # Halved radii via config constants
                 base_r   = PLANKTON_BASE_RADIUS_MIN + particle.nutrition * (
                     PLANKTON_BASE_RADIUS_MAX - PLANKTON_BASE_RADIUS_MIN
                 )
@@ -294,7 +365,6 @@ class ParticleSystem:
                 brightness = 0.7 + 0.3 * particle.nutrition * (0.8 + 0.2 * pulse)
                 col = tuple(min(255, int(c * brightness)) for c in particle.color)
 
-                # Bioluminescent glow at night (scaled down with size)
                 if biolumin_alpha > 0:
                     glow_r     = r + 3 + int(pulse * 2)
                     glow_alpha = min(255, int(biolumin_alpha * 1.4 * particle.nutrition))
@@ -320,7 +390,6 @@ class ParticleSystem:
                 particle._draw_plankton_shape(
                     shape_surf, (*col, 220), cx, cy, r, particle.spin_phase
                 )
-                # Bright nucleus
                 nucleus_r = max(1, r // 3)
                 bright_col = tuple(min(255, c + 80) for c in col)
                 pygame.draw.circle(
@@ -343,3 +412,7 @@ class ParticleSystem:
 
         for effect in self.eat_effects:
             effect.draw(screen, camera)
+        for effect in self.mating_effects:
+            effect.draw(screen, camera)
+        for heart in self._heart_particles:
+            heart.draw(screen, camera)

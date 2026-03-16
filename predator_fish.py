@@ -1,8 +1,11 @@
 """Predator Fish - High-speed hunters with dash capabilities"""
 
 import math
-from fish_base import NeuralFish
+from fish_base import NeuralFish, get_life_stage_size_mult
 from config import *
+from config import (
+    PREDATOR_SIZE_ADVANTAGE_MULTIPLIER, PREY_PREDATOR_MIN_DISTANCE
+)
 
 
 class PredatorFish(NeuralFish):
@@ -16,6 +19,19 @@ class PredatorFish(NeuralFish):
         self.dash_cooldown = 0
         self.mate = None
 
+    def _get_viable_prey(self, all_fish):
+        """Return prey fish that are strictly smaller than this predator."""
+        my_size = self.get_current_size_mult()
+        prey = []
+        for f in all_fish:
+            if f.is_predator or f.is_hidden:
+                continue
+            prey_size = f.get_current_size_mult()
+            # Predator must be meaningfully larger — at least 20% bigger or same size
+            if my_size >= prey_size * PREDATOR_SIZE_ADVANTAGE_MULTIPLIER:
+                prey.append(f)
+        return prey
+
     def update(self, dt, all_fish, targets, particle_system, plant_manager,
                time_system=None):
         # Seasonal activity scaling (slower in winter)
@@ -23,17 +39,21 @@ class PredatorFish(NeuralFish):
             time_system.predator_activity_modifier if time_system else 1.0
         )
 
-        prey_targets = [f for f in all_fish if not f.is_predator and not f.is_hidden]
+        # Only hunt when hungry — same hunger threshold as other fish
+        is_hungry = self.energy < FISH_HUNGER_THRESHOLD
+
+        # Only target prey that are smaller than the predator
+        prey_targets = self._get_viable_prey(all_fish) if is_hungry else []
 
         closest_prey = None
-        min_dist = 400
+        min_dist = PREY_PREDATOR_MIN_DISTANCE
         for prey in prey_targets:
             dist = self.physics.pos.distance_to(prey.physics.pos)
             if dist < min_dist:
                 min_dist = dist
                 closest_prey = prey
 
-        if closest_prey:
+        if closest_prey and is_hungry:
             seek_force = self.physics.seek(
                 closest_prey.physics.pos.x,
                 closest_prey.physics.pos.y,
@@ -75,17 +95,18 @@ class PredatorFish(NeuralFish):
             time_system=time_system,
         )
 
-        # Eating on collision
-        for prey in prey_targets:
-            collision_radius = 20 * self.traits.physical_traits.get("size_mult", 1.0)
-            dist = math.hypot(
-                self.physics.pos.x - prey.physics.pos.x,
-                self.physics.pos.y - prey.physics.pos.y,
-            )
-            if dist < collision_radius:
-                prey.energy = 0
-                self.energy = min(FISH_MAX_ENERGY, self.energy + 25.0)
-                break
+        # Eating on collision — only viable (smaller) prey
+        if is_hungry:
+            for prey in prey_targets:
+                collision_radius = 20 * self.get_current_size_mult()
+                dist = math.hypot(
+                    self.physics.pos.x - prey.physics.pos.x,
+                    self.physics.pos.y - prey.physics.pos.y,
+                )
+                if dist < collision_radius:
+                    prey.energy = 0
+                    self.energy = min(FISH_MAX_ENERGY, self.energy + 25.0)
+                    break
 
         return res
 

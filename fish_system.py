@@ -66,7 +66,7 @@ class FishSystem:
                 self.eggs.append(egg)
                 predator.mate = None
 
-        # 2. Update eggs
+        # 2. Update eggs — hatch and spawn at egg location
         for egg in self.eggs[:]:
             if egg.update(dt, self.world):
                 self.eggs.remove(egg)
@@ -86,7 +86,6 @@ class FishSystem:
         # 5. Core Simulation Loop
         plankton = [p for p in self.particle_system.particles if p.is_plankton]
 
-        # Seasonal predator activity
         pred_activity = time_system.predator_activity_modifier if time_system else 1.0
 
         sim_groups = [
@@ -97,7 +96,6 @@ class FishSystem:
 
         for f_list, targets, can_mate in sim_groups:
             for f in f_list[:]:
-                # Pass time_system to each fish update
                 res = f.update(
                     dt, all_fish, targets,
                     self.particle_system, self.plant_manager,
@@ -159,16 +157,24 @@ class FishSystem:
                     break
 
     def spawn_from_egg(self, egg):
+        """Spawn a juvenile fish at the egg's position."""
+        # Clamp spawn position to valid water bounds
+        spawn_x = max(50, min(WORLD_WIDTH - 50, egg.x))
+        spawn_y = max(WATER_LINE_Y + 30, min(WORLD_HEIGHT - 100, egg.y))
+
         if egg.is_cleaner:
             from cleaner_fish import CleanerFish
-            child = CleanerFish(self.world, traits=egg.traits, brain=egg.brain)
+            child = CleanerFish(self.world, traits=egg.traits, brain=egg.brain,
+                                start_x=spawn_x, start_y=spawn_y)
             self.cleaner_fish.append(child)
         elif egg.is_predator:
             from predator_fish import PredatorFish
-            child = PredatorFish(self.world, traits=egg.traits, brain=egg.brain)
+            child = PredatorFish(self.world, traits=egg.traits, brain=egg.brain,
+                                 start_x=spawn_x, start_y=spawn_y)
             self.predators.append(child)
         else:
-            child = NeuralFish(self.world, traits=egg.traits, brain=egg.brain)
+            child = NeuralFish(self.world, traits=egg.traits, brain=egg.brain,
+                               start_x=spawn_x, start_y=spawn_y)
             self.fish.append(child)
 
         p1, p2 = egg.parent1, egg.parent2
