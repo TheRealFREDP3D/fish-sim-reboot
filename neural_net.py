@@ -5,14 +5,28 @@ import random
 
 
 class NeuralNet:
-    """Simplified feed-forward neural network with two hidden layers"""
+    """Feed-forward neural network with two hidden layers.
 
-    def __init__(self, input_size, hidden_size=8, output_size=3):
+    Output layout (7 neurons):
+        [0] steer   — tanh, movement direction delta
+        [1] thrust  — tanh, forward drive
+        [2] REST    — state logit (raw, passed through softmax externally)
+        [3] HUNT    — state logit
+        [4] FLEE    — state logit
+        [5] MATE    — state logit
+        [6] NEST    — state logit
+    """
+
+    # Keep output_size at 7: 2 movement + 5 state logits
+    MOVEMENT_OUTPUTS = 2
+    STATE_OUTPUTS = 5
+
+    def __init__(self, input_size, hidden_size=8, output_size=7):
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.output_size = output_size
+        # Always 7 outputs regardless of what is passed, for safety
+        self.output_size = max(output_size, self.MOVEMENT_OUTPUTS + self.STATE_OUTPUTS)
 
-        # Initialize weights with Xavier/Glorot-like variance for better starting stability
         scale1 = math.sqrt(2.0 / (input_size + hidden_size))
         self.w1 = [
             [random.uniform(-scale1, scale1) for _ in range(input_size)]
@@ -20,7 +34,6 @@ class NeuralNet:
         ]
         self.b1 = [0.0 for _ in range(hidden_size)]
 
-        # Add second hidden layer with 6 neurons
         self.hidden2_size = 6
         scale2 = math.sqrt(2.0 / (hidden_size + self.hidden2_size))
         self.w2 = [
@@ -29,12 +42,12 @@ class NeuralNet:
         ]
         self.b2 = [0.0 for _ in range(self.hidden2_size)]
 
-        scale3 = math.sqrt(2.0 / (self.hidden2_size + output_size))
+        scale3 = math.sqrt(2.0 / (self.hidden2_size + self.output_size))
         self.w3 = [
             [random.uniform(-scale3, scale3) for _ in range(self.hidden2_size)]
-            for _ in range(output_size)
+            for _ in range(self.output_size)
         ]
-        self.b3 = [0.0 for _ in range(output_size)]
+        self.b3 = [0.0 for _ in range(self.output_size)]
 
     def sigmoid(self, x):
         return 1 / (1 + math.exp(-max(-15, min(15, x))))
@@ -42,35 +55,50 @@ class NeuralNet:
     def tanh(self, x):
         return math.tanh(max(-15, min(15, x)))
 
+    @staticmethod
+    def softmax(logits):
+        """Numerically stable softmax over a list of floats."""
+        m = max(logits)
+        exps = [math.exp(v - m) for v in logits]
+        s = sum(exps)
+        return [e / s for e in exps]
+
     def forward(self, inputs):
-        """Run forward pass and return outputs (using tanh for steering)"""
-        # Input to first hidden
+        """Run forward pass.
+
+        Returns:
+            outputs   — list[7]: [steer, thrust, rest_p, hunt_p, flee_p, mate_p, nest_p]
+                        Movement outputs are tanh-activated.
+                        State outputs are softmax probabilities (sum to 1).
+            hidden    — list[6]: second hidden layer activations
+            hidden2   — alias for hidden (kept for backwards compat with brain visualizer)
+        """
+        # Input → hidden1
         hidden = []
         for i in range(self.hidden_size):
-            sum_val = (
-                sum(inputs[j] * self.w1[i][j] for j in range(self.input_size))
-                + self.b1[i]
-            )
-            hidden.append(self.tanh(sum_val))
+            s = sum(inputs[j] * self.w1[i][j] for j in range(self.input_size)) + self.b1[i]
+            hidden.append(self.tanh(s))
 
-        # First hidden to second hidden
+        # Hidden1 → hidden2
         hidden2 = []
         for i in range(self.hidden2_size):
-            sum_val = (
-                sum(hidden[j] * self.w2[i][j] for j in range(self.hidden_size))
-                + self.b2[i]
-            )
-            hidden2.append(self.tanh(sum_val))
+            s = sum(hidden[j] * self.w2[i][j] for j in range(self.hidden_size)) + self.b2[i]
+            hidden2.append(self.tanh(s))
 
-        # Second hidden to output
-        outputs = []
+        # Hidden2 → raw outputs
+        raw = []
         for i in range(self.output_size):
-            sum_val = (
-                sum(hidden2[j] * self.w3[i][j] for j in range(self.hidden2_size))
-                + self.b3[i]
-            )
-            outputs.append(self.tanh(sum_val))
+            s = sum(hidden2[j] * self.w3[i][j] for j in range(self.hidden2_size)) + self.b3[i]
+            raw.append(s)
 
+        # Movement: tanh (indices 0-1)
+        steer = self.tanh(raw[0])
+        thrust = self.tanh(raw[1])
+
+        # State: softmax (indices 2-6)
+        state_probs = self.softmax(raw[2:7])
+
+        outputs = [steer, thrust] + state_probs
         return outputs, hidden, hidden2
 
     @staticmethod
@@ -84,14 +112,12 @@ class NeuralNet:
         child = NeuralNet(parent1.input_size, parent1.hidden_size, parent1.output_size)
 
         def blend_matrix(m1, m2):
-            """Element-wise average of two matrices."""
             return [
                 [(m1[i][j] + m2[i][j]) * 0.5 for j in range(len(m1[0]))]
                 for i in range(len(m1))
             ]
 
         def blend_vector(v1, v2):
-            """Element-wise average of two vectors."""
             return [(v1[i] + v2[i]) * 0.5 for i in range(len(v1))]
 
         child.w1 = blend_matrix(parent1.w1, parent2.w1)
@@ -104,11 +130,9 @@ class NeuralNet:
         return child
 
     def mutate(self, mutation_rate=0.1, mutation_strength=0.2):
-        """Create mutated copy for offspring"""
-        # Create new network with same architecture
+        """Create a mutated copy for offspring."""
         child = NeuralNet(self.input_size, self.hidden_size, self.output_size)
 
-        # Copy weights and biases efficiently using list comprehensions
         child.w1 = [row[:] for row in self.w1]
         child.b1 = self.b1[:]
         child.w2 = [row[:] for row in self.w2]
@@ -122,7 +146,6 @@ class NeuralNet:
                     mutate_list(lst[i])
                 elif random.random() < mutation_rate:
                     lst[i] += random.gauss(0, mutation_strength)
-                    # Keep weights in a reasonable range
                     lst[i] = max(-2.0, min(2.0, lst[i]))
 
         mutate_list(child.w1)

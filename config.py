@@ -255,6 +255,15 @@ class FishState(Enum):
     NESTING = auto()
 
 
+# Index mapping: output neuron index → FishState (for softmax logits 2-6)
+FISH_STATE_ORDER = [
+    FishState.RESTING,   # logit index 0 → output index 2
+    FishState.HUNTING,   # logit index 1 → output index 3
+    FishState.FLEEING,   # logit index 2 → output index 4
+    FishState.MATING,    # logit index 3 → output index 5
+    FishState.NESTING,   # logit index 4 → output index 6
+]
+
 BRAIN_PANEL_WIDTH = 420
 BRAIN_PANEL_HEIGHT = 800
 
@@ -278,6 +287,17 @@ SUMMER_SEED_BASE_PROBABILITY = 0.001
 SEED_ENERGY_COST = 2.0
 PREDATOR_SIZE_ADVANTAGE_MULTIPLIER = 1.2
 PREY_PREDATOR_MIN_DISTANCE = 400
+
+# ── Soft state-machine biases ─────────────────────────────────────────────────
+# These are added to the raw state logits before softmax to give each state
+# a prior that reflects the fish's current physiological situation.
+# The NN can still overcome these biases — they just tip the scales.
+# Values are logit-space additions (positive = more likely, negative = less likely).
+STATE_BIAS_FLEE_THREAT = 3.5      # per unit of threat sensor sum (0-3 range)
+STATE_BIAS_HUNT_HUNGER = 2.5      # scales with (1 - energy/max_energy)
+STATE_BIAS_MATE_DRIVE = 2.0       # when mature, energy above threshold, cooldown done
+STATE_BIAS_NEST_PREGNANT = 999.0  # hard force (pregnancy is not optional)
+STATE_BIAS_REST_NIGHT = 1.5       # extra rest pressure at night
 
 # ── Mating display constants ──────────────────────────────────────────────────
 MATING_HEART_SPAWN_INTERVAL = 1.2
@@ -335,17 +355,15 @@ SPRING_GERMINATION_BOOST = 4.0
 WINTER_PHOTOSYNTHESIS_BASE = 0.08
 
 # Flowering preferences per season (0=Spring, 1=Summer, 2=Autumn, 3=Winter)
-# Summer now also has a moderate preference so plants can flower+seed in Summer too
 FLOWERING_SEASON_PREFERENCE = {
     0: 0.3,  # Spring: rare flowering
-    1: 1.4,  # Summer: good flowering (was 1.8 — still high but allows summer seeding)
-    2: 1.0,  # Autumn: solid flowering (was 0.6)
+    1: 1.4,  # Summer: good flowering
+    2: 1.0,  # Autumn: solid flowering
     3: 0.0,  # Winter: none
 }
 
 _SEASON_AGE_RATE = {0: 0.8, 1: 0.7, 2: 1.2, 3: 2.0}
 _SEASON_PHOTO_MOD = {0: 1.0, 1: 1.1, 2: 0.8, 3: 0.25}
-# Allow seeding in Summer (1) and Autumn (2); not Spring (saves energy for growth) or Winter
 _SEASON_CAN_SEED = {0: False, 1: True, 2: True, 3: False}
 _SEASON_SEED_COOLDOWN = {0: INFINITE_COOLDOWN, 1: 30.0, 2: 10.0, 3: INFINITE_COOLDOWN}
 
