@@ -109,7 +109,11 @@ class NeuralNet:
 
     @staticmethod
     def blend(parent1, parent2):
-        """Create a new network by blending weights from two parents."""
+        """Create a new network by uniform crossover from two parents.
+        
+        Each weight/bias is randomly taken from either parent (not averaged),
+        preserving complete sub-circuits and learned behaviors.
+        """
         if (parent1.input_size != parent2.input_size or
                 parent1.hidden_size != parent2.hidden_size or
                 parent1.output_size != parent2.output_size):
@@ -117,21 +121,25 @@ class NeuralNet:
 
         child = NeuralNet(parent1.input_size, parent1.hidden_size, parent1.output_size)
 
-        def blend_matrix(m1, m2):
+        def crossover_matrix(m1, m2):
+            """Randomly pick each weight from either parent."""
             return [
-                [(m1[i][j] + m2[i][j]) * 0.5 for j in range(len(m1[0]))]
+                [m1[i][j] if random.random() < 0.5 else m2[i][j] 
+                 for j in range(len(m1[0]))]
                 for i in range(len(m1))
             ]
 
-        def blend_vector(v1, v2):
-            return [(v1[i] + v2[i]) * 0.5 for i in range(len(v1))]
+        def crossover_vector(v1, v2):
+            """Randomly pick each bias from either parent."""
+            return [v1[i] if random.random() < 0.5 else v2[i] 
+                    for i in range(len(v1))]
 
-        child.w1 = blend_matrix(parent1.w1, parent2.w1)
-        child.b1 = blend_vector(parent1.b1, parent2.b1)
-        child.w2 = blend_matrix(parent1.w2, parent2.w2)
-        child.b2 = blend_vector(parent1.b2, parent2.b2)
-        child.w3 = blend_matrix(parent1.w3, parent2.w3)
-        child.b3 = blend_vector(parent1.b3, parent2.b3)
+        child.w1 = crossover_matrix(parent1.w1, parent2.w1)
+        child.b1 = crossover_vector(parent1.b1, parent2.b1)
+        child.w2 = crossover_matrix(parent1.w2, parent2.w2)
+        child.b2 = crossover_vector(parent1.b2, parent2.b2)
+        child.w3 = crossover_matrix(parent1.w3, parent2.w3)
+        child.b3 = crossover_vector(parent1.b3, parent2.b3)
 
         return child
 
