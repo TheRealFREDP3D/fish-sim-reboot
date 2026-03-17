@@ -29,7 +29,7 @@ A sophisticated underwater ecosystem simulation featuring neural network-driven 
 - **Plankton Diel Migration**: Plankton migrate toward the surface during the day and sink to depth at night, just as they do in real oceans
 - **Time Controls**: Press **T** to cycle through 1× / 3× / 6× speed; press **P** to pause
 
-![Brain Visualizer](doc/brain-vizualiser-Animation.gif)
+![Brain Visualizer](doc/Animation.gif)
 
 ### **Neural Fish System**
 - **Multiple Fish Species**: Regular fish, cleaner fish (cyan-striped), and predators (red)
