@@ -10,6 +10,7 @@ from config import (
     BRAIN_PANEL_WIDTH,
     BRAIN_PANEL_HEIGHT,
     FishState,
+    FISH_MAX_ENERGY,
 )
 
 # ── Palette ────────────────────────────────────────────────────────────────────
@@ -30,11 +31,11 @@ RED_ACC = (255, 100, 110)
 RED_DIM = (130, 45, 50)
 
 # Neural activation colours
-COL_POS_HI = (80, 255, 220)   
-COL_POS_MID = (0, 180, 160)   
-COL_NEU = (30, 55, 80)        
-COL_NEG_MID = (200, 120, 40)  
-COL_NEG_HI = (255, 180, 60)   
+COL_POS_HI = (80, 255, 220)
+COL_POS_MID = (0, 180, 160)
+COL_NEU = (30, 55, 80)
+COL_NEG_MID = (200, 120, 40)
+COL_NEG_HI = (255, 180, 60)
 
 _COL_DIM_WIRE = (18, 35, 52)
 
@@ -243,13 +244,25 @@ class BrainVisualizer:
     def _draw_header(self, surf, fish, accent, y):
         PAD = 16
         pill_w = 80
-        species = "PREDATOR" if fish.is_predator else "CLEANER" if fish.is_cleaner else "COMMON"
+        species = (
+            "PREDATOR"
+            if fish.is_predator
+            else "CLEANER" if fish.is_cleaner else "COMMON"
+        )
         draw_capsule(surf, (*accent, 200), PAD, y, pill_w, 22, radius=11)
         t = self.f_tiny.render(species, True, BG)
         surf.blit(t, (PAD + (pill_w - t.get_width()) // 2, y + 4))
         y += 32
-        base_c = RED_ACC if fish.state == FishState.FLEEING else AMBER if fish.state == FishState.HUNTING else TEXT_SECONDARY
-        state_c = lerp_color(base_c, TEXT_PRIMARY, self.state_flash / 0.6) if self.state_flash > 0 else base_c
+        base_c = (
+            RED_ACC
+            if fish.state == FishState.FLEEING
+            else AMBER if fish.state == FishState.HUNTING else TEXT_SECONDARY
+        )
+        state_c = (
+            lerp_color(base_c, TEXT_PRIMARY, self.state_flash / 0.6)
+            if self.state_flash > 0
+            else base_c
+        )
         t = self.f_body.render(f"  {fish.state.name}", True, state_c)
         surf.blit(t, (PAD + 4, y))
         y += 26
@@ -264,14 +277,16 @@ class BrainVisualizer:
         LW, BAR_H = 62, 10
         BAR_W = self.PANEL_W - PAD * 2 - LW - 32
         bars = [
-            ("ENERGY", max(0.0, min(1.0, fish.energy / 50.0)), accent),
+            ("ENERGY", max(0.0, min(1.0, fish.energy / FISH_MAX_ENERGY)), accent),
             ("STAMINA", fish.stamina / 100.0, (80, 220, 140)),
         ]
         for label, ratio, color in bars:
             surf.blit(self.f_tiny.render(label, True, TEXT_LABEL), (PAD, y + 1))
             bx = PAD + LW
             pygame.draw.rect(surf, BG_SECTION, (bx, y, BAR_W, BAR_H), border_radius=5)
-            pygame.draw.rect(surf, color, (bx, y, int(BAR_W * ratio), BAR_H), border_radius=5)
+            pygame.draw.rect(
+                surf, color, (bx, y, int(BAR_W * ratio), BAR_H), border_radius=5
+            )
             y += 20
         return y + 6
 
@@ -282,22 +297,36 @@ class BrainVisualizer:
         NET_H = 240
         net_top = y
         W = self.PANEL_W
-        xs = {"in": int(W * 0.13), "h1": int(W * 0.38), "h2": int(W * 0.64), "out": int(W * 0.88)}
+        xs = {
+            "in": int(W * 0.13),
+            "h1": int(W * 0.38),
+            "h2": int(W * 0.64),
+            "out": int(W * 0.88),
+        }
 
         def col_nodes(x, n):
             return [(x, net_top + int((i + 0.5) * NET_H / n)) for i in range(n)]
 
-        pos_in = col_nodes(xs["in"], 18) # 18 inputs
+        pos_in = col_nodes(xs["in"], 18)  # 18 inputs
         pos_h1 = col_nodes(xs["h1"], 12)
         pos_h2 = col_nodes(xs["h2"], 6)
         pos_out = col_nodes(xs["out"], 4)
 
         if not self._node_positions_built:
-            self._pos_in, self._pos_h1, self._pos_h2, self._pos_out = pos_in, pos_h1, pos_h2, pos_out
+            self._pos_in, self._pos_h1, self._pos_h2, self._pos_out = (
+                pos_in,
+                pos_h1,
+                pos_h2,
+                pos_out,
+            )
             self._seed_particles()
             self._node_positions_built = True
 
-        inp, h1, h2 = list(fish.last_inputs), list(fish.last_hidden1), list(fish.last_hidden)
+        inp, h1, h2 = (
+            list(fish.last_inputs),
+            list(fish.last_hidden1),
+            list(fish.last_hidden),
+        )
         out = list(fish.last_outputs[:4])
 
         def draw_connections(src_pos, dst_pos, src_acts):
@@ -320,10 +349,13 @@ class BrainVisualizer:
                 tl = self.f_tiny.render(label, True, TEXT_LABEL)
                 surf.blit(tl, (pos[0] + r + 3, pos[1] - 6))
 
-        for i, pos in enumerate(pos_in): draw_node(pos, inp[i], r=4)
-        for i, pos in enumerate(pos_h1): draw_node(pos, h1[i], r=5)
-        for i, pos in enumerate(pos_h2): draw_node(pos, h2[i], r=6)
-        
+        for i, pos in enumerate(pos_in):
+            draw_node(pos, inp[i], r=4)
+        for i, pos in enumerate(pos_h1):
+            draw_node(pos, h1[i], r=5)
+        for i, pos in enumerate(pos_h2):
+            draw_node(pos, h2[i], r=6)
+
         OUT_LABELS = ["Str", "Thr", "Hid", "Spr"]
         for i, pos in enumerate(pos_out):
             draw_node(pos, out[i] if i < len(out) else 0.0, r=7, label=OUT_LABELS[i])
@@ -334,7 +366,13 @@ class BrainVisualizer:
     def _seed_particles(self):
         self._particles.clear()
         for _ in range(30):
-            self._particles.append(_Particle(random.choice(self._pos_h1), random.choice(self._pos_h2), (200, 200, 200)))
+            self._particles.append(
+                _Particle(
+                    random.choice(self._pos_h1),
+                    random.choice(self._pos_h2),
+                    (200, 200, 200),
+                )
+            )
 
     def _draw_outputs(self, surf, fish, accent, y):
         PAD = 16
@@ -342,23 +380,27 @@ class BrainVisualizer:
         y += 18
         out = fish.last_outputs
         gx, gw, gh = PAD + 52, self.PANEL_W - PAD * 2 - 80, 10
-        
+
         drives = [
             ("STEER", out[0], True),
             ("THRUST", (out[1] + 1) / 2, False),
             ("HIDE", out[2], False),
-            ("SPRINT", out[3], False)
+            ("SPRINT", out[3], False),
         ]
-        
+
         for label, val, dual in drives:
             surf.blit(self.f_tiny.render(label, True, TEXT_SECONDARY), (PAD, y + 1))
             pygame.draw.rect(surf, BG_SECTION, (gx, y, gw, gh), border_radius=5)
             if dual:
                 fw = int(abs(val) * gw / 2)
                 fx = gx + gw // 2 if val >= 0 else gx + gw // 2 - fw
-                pygame.draw.rect(surf, activation_color(val), (fx, y, fw, gh), border_radius=5)
+                pygame.draw.rect(
+                    surf, activation_color(val), (fx, y, fw, gh), border_radius=5
+                )
             else:
-                pygame.draw.rect(surf, accent, (gx, y, int(gw * val), gh), border_radius=5)
+                pygame.draw.rect(
+                    surf, accent, (gx, y, int(gw * val), gh), border_radius=5
+                )
             y += 16
         return y + 4
 
@@ -368,11 +410,19 @@ class BrainVisualizer:
         y += 18
         LW, TW, TH = 70, self.PANEL_W - PAD * 2 - 100, 8
         for label, val in fish.traits.physical_traits.items():
-            if "mult" not in label: continue
+            if "mult" not in label:
+                continue
             surf.blit(self.f_tiny.render(label[:6], True, TEXT_SECONDARY), (PAD, y + 1))
             pygame.draw.rect(surf, BG_SECTION, (PAD + LW, y, TW, TH), border_radius=4)
             dev = (val - 1.0) / 0.8
-            pygame.draw.rect(surf, TEAL if dev > 0 else AMBER, (PAD + LW + TW // 2, y, int(dev * TW / 2), TH), border_radius=4)
+            bar_width = max(0, int(abs(dev) * TW / 2))
+            bar_x = PAD + LW + TW // 2 if dev >= 0 else PAD + LW + TW // 2 - bar_width
+            pygame.draw.rect(
+                surf,
+                TEAL if dev > 0 else AMBER,
+                (bar_x, y, bar_width, TH),
+                border_radius=4,
+            )
             y += 14
         return y + 4
 

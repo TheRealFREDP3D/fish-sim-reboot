@@ -57,7 +57,7 @@ class World:
             (
                 rng.uniform(0, WORLD_WIDTH),
                 rng.uniform(0, WATER_LINE_Y - 10),
-                rng.uniform(0.4, 1.0),   # size factor
+                rng.uniform(0.4, 1.0),  # size factor
                 rng.uniform(0, math.pi * 2),  # twinkle phase
             )
             for _ in range(STAR_COUNT)

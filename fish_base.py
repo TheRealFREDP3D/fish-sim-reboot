@@ -210,7 +210,9 @@ class NeuralFish:
         if self.closest_plant:
             for f in all_fish:
                 if getattr(f, "is_predator", False):
-                    p_dist = f.physics.pos.distance_to((self.closest_plant.x, self.closest_plant.base_y))
+                    p_dist = f.physics.pos.distance_to(
+                        (self.closest_plant.x, self.closest_plant.base_y)
+                    )
                     if p_dist < PLANT_COVER_RADIUS:
                         ambush_alert = 1.0
                         break
@@ -227,14 +229,15 @@ class NeuralFish:
             # 16: Ambush Alert
             ambush_alert,
             # 17: Closest Mate Distance
-            min(1.0, min_mate_dist / FISH_SENSOR_RANGE)
+            min(1.0, min_mate_dist / FISH_SENSOR_RANGE),
         ]
         return radar + stats
 
     # ── Soft state selection ───────────────────────────────────────────────
 
-    def _pick_state(self, raw_state_probs, threat_level, night_rest_factor,
-                    mating_drive):
+    def _pick_state(
+        self, raw_state_probs, threat_level, night_rest_factor, mating_drive
+    ):
         """
         Apply physiological biases to the NN's raw softmax state probabilities.
         """
@@ -242,8 +245,7 @@ class NeuralFish:
             return FishState.NESTING
 
         # Convert probabilities back to log-space for bias addition
-        import math as _math
-        logits = [_math.log(max(p, 1e-9)) for p in raw_state_probs]
+        logits = [math.log(max(p, 1e-9)) for p in raw_state_probs]
 
         # Threat → nudge FLEE
         logits[2] += threat_level * STATE_BIAS_FLEE_THREAT
@@ -264,7 +266,8 @@ class NeuralFish:
         logits[0] += (1.0 - night_rest_factor) * STATE_BIAS_REST_NIGHT
 
         if not self.is_mature:
-            logits[3] = -1e9
+            logits[1] = -1e9  # Block HUNTING for immature fish
+            logits[3] = -1e9  # Block MATING for immature fish
 
         best_idx = logits.index(max(logits))
         return FISH_STATE_ORDER[best_idx]
@@ -388,7 +391,9 @@ class NeuralFish:
 
         # ── Behavioral Lever: Sprint Drive ────────────────────────────────
         # Evolution can temporarily boost speed by up to 50%
-        speed_ceiling *= (1.0 + sprint_drive * 0.5)
+        speed_ceiling *= 1.0 + sprint_drive * 0.5
+        # Hard cap at 1.8x max speed to prevent extreme overflow
+        speed_ceiling = min(speed_ceiling, self.physics.max_speed * 1.8)
 
         turn_rate = FISH_TURN_RATE_SCALAR * self.traits.physical_traits.get(
             "turn_rate_mult", 1.0
@@ -412,7 +417,7 @@ class NeuralFish:
 
         self.physics.apply_force((steer_force_x, steer_force_y))
 
-        # Egg laying 
+        # Egg laying
         if self.is_pregnant and self.closest_plant:
             dist_to_plant = self.physics.pos.distance_to(
                 (self.closest_plant.x, self.closest_plant.base_y)
