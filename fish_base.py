@@ -41,7 +41,7 @@ def get_life_stage_size_mult(age):
 
 
 class NeuralFish:
-    INPUT_COUNT = 15
+    INPUT_COUNT = 18
     OUTPUT_COUNT = 9  # 2 movement + 2 behavior + 5 state logits
 
     def __init__(
@@ -155,6 +155,7 @@ class NeuralFish:
                 self.is_hidden = True
 
         def fill_radar(objects, offset, is_threat_radar=False, bias_multiplier=1.0):
+            min_d = FISH_SENSOR_RANGE
             for obj in objects:
                 if is_threat_radar and getattr(obj, "is_hidden", False):
                     continue
@@ -169,6 +170,8 @@ class NeuralFish:
                 if is_threat_radar and self.is_hidden:
                     detection_range *= 0.5
                 if dist < detection_range and dist > 0:
+                    if dist < min_d:
+                        min_d = dist
                     angle = (
                         math.atan2(oy - self.physics.pos.y, ox - self.physics.pos.x)
                         - self.physics.heading
@@ -182,6 +185,7 @@ class NeuralFish:
                         radar[offset + sector] += (
                             1.0 - (dist / detection_range)
                         ) * bias_multiplier
+            return min_d
 
         fill_radar(targets, 0)
         fill_radar(
@@ -189,7 +193,7 @@ class NeuralFish:
             3,
             is_threat_radar=True,
         )
-        fill_radar(
+        min_mate_dist = fill_radar(
             [
                 f
                 for f in all_fish
@@ -201,6 +205,16 @@ class NeuralFish:
             6,
         )
 
+        # ── Ambush Alert (is a predator near my plant?) ──────────────────
+        ambush_alert = 0.0
+        if self.closest_plant:
+            for f in all_fish:
+                if getattr(f, "is_predator", False):
+                    p_dist = f.physics.pos.distance_to((self.closest_plant.x, self.closest_plant.base_y))
+                    if p_dist < PLANT_COVER_RADIUS:
+                        ambush_alert = 1.0
+                        break
+
         stats = [
             self.energy / FISH_MAX_ENERGY,
             self.stamina / 100.0,
@@ -208,6 +222,12 @@ class NeuralFish:
             self.physics.vel.length() / self.physics.max_speed,
             cover_quality,
             sum(plant_food) / 3.0,
+            # 15: Normalized distance to closest plant
+            min(1.0, min_plant_dist / FISH_SENSOR_RANGE),
+            # 16: Ambush Alert
+            ambush_alert,
+            # 17: Closest Mate Distance
+            min(1.0, min_mate_dist / FISH_SENSOR_RANGE)
         ]
         return radar + stats
 

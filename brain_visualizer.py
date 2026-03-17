@@ -197,7 +197,7 @@ class BrainVisualizer:
 
         if self._pos_in and selected_fish is not None:
             inp = selected_fish.last_inputs
-            if len(inp) == 15:
+            if len(inp) == 18:
                 for i, node_pos in enumerate(self._pos_in):
                     act = inp[i] if i < len(inp) else 0.0
                     if abs(act) > 0.25 and random.random() < abs(act) * dt * 4:
@@ -287,10 +287,10 @@ class BrainVisualizer:
         def col_nodes(x, n):
             return [(x, net_top + int((i + 0.5) * NET_H / n)) for i in range(n)]
 
-        pos_in = col_nodes(xs["in"], 15)
+        pos_in = col_nodes(xs["in"], 18) # 18 inputs
         pos_h1 = col_nodes(xs["h1"], 12)
         pos_h2 = col_nodes(xs["h2"], 6)
-        pos_out = col_nodes(xs["out"], 4) # Expanded to 4 nodes
+        pos_out = col_nodes(xs["out"], 4)
 
         if not self._node_positions_built:
             self._pos_in, self._pos_h1, self._pos_h2, self._pos_out = pos_in, pos_h1, pos_h2, pos_out
