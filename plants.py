@@ -507,7 +507,7 @@ class Plant:
                 mx = self.x + mark["ox"]
                 my = self.base_y + mark["oy"]
                 screen_pos = camera.apply((mx, my))
-                alpha = int(255 * (mark["life"] / GRAZING_VISUAL_DURATION))
+                alpha = max(0, min(255, int(255 * (mark["life"] / GRAZING_VISUAL_DURATION))))
                 # Use surface with SRCALPHA for proper alpha blending
                 bite_surf = pygame.Surface((12, 12), pygame.SRCALPHA)
                 pygame.draw.circle(bite_surf, (90, 60, 40, alpha), (6, 6), 4)

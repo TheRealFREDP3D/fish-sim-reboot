@@ -42,7 +42,7 @@ def get_life_stage_size_mult(age):
 
 class NeuralFish:
     INPUT_COUNT = 15
-    OUTPUT_COUNT = 7  # 2 movement + 5 state logits
+    OUTPUT_COUNT = 9  # 2 movement + 2 behavior + 5 state logits
 
     def __init__(
         self,
@@ -216,28 +216,19 @@ class NeuralFish:
     def _pick_state(self, raw_state_probs, threat_level, night_rest_factor,
                     mating_drive):
         """
-        Apply physiological biases to the NN's raw softmax state probabilities
-        then argmax to pick the final FishState.
-
-        Pregnancy is the one hard override — a pregnant fish always nests.
-        Everything else uses additive logit biases so the NN can still
-        shift state thresholds through evolution.
+        Apply physiological biases to the NN's raw softmax state probabilities.
         """
         if self.is_pregnant:
             return FishState.NESTING
 
         # Convert probabilities back to log-space for bias addition
-        # (clamp to avoid log(0))
         import math as _math
         logits = [_math.log(max(p, 1e-9)) for p in raw_state_probs]
-
-        # Index mapping matches FISH_STATE_ORDER:
-        # 0=REST, 1=HUNT, 2=FLEE, 3=MATE, 4=NEST
 
         # Threat → nudge FLEE
         logits[2] += threat_level * STATE_BIAS_FLEE_THREAT
 
-        # Hunger → nudge HUNT  (stronger when more hungry)
+        # Hunger → nudge HUNT
         hunger_signal = max(0.0, 1.0 - self.energy / FISH_MAX_ENERGY)
         logits[1] += hunger_signal * STATE_BIAS_HUNT_HUNGER
 
@@ -252,11 +243,9 @@ class NeuralFish:
         # Night → nudge REST
         logits[0] += (1.0 - night_rest_factor) * STATE_BIAS_REST_NIGHT
 
-        # Immature fish cannot MATE
         if not self.is_mature:
             logits[3] = -1e9
 
-        # Pick highest-logit state
         best_idx = logits.index(max(logits))
         return FISH_STATE_ORDER[best_idx]
 
@@ -325,18 +314,28 @@ class NeuralFish:
         self.last_hidden1 = hidden1
         self.last_hidden = hidden2
         self.last_outputs = outputs
-        self.output_history.append(list(outputs[:2]))  # store only movement outputs
+        self.output_history.append(list(outputs[:4]))  # Store movement + behaviors
 
         steer_out = outputs[0]
         thrust_out = outputs[1]
-        # outputs[2:7] are softmax state probabilities
-        raw_state_probs = outputs[2:7]
+        hide_drive = outputs[2]
+        sprint_drive = outputs[3]
+        raw_state_probs = outputs[4:9]
         self.last_state_probs = raw_state_probs
 
-        # ── Soft state selection (replaces hard state machine) ───────────
+        # ── Soft state selection ─────────────────────────────────────────
         self.state = self._pick_state(
             raw_state_probs, threat_level, night_rest_factor, mating_drive
         )
+
+        # ── Behavioral Lever: Hide Drive ──────────────────────────────────
+        if self.closest_plant:
+            # High hide_drive pushes the fish to stay near plant cover
+            hide_weight = hide_drive * 1.6
+            hide_force = self.physics.seek(
+                self.closest_plant.x, self.closest_plant.base_y, weight=hide_weight
+            )
+            self.physics.apply_force(hide_force)
 
         # ── Mating display timers ─────────────────────────────────────────
         if self.state == FishState.MATING:
@@ -352,7 +351,7 @@ class NeuralFish:
                 0.0, self._mating_glow_timer - dt * MATING_GLOW_DECAY_RATE
             )
 
-        # ── Speed ceiling (soft max per state, not a hard override) ──────
+        # ── Speed ceiling ─────────────────────────────────────────────────
         stamina_factor = max(0.3, self.stamina / 100.0)
         if self.state == FishState.FLEEING:
             speed_ceiling = (
@@ -366,6 +365,10 @@ class NeuralFish:
             speed_ceiling = self.physics.max_speed * 0.6
         else:
             speed_ceiling = self.physics.max_speed * 0.35 * night_rest_factor
+
+        # ── Behavioral Lever: Sprint Drive ────────────────────────────────
+        # Evolution can temporarily boost speed by up to 50%
+        speed_ceiling *= (1.0 + sprint_drive * 0.5)
 
         turn_rate = FISH_TURN_RATE_SCALAR * self.traits.physical_traits.get(
             "turn_rate_mult", 1.0
@@ -389,7 +392,7 @@ class NeuralFish:
 
         self.physics.apply_force((steer_force_x, steer_force_y))
 
-        # Egg laying when near a plant
+        # Egg laying 
         if self.is_pregnant and self.closest_plant:
             dist_to_plant = self.physics.pos.distance_to(
                 (self.closest_plant.x, self.closest_plant.base_y)
@@ -590,22 +593,6 @@ class NeuralFish:
         eye_y = screen_pos[1] + math.sin(angle + 0.35) * size * 1.3
         pygame.draw.circle(screen, (255, 255, 255), (int(eye_x), int(eye_y)), 2)
         pygame.draw.circle(screen, (0, 0, 0), (int(eye_x), int(eye_y)), 1)
-
-        # ── Family bond lines to immature children ───────────────────────
-        if self.family and self.family.active and self.is_mature:
-            for child in self.family.children:
-                if not child.is_mature:
-                    child_screen = camera.apply(child.physics.pos)
-                    dist = self.physics.pos.distance_to(child.physics.pos)
-                    bond_alpha = int(80 * (1.0 - min(1.0, dist / 200.0)))
-                    if bond_alpha > 10:
-                        pygame.draw.line(
-                            screen,
-                            (255, 220, 255),
-                            (int(screen_pos[0]), int(screen_pos[1])),
-                            (int(child_screen[0]), int(child_screen[1])),
-                            1,
-                        )
 
         # Selection ring
         if selected:

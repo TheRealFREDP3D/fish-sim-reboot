@@ -7,25 +7,27 @@ import random
 class NeuralNet:
     """Feed-forward neural network with two hidden layers.
 
-    Output layout (7 neurons):
-        [0] steer   — tanh, movement direction delta
-        [1] thrust  — tanh, forward drive
-        [2] REST    — state logit (raw, passed through softmax externally)
-        [3] HUNT    — state logit
-        [4] FLEE    — state logit
-        [5] MATE    — state logit
-        [6] NEST    — state logit
+    Output layout (9 neurons):
+        [0] steer        — tanh, movement direction delta
+        [1] thrust       — tanh, forward drive
+        [2] hide_drive   — sigmoid, tendency to seek plant cover
+        [3] sprint_drive — sigmoid, temporary speed ceiling boost
+        [4] REST         — state logit (raw, passed through softmax externally)
+        [5] HUNT         — state logit
+        [6] FLEE         — state logit
+        [7] MATE         — state logit
+        [8] NEST         — state logit
     """
 
-    # Keep output_size at 7: 2 movement + 5 state logits
     MOVEMENT_OUTPUTS = 2
+    BEHAVIOR_OUTPUTS = 2
     STATE_OUTPUTS = 5
 
-    def __init__(self, input_size, hidden_size=8, output_size=7):
+    def __init__(self, input_size, hidden_size=8, output_size=9):
         self.input_size = input_size
         self.hidden_size = hidden_size
-        # Always 7 outputs regardless of what is passed, for safety
-        self.output_size = max(output_size, self.MOVEMENT_OUTPUTS + self.STATE_OUTPUTS)
+        # Total outputs: 2 movement + 2 behavior + 5 states
+        self.output_size = max(output_size, self.MOVEMENT_OUTPUTS + self.BEHAVIOR_OUTPUTS + self.STATE_OUTPUTS)
 
         scale1 = math.sqrt(2.0 / (input_size + hidden_size))
         self.w1 = [
@@ -58,6 +60,8 @@ class NeuralNet:
     @staticmethod
     def softmax(logits):
         """Numerically stable softmax over a list of floats."""
+        if not logits:
+            return []
         m = max(logits)
         exps = [math.exp(v - m) for v in logits]
         s = sum(exps)
@@ -67,11 +71,9 @@ class NeuralNet:
         """Run forward pass.
 
         Returns:
-            outputs   — list[7]: [steer, thrust, rest_p, hunt_p, flee_p, mate_p, nest_p]
-                        Movement outputs are tanh-activated.
-                        State outputs are softmax probabilities (sum to 1).
+            outputs   — list[9]: [steer, thrust, hide, sprint, rest_p, hunt_p, flee_p, mate_p, nest_p]
             hidden    — list[6]: second hidden layer activations
-            hidden2   — alias for hidden (kept for backwards compat with brain visualizer)
+            hidden2   — alias for hidden
         """
         # Input → hidden1
         hidden = []
@@ -91,14 +93,18 @@ class NeuralNet:
             s = sum(hidden2[j] * self.w3[i][j] for j in range(self.hidden2_size)) + self.b3[i]
             raw.append(s)
 
-        # Movement: tanh (indices 0-1)
+        # 1. Movement: tanh (indices 0-1)
         steer = self.tanh(raw[0])
         thrust = self.tanh(raw[1])
 
-        # State: softmax (indices 2-6)
-        state_probs = self.softmax(raw[2:7])
+        # 2. Behavior Drives: sigmoid (indices 2-3)
+        hide_drive = self.sigmoid(raw[2])
+        sprint_drive = self.sigmoid(raw[3])
 
-        outputs = [steer, thrust] + state_probs
+        # 3. States: softmax (indices 4-8)
+        state_probs = self.softmax(raw[4:9])
+
+        outputs = [steer, thrust, hide_drive, sprint_drive] + state_probs
         return outputs, hidden, hidden2
 
     @staticmethod
