@@ -18,7 +18,7 @@ from config import (
     FISH_ADULT_DURATION,
 )
 
-# ── Palette ──────────────────────────────────────────────────────────────────
+# ── Palette ────────────────────────────────────────────────────────────────────
 BG = (6, 12, 20)
 BG_SECTION = (12, 22, 35)
 DIVIDER = (20, 38, 55)
@@ -36,11 +36,14 @@ RED_ACC = (255, 100, 110)
 RED_DIM = (130, 45, 50)
 
 # Neural activation colours — deep-sea bioluminescence
-COL_POS_HI = (80, 255, 220)  # teal-white: high positive
-COL_POS_MID = (0, 180, 160)  # mid teal
-COL_NEU = (30, 55, 80)  # dark slate: near-zero
+COL_POS_HI = (80, 255, 220)   # teal-white: high positive
+COL_POS_MID = (0, 180, 160)   # mid teal
+COL_NEU = (30, 55, 80)        # dark slate: near-zero
 COL_NEG_MID = (200, 120, 40)  # amber: mid negative
-COL_NEG_HI = (255, 180, 60)  # bright amber: high negative
+COL_NEG_HI = (255, 180, 60)   # bright amber: high negative
+
+# Dim wire colour used in draw_connections — extracted as a constant
+_COL_DIM_WIRE = (18, 35, 52)
 
 SPECIES_ACCENT = {
     (False, False): AMBER,
@@ -55,10 +58,6 @@ SPECIES_ACCENT_DIM = {
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
-
-def lerp(a, b, t):
-    return a + (b - a) * t
 
 
 def lerp_color(c1, c2, t):
@@ -190,7 +189,7 @@ class BrainVisualizer:
         # Node "heartbeat" timers (staggered phase per node)
         self._node_phases: dict = {}
 
-    # ── Public API ────────────────────────────────────────────────────────
+    # ── Public API ────────────────────────────────────────────
 
     def update(self, dt, selected_fish):
         self.anim_t += dt
@@ -416,9 +415,6 @@ class BrainVisualizer:
             for i, sp in enumerate(src_pos):
                 act = src_acts[i] if i < len(src_acts) else 0.0
                 strength = abs(act)
-                col_dim = (18, 35, 52)
-
-                pts = _bezier_points(sp, dst_pos[0], steps=14)
 
                 for dp in dst_pos:
                     pts = _bezier_points(sp, dp, steps=14)
@@ -426,7 +422,7 @@ class BrainVisualizer:
                     if strength < THRESH:
                         # Dim wire — draw as single thin polyline
                         if len(pts) > 1:
-                            pygame.draw.lines(surf, col_dim, False, pts, 1)
+                            pygame.draw.lines(surf, _COL_DIM_WIRE, False, pts, 1)
                     else:
                         col = activation_color(act)
                         thick = 1 + int(strength * 2.5)
@@ -475,21 +471,10 @@ class BrainVisualizer:
 
         # ── Draw nodes ────────────────────────────────────────────────────
         INPUT_LABELS = [
-            "L",
-            "C",
-            "R",
-            "L",
-            "C",
-            "R",
-            "L",
-            "C",
-            "R",
-            "Nrg",
-            "Stm",
-            "Dep",
-            "Spd",
-            "Cover",
-            "Food",
+            "L", "C", "R",
+            "L", "C", "R",
+            "L", "C", "R",
+            "Nrg", "Stm", "Dep", "Spd", "Cover", "Food",
         ]
         INPUT_GROUPS = [
             ("Food", slice(0, 3)),

@@ -93,13 +93,12 @@ from config import (
     GRAZING_VISUAL_DURATION,
     PLANKTON_PER_PLANT_CHANCE,
     PLANKTON_HARD_CAP,
+    PLANT_HARD_CAP,
+    SEED_HARD_CAP,
 )
 from roots import RootSystem
 from seeds import Seed
 from plant_development import PlantDevelopment
-
-PLANT_HARD_CAP = 60
-SEED_HARD_CAP = 60  # increased from 40
 
 # Map each plant type to its dominant color for plankton tinting
 _PLANT_PLANKTON_COLOR = {
@@ -142,6 +141,8 @@ class Plant:
                 }
                 for _ in range(self.blade_count)
             ]
+            # Sync PlantDevelopment so visible_blades never indexes beyond blade_data
+            self.development.total_blades = self.blade_count
         elif plant_type == "lily_pad":
             self.pad_radius = int(
                 (
@@ -175,7 +176,7 @@ class Plant:
             0, 1.0 / max(PLANKTON_PER_PLANT_CHANCE, 0.001)
         )
 
-    # ── Species init ───────────────────────────────────────────────────────
+    # ── Species init ───────────────────────────────────────────────────────────
 
     def _init_species_params(self):
         params_map = {
@@ -306,7 +307,7 @@ class Plant:
             for i in range(TUBE_SPONGE_SEGMENTS)
         ]
 
-    # ── Fish-Plant Interaction ──────────────────────────────────────────────
+    # ── Fish-Plant Interaction ──────────────────────────────────────────────────
 
     def graze(self, amount):
         if self.biomass <= 0.5:
@@ -323,7 +324,7 @@ class Plant:
         )
         return PLANT_GRAZE_ENERGY_GAIN * (damage / PLANT_GRAZE_DAMAGE)
 
-    # ── Plankton production ────────────────────────────────────────────────
+    # ── Plankton production ────────────────────────────────────────────────────
 
     def try_produce_plankton(self, dt, particle_system, time):
         if not self.development.is_mature:
@@ -339,7 +340,7 @@ class Plant:
         particle_system.spawn_plankton_at(tip_x, tip_y, color_hint=color_hint)
         return True
 
-    # ── Update ─────────────────────────────────────────────────────────────
+    # ── Update ─────────────────────────────────────────────────────────────────
 
     def update(self, dt, soil_grid, photosynthesis_rate=1.0, season_index=0):
         self.wind_phase = self.wind_phase + dt * 0.4
@@ -446,7 +447,7 @@ class Plant:
 
         return alive
 
-    # ── Seed production ────────────────────────────────────────────────────
+    # ── Seed production ────────────────────────────────────────────────────────
 
     def try_produce_seed(self, time, seed_dispersal_modifier, season_index):
         if not self.development.can_produce_seed(seed_dispersal_modifier, season_index):
@@ -461,7 +462,7 @@ class Plant:
         child_seed.vy = random.uniform(-2.0, -0.5)
         return child_seed
 
-    # ── Drawing ────────────────────────────────────────────────────────────
+    # ── Drawing ────────────────────────────────────────────────────────────────
 
     def draw(self, screen, camera, time, soil_grid, biolum_alpha=0):
         if not camera.is_visible((self.x, self.base_y - 100), margin=200):
@@ -602,7 +603,7 @@ class Plant:
             return (int(r * 0.7), int(g * 0.8), int(b * 0.5))
         return (max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)))
 
-    # ── Species draw methods ───────────────────────────────────────────────
+    # ── Species draw methods ───────────────────────────────────────────────────
 
     def draw_seagrass(self, screen, camera, time, color, height):
         visible = max(
@@ -892,7 +893,6 @@ class PlantManager:
         self.seeds = []
         self.bubbles = []
         self._renewal_timer = 0.0
-        self._last_renewal_season = -1
 
     def spawn_initial_seeds(self):
         """Spawn a generous initial seed bank and a handful of established plants."""

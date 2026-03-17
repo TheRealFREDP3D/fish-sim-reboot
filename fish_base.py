@@ -6,7 +6,6 @@ from neural_net import NeuralNet
 from fish_traits import FishTraits
 from fish_physics import SteeringPhysics
 from config import *
-from family import Family
 from environment_objects import PoopParticle
 
 _GLOW_SURF_SIZE = 60
@@ -83,6 +82,10 @@ class NeuralFish:
         self.pregnancy_traits = None
         self.pregnancy_partner = None
         self.family = None
+
+        # Declared here to avoid per-frame getattr() and latent attribute creation
+        self.closest_plant = None
+        self.grazing_cooldown = 0.0
 
         self.last_inputs = [0.0] * self.INPUT_COUNT
         self.last_hidden = [0.0] * self.brain.hidden2_size
@@ -267,7 +270,6 @@ class NeuralFish:
         threat_level = sum(full_inputs[3:6])
         cover_quality = full_inputs[13]
 
-        self.grazing_cooldown = getattr(self, "grazing_cooldown", 0.0)
         self.grazing_cooldown = max(0.0, self.grazing_cooldown - dt)
 
         if (
@@ -606,29 +608,6 @@ class NeuralFish:
             sym_font = pygame.font.Font(None, 18)
             sym = sym_font.render("♥", True, (255, 100, 150))
             screen.blit(sym, (int(screen_pos[0]) - sym.get_width() // 2, heart_y))
-
-    def draw_brain(self, screen, time):
-        pass
-
-    def _get_activation_color(self, value):
-        def lerp_color(c1, c2, t):
-            return tuple(int(a + (b - a) * t) for a, b in zip(c1, c2))
-
-        NEUTRAL = (100, 100, 100)
-        POSITIVE = (50, 255, 50)
-        NEGATIVE = (255, 50, 255)
-        t = min(1.0, abs(value))
-        return (
-            lerp_color(NEUTRAL, POSITIVE, t)
-            if value > 0
-            else lerp_color(NEUTRAL, NEGATIVE, t)
-        )
-
-    def _get_gradient_color(self, ratio):
-        ratio = max(0, min(1, ratio))
-        if ratio < 0.5:
-            return (255, int(255 * ratio * 2), 50)
-        return (int(255 * (1 - (ratio - 0.5) * 2)), 255, 50)
 
     def get_color(self):
         if self.is_predator:

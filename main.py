@@ -55,6 +55,9 @@ class Simulation:
         self.font_large = pygame.font.Font(None, 32)
 
     def _reset(self):
+        # Release pygame surfaces held by the old world before replacing it
+        self.world.cleanup()
+
         self.time_system = TimeSystem()
         self.world = World()
         self.camera = Camera()

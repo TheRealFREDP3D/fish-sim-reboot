@@ -57,7 +57,7 @@ class World:
             (
                 rng.uniform(0, WORLD_WIDTH),
                 rng.uniform(0, WATER_LINE_Y - 10),
-                rng.uniform(0.4, 1.0),  # size factor
+                rng.uniform(0.4, 1.0),   # size factor
                 rng.uniform(0, math.pi * 2),  # twinkle phase
             )
             for _ in range(STAR_COUNT)
@@ -77,18 +77,13 @@ class World:
         self._rebuild_haze()
 
     def cleanup(self):
-        """Clean up pygame surfaces to prevent memory leaks."""
-        if hasattr(self, "_star_surfs"):
-            for _, surface in self._star_surfs:
-                if surface:
-                    surface = None
-            self._star_surfs.clear()
-
-        if hasattr(self, "water_gradient_surface"):
-            self.water_gradient_surface = None
-
-        if hasattr(self, "haze_surface"):
-            self.haze_surface = None
+        """Release pygame surfaces to prevent memory leaks on world reset."""
+        self._star_surfs.clear()  # releases all (r, surface) tuples and their surfaces
+        self.season_particles.clear()
+        self.water_gradient_surface = None
+        self.haze_surface = None
+        self.night_overlay = None
+        self._ray_surface = None
 
     # ── Terrain generation ─────────────────────────────────────────────────
 

@@ -7,8 +7,14 @@ from config import PREDATOR_SIZE_ADVANTAGE_MULTIPLIER, PREY_PREDATOR_MIN_DISTANC
 
 
 class PredatorFish(NeuralFish):
-    def __init__(self, world, traits=None, brain=None):
-        super().__init__(world, traits=traits, brain=brain)
+    def __init__(self, world, traits=None, brain=None, start_x=None, start_y=None):
+        super().__init__(
+            world,
+            traits=traits,
+            brain=brain,
+            start_x=start_x,
+            start_y=start_y,
+        )
         self.is_predator = True
         self.physics.max_speed *= PREDATOR_SPEED_MULT
 

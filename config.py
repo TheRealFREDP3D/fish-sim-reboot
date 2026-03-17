@@ -27,14 +27,14 @@ PARTICLE_ALPHA = 90
 
 # Plankton color palette — varied microorganism hues
 PLANKTON_COLORS = [
-    (80, 200, 120),  # green algae
-    (60, 210, 180),  # cyan diatom
-    (160, 220, 80),  # yellow-green
+    (80, 200, 120),   # green algae
+    (60, 210, 180),   # cyan diatom
+    (160, 220, 80),   # yellow-green
     (100, 180, 220),  # blue phytoplankton
-    (200, 160, 80),  # golden dinoflagellate
-    (180, 90, 180),  # pink/purple cryptophyte
-    (60, 190, 140),  # teal cyanobacteria
-    (220, 200, 60),  # yellow diatom
+    (200, 160, 80),   # golden dinoflagellate
+    (180, 90, 180),   # pink/purple cryptophyte
+    (60, 190, 140),   # teal cyanobacteria
+    (220, 200, 60),   # yellow diatom
 ]
 
 # Plankton size (half of previous values)
@@ -194,9 +194,9 @@ PLANT_HARD_CAP = 60
 SEED_HARD_CAP = 60  # increased from 40 — allow more seeds to accumulate
 
 # ── Plankton spawning from plants ─────────────────────────────────────────────
-PLANKTON_PER_PLANT_CHANCE = 0.012  # probability per mature plant per second
-PLANKTON_HARD_CAP = 200  # max plankton alive at once
-PLANKTON_SPAWN_SPREAD = 30  # px radius around plant tip
+PLANKTON_PER_PLANT_CHANCE = 0.012   # probability per mature plant per second
+PLANKTON_HARD_CAP = 200             # max plankton alive at once
+PLANKTON_SPAWN_SPREAD = 30          # px radius around plant tip
 
 # ── Evolution settings ────────────────────────────────────────────────────────
 MUTATION_RATE = 0.2
@@ -279,7 +279,7 @@ SEED_ENERGY_COST = 2.0
 PREDATOR_SIZE_ADVANTAGE_MULTIPLIER = 1.2
 PREY_PREDATOR_MIN_DISTANCE = 400
 
-# ── Mating display constants ───────────────────────────────────────────────────
+# ── Mating display constants ──────────────────────────────────────────────────
 MATING_HEART_SPAWN_INTERVAL = 1.2
 MATING_HEART_RANDOM_RANGE = 0.6
 MATING_GLOW_DECAY_RATE = 3.0
@@ -309,26 +309,26 @@ BIOLUM_COLORS = {
 STAR_COUNT = 120
 STAR_MAX_ALPHA = 200
 
+# Keys 0 (Spring) and 1 (Summer) intentionally absent — they produce no particles.
+# world.py uses .get(season_idx, 0.0) so missing keys safely default to 0.
 SEASONAL_PARTICLE_CHANCE = {
-    0: 0.0,
-    1: 0.0,
-    2: 0.004,
-    3: 0.003,
+    2: 0.004,  # Autumn — falling leaves
+    3: 0.003,  # Winter — snow
 }
 LEAF_COLORS = [(180, 80, 20), (210, 130, 30), (160, 60, 10), (200, 160, 40)]
 SNOW_COLOR = (220, 235, 255)
 
-# ── Enhanced seasonal plant behavior ──────────────────────────────────────────
+# ── Enhanced seasonal plant behavior ─────────────────────────────────────────
 # Significantly raised survival chances so plants persist through winter
 WINTER_SURVIVAL_CHANCE = {
-    "kelp": 0.30,  # was 0.15
-    "seagrass": 0.55,  # was 0.35
-    "algae": 0.15,  # was 0.05
-    "red_seaweed": 0.25,  # was 0.10
-    "lily_pad": 0.80,  # was 0.70
-    "tube_sponge": 0.60,  # was 0.45
-    "fan_coral": 0.40,  # was 0.25
-    "anemone": 0.70,  # was 0.60
+    "kelp": 0.30,        # was 0.15
+    "seagrass": 0.55,    # was 0.35
+    "algae": 0.15,       # was 0.05
+    "red_seaweed": 0.25, # was 0.10
+    "lily_pad": 0.80,    # was 0.70
+    "tube_sponge": 0.60, # was 0.45
+    "fan_coral": 0.40,   # was 0.25
+    "anemone": 0.70,     # was 0.60
 }
 
 SPRING_GERMINATION_BOOST = 4.0
@@ -349,7 +349,7 @@ _SEASON_PHOTO_MOD = {0: 1.0, 1: 1.1, 2: 0.8, 3: 0.25}
 _SEASON_CAN_SEED = {0: False, 1: True, 2: True, 3: False}
 _SEASON_SEED_COOLDOWN = {0: INFINITE_COOLDOWN, 1: 30.0, 2: 10.0, 3: INFINITE_COOLDOWN}
 
-# ── Fish-Plant Interaction Mechanics ──────────────────────────────────────────
+# ── Fish-Plant Interaction Mechanics ─────────────────────────────────────────
 PLANT_COVER_RADIUS = 85.0
 PLANT_COVER_STRENGTH = {
     "kelp": 1.4,

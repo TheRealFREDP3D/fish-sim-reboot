@@ -333,17 +333,6 @@ class ParticleSystem:
 
     # ── Update / Draw ──────────────────────────────────────────────────────
 
-    def update(self, time, time_system=None):
-        depth_bias = time_system.plankton_depth_bias if time_system else 0.0
-        for particle in self.particles:
-            particle.update(time, depth_bias=depth_bias)
-
-        self.eat_effects = [
-            e for e in self.eat_effects if e.update(1 / 60)
-        ]  # approximate; real dt passed from fish_system
-        self.mating_effects = [e for e in self.mating_effects if e.update(1 / 60)]
-        self._heart_particles = [h for h in self._heart_particles if h.update(1 / 60)]
-
     def update_with_dt(self, dt, time_system=None):
         """Preferred update — accepts real dt with optimized particle management."""
         depth_bias = time_system.plankton_depth_bias if time_system else 0.0
