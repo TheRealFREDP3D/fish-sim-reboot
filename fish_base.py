@@ -23,8 +23,8 @@ def _get_glow_surf():
 
 def get_life_stage_size_mult(age):
     larva_end = FISH_LARVA_DURATION
-    juv_end = larva_end + max(0.1, FISH_JUVENILE_DURATION)  # Prevent division by zero
-    adult_end = juv_end + max(0.1, FISH_ADULT_DURATION)  # Prevent division by zero
+    juv_end = larva_end + max(0.1, FISH_JUVENILE_DURATION)
+    adult_end = juv_end + max(0.1, FISH_ADULT_DURATION)
 
     if age < larva_end:
         return 0.35
@@ -41,8 +41,8 @@ def get_life_stage_size_mult(age):
 
 
 class NeuralFish:
-    INPUT_COUNT = 15
-    OUTPUT_COUNT = 2
+    INPUT_COUNT = 18
+    OUTPUT_COUNT = 9  # 2 movement + 2 behavior + 5 state logits
 
     def __init__(
         self,
@@ -61,7 +61,6 @@ class NeuralFish:
             brain if brain else NeuralNet(self.INPUT_COUNT, 12, self.OUTPUT_COUNT)
         )
 
-        # Use provided spawn position (e.g. egg location) or random
         start_x = start_x or random.uniform(100, WORLD_WIDTH - 100)
         start_y = start_y or random.uniform(WATER_LINE_Y + 100, WORLD_HEIGHT - 200)
 
@@ -83,7 +82,6 @@ class NeuralFish:
         self.pregnancy_partner = None
         self.family = None
 
-        # Declared here to avoid per-frame getattr() and latent attribute creation
         self.closest_plant = None
         self.grazing_cooldown = 0.0
 
@@ -91,13 +89,14 @@ class NeuralFish:
         self.last_hidden = [0.0] * self.brain.hidden2_size
         self.last_hidden1 = [0.0] * self.brain.hidden_size
         self.last_outputs = [0.0] * self.OUTPUT_COUNT
+        # State probabilities exposed for the brain visualizer
+        self.last_state_probs = [0.2] * 5
         self.output_history = collections.deque(maxlen=60)
 
         self.food_eaten = 0
         self.distance_traveled = 0.0
         self.offspring_count = 0
 
-        # Mating display state
         self._mating_glow_timer = 0.0
         self._heart_timer = 0.0
 
@@ -156,6 +155,7 @@ class NeuralFish:
                 self.is_hidden = True
 
         def fill_radar(objects, offset, is_threat_radar=False, bias_multiplier=1.0):
+            min_d = FISH_SENSOR_RANGE
             for obj in objects:
                 if is_threat_radar and getattr(obj, "is_hidden", False):
                     continue
@@ -170,6 +170,8 @@ class NeuralFish:
                 if is_threat_radar and self.is_hidden:
                     detection_range *= 0.5
                 if dist < detection_range and dist > 0:
+                    if dist < min_d:
+                        min_d = dist
                     angle = (
                         math.atan2(oy - self.physics.pos.y, ox - self.physics.pos.x)
                         - self.physics.heading
@@ -183,41 +185,15 @@ class NeuralFish:
                         radar[offset + sector] += (
                             1.0 - (dist / detection_range)
                         ) * bias_multiplier
+            return min_d
 
-        food_bias = 1.0
-        threat_bias = 1.0
-        mate_bias = 1.0
-
-        if self.state == FishState.HUNTING:
-            food_bias = 2.5
-        elif self.state == FishState.MATING:
-            mate_bias = 2.5
-        elif self.state == FishState.FLEEING:
-            threat_bias = 3.0
-        elif self.state == FishState.NESTING:
-            if self.closest_plant and min_plant_dist < 300:
-                dx = self.closest_plant.x - self.physics.pos.x
-                dy = self.closest_plant.base_y - self.physics.pos.y
-                dist = max(1, min_plant_dist)
-                angle = math.atan2(dy, dx) - self.physics.heading
-                angle = (angle + math.pi) % (2 * math.pi) - math.pi
-                if abs(angle) < FISH_SENSOR_ARC:
-                    sector = int((angle + FISH_SENSOR_ARC) / (2 * FISH_SENSOR_ARC) * 3)
-                    sector = max(0, min(2, sector))
-                    radar[sector] += (1.0 - (dist / 300)) * 2.0
-        elif self.state == FishState.RESTING:
-            food_bias = 0.4
-            threat_bias = 0.6
-            mate_bias = 0.4
-
-        fill_radar(targets, 0, bias_multiplier=food_bias)
+        fill_radar(targets, 0)
         fill_radar(
             [f for f in all_fish if getattr(f, "is_predator", False)],
             3,
             is_threat_radar=True,
-            bias_multiplier=threat_bias,
         )
-        fill_radar(
+        min_mate_dist = fill_radar(
             [
                 f
                 for f in all_fish
@@ -227,8 +203,19 @@ class NeuralFish:
                 and f.is_mature
             ],
             6,
-            bias_multiplier=mate_bias,
         )
+
+        # ── Ambush Alert (is a predator near my plant?) ──────────────────
+        ambush_alert = 0.0
+        if self.closest_plant:
+            for f in all_fish:
+                if getattr(f, "is_predator", False):
+                    p_dist = f.physics.pos.distance_to(
+                        (self.closest_plant.x, self.closest_plant.base_y)
+                    )
+                    if p_dist < PLANT_COVER_RADIUS:
+                        ambush_alert = 1.0
+                        break
 
         stats = [
             self.energy / FISH_MAX_ENERGY,
@@ -237,8 +224,53 @@ class NeuralFish:
             self.physics.vel.length() / self.physics.max_speed,
             cover_quality,
             sum(plant_food) / 3.0,
+            # 15: Normalized distance to closest plant
+            min(1.0, min_plant_dist / FISH_SENSOR_RANGE),
+            # 16: Ambush Alert
+            ambush_alert,
+            # 17: Closest Mate Distance
+            min(1.0, min_mate_dist / FISH_SENSOR_RANGE),
         ]
         return radar + stats
+
+    # ── Soft state selection ───────────────────────────────────────────────
+
+    def _pick_state(
+        self, raw_state_probs, threat_level, night_rest_factor, mating_drive
+    ):
+        """
+        Apply physiological biases to the NN's raw softmax state probabilities.
+        """
+        if self.is_pregnant:
+            return FishState.NESTING
+
+        # Convert probabilities back to log-space for bias addition
+        logits = [math.log(max(p, 1e-9)) for p in raw_state_probs]
+
+        # Threat → nudge FLEE
+        logits[2] += threat_level * STATE_BIAS_FLEE_THREAT
+
+        # Hunger → nudge HUNT
+        hunger_signal = max(0.0, 1.0 - self.energy / FISH_MAX_ENERGY)
+        logits[1] += hunger_signal * STATE_BIAS_HUNT_HUNGER
+
+        # Mating readiness → nudge MATE
+        if (
+            self.is_mature
+            and self.energy > FISH_MATING_THRESHOLD / mating_drive
+            and self.mating_cooldown <= 0
+        ):
+            logits[3] += STATE_BIAS_MATE_DRIVE * mating_drive
+
+        # Night → nudge REST
+        logits[0] += (1.0 - night_rest_factor) * STATE_BIAS_REST_NIGHT
+
+        if not self.is_mature:
+            logits[1] = -1e9  # Block HUNTING for immature fish
+            logits[3] = -1e9  # Block MATING for immature fish
+
+        best_idx = logits.index(max(logits))
+        return FISH_STATE_ORDER[best_idx]
 
     # ── Update ─────────────────────────────────────────────────────────────
 
@@ -277,7 +309,6 @@ class NeuralFish:
             and self.energy < FISH_HUNGER_THRESHOLD * 0.7
             and self.grazing_cooldown <= 0
         ):
-
             for plant in plant_manager.plants:
                 if (
                     plant.biomass > 2.0
@@ -298,23 +329,38 @@ class NeuralFish:
         if cover_quality > 0.3:
             self.stamina = min(100.0, self.stamina + 18.0 * cover_quality * dt)
 
+        # ── Neural net forward pass ──────────────────────────────────────
         mating_drive = time_system.mating_drive_modifier if time_system else 1.0
-        eff_mating_th = FISH_MATING_THRESHOLD / mating_drive
 
-        if threat_level > 0.3:
-            self.state = FishState.FLEEING
-        elif self.is_pregnant:
-            self.state = FishState.NESTING
-        elif self.energy < FISH_HUNGER_THRESHOLD:
-            self.state = FishState.HUNTING
-        elif (
-            self.is_mature and self.energy > eff_mating_th and self.mating_cooldown <= 0
-        ):
-            self.state = FishState.MATING
-        else:
-            self.state = FishState.RESTING
+        self.last_inputs = full_inputs
+        outputs, hidden1, hidden2 = self.brain.forward(self.last_inputs)
+        self.last_hidden1 = hidden1
+        self.last_hidden = hidden2
+        self.last_outputs = outputs
+        self.output_history.append(list(outputs[:4]))  # Store movement + behaviors
 
-        # ── Mating display timers ───────────────────────────────────────────
+        steer_out = outputs[0]
+        thrust_out = outputs[1]
+        hide_drive = outputs[2]
+        sprint_drive = outputs[3]
+        raw_state_probs = outputs[4:9]
+        self.last_state_probs = raw_state_probs
+
+        # ── Soft state selection ─────────────────────────────────────────
+        self.state = self._pick_state(
+            raw_state_probs, threat_level, night_rest_factor, mating_drive
+        )
+
+        # ── Behavioral Lever: Hide Drive ──────────────────────────────────
+        if self.closest_plant:
+            # High hide_drive pushes the fish to stay near plant cover
+            hide_weight = hide_drive * 1.6
+            hide_force = self.physics.seek(
+                self.closest_plant.x, self.closest_plant.base_y, weight=hide_weight
+            )
+            self.physics.apply_force(hide_force)
+
+        # ── Mating display timers ─────────────────────────────────────────
         if self.state == FishState.MATING:
             self._mating_glow_timer += dt
             self._heart_timer = max(0.0, self._heart_timer - dt)
@@ -328,16 +374,7 @@ class NeuralFish:
                 0.0, self._mating_glow_timer - dt * MATING_GLOW_DECAY_RATE
             )
 
-        self.last_inputs = full_inputs
-        outputs, hidden1, hidden2 = self.brain.forward(self.last_inputs)
-        self.last_hidden1 = hidden1
-        self.last_hidden = hidden2
-        self.last_outputs = outputs
-        self.output_history.append(list(outputs))
-
-        steer_out = outputs[0]
-        thrust_out = outputs[1]
-
+        # ── Speed ceiling ─────────────────────────────────────────────────
         stamina_factor = max(0.3, self.stamina / 100.0)
         if self.state == FishState.FLEEING:
             speed_ceiling = (
@@ -351,6 +388,12 @@ class NeuralFish:
             speed_ceiling = self.physics.max_speed * 0.6
         else:
             speed_ceiling = self.physics.max_speed * 0.35 * night_rest_factor
+
+        # ── Behavioral Lever: Sprint Drive ────────────────────────────────
+        # Evolution can temporarily boost speed by up to 50%
+        speed_ceiling *= 1.0 + sprint_drive * 0.5
+        # Hard cap at 1.8x max speed to prevent extreme overflow
+        speed_ceiling = min(speed_ceiling, self.physics.max_speed * 1.8)
 
         turn_rate = FISH_TURN_RATE_SCALAR * self.traits.physical_traits.get(
             "turn_rate_mult", 1.0
@@ -374,7 +417,7 @@ class NeuralFish:
 
         self.physics.apply_force((steer_force_x, steer_force_y))
 
-        # Egg laying when near a plant
+        # Egg laying
         if self.is_pregnant and self.closest_plant:
             dist_to_plant = self.physics.pos.distance_to(
                 (self.closest_plant.x, self.closest_plant.base_y)
@@ -398,7 +441,7 @@ class NeuralFish:
                     getattr(self, "pregnancy_brain", None),
                 )
 
-        # ── Family cohesion ────────────────────────────────────────────────
+        # ── Family cohesion ───────────────────────────────────────────────
         if self.family and self.family.active:
             if self.is_mature and not self.is_pregnant:
                 child_positions = [
@@ -436,7 +479,7 @@ class NeuralFish:
         self.physics.update(dt, FISH_DRAG, speed_ceiling)
         self.distance_traveled += self.physics.vel.length() * dt
 
-        # ── Food collision ─────────────────────────────────────────────────
+        # ── Food collision ────────────────────────────────────────────────
         for t in targets[:]:
             if self.is_predator:
                 break
@@ -482,7 +525,7 @@ class NeuralFish:
         tail_angle = angle + math.pi + math.sin(time * 10) * 0.4
         screen_pos = camera.apply(pos)
 
-        # ── Mating glow ────────────────────────────────────────────────────
+        # ── Mating glow ──────────────────────────────────────────────────
         if self._mating_glow_timer > 0:
             pulse = (math.sin(time * 6.0) + 1) * 0.5
             glow_intensity = min(1.0, self._mating_glow_timer / 0.5) * (
@@ -513,7 +556,7 @@ class NeuralFish:
                 ),
             )
 
-        # ── Bioluminescence glow ───────────────────────────────────────────
+        # ── Bioluminescence glow ─────────────────────────────────────────
         if biolum_alpha > 10:
             if self.is_predator:
                 glow_col = BIOLUM_COLORS["predator"]
@@ -576,22 +619,6 @@ class NeuralFish:
         pygame.draw.circle(screen, (255, 255, 255), (int(eye_x), int(eye_y)), 2)
         pygame.draw.circle(screen, (0, 0, 0), (int(eye_x), int(eye_y)), 1)
 
-        # ── Family bond lines to immature children ─────────────────────────
-        if self.family and self.family.active and self.is_mature:
-            for child in self.family.children:
-                if not child.is_mature:
-                    child_screen = camera.apply(child.physics.pos)
-                    dist = self.physics.pos.distance_to(child.physics.pos)
-                    bond_alpha = int(80 * (1.0 - min(1.0, dist / 200.0)))
-                    if bond_alpha > 10:
-                        pygame.draw.line(
-                            screen,
-                            (255, 220, 255),
-                            (int(screen_pos[0]), int(screen_pos[1])),
-                            (int(child_screen[0]), int(child_screen[1])),
-                            1,
-                        )
-
         # Selection ring
         if selected:
             pygame.draw.circle(
@@ -602,7 +629,7 @@ class NeuralFish:
                 2,
             )
 
-        # ── Mating state ♥ label ───────────────────────────────────────────
+        # ── Mating state ♥ label ─────────────────────────────────────────
         if self.state == FishState.MATING and self._mating_glow_timer > 0.3:
             heart_y = int(screen_pos[1]) - int(size * 4) - 8
             sym_font = pygame.font.Font(None, 18)

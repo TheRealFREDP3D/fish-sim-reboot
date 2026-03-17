@@ -12,6 +12,7 @@ class PoopParticle:
         self.color = (90 + c_var, 60 + c_var, 30)
         self.size = random.uniform(2, 4)
         self.rot = random.uniform(0, 360)
+        self.nutrition = 0.8  # Added for CleanerFish consumption logic
 
     def update(self, dt, world):
         self.y += self.vy * 40 * dt
@@ -47,12 +48,11 @@ class HeartParticle:
         self.life = random.uniform(1.2, 2.2)
         self.max_life = self.life
         self.size = random.uniform(5, 10)
-        self.phase = random.uniform(0, math.pi * 2)
 
     def update(self, dt):
         self.x += self.vx * 40 * dt
         self.y += self.vy * 40 * dt
-        self.vy -= 0.01 * dt  # float upward
+        self.vy -= 0.01 * dt
         self.life -= dt
         return self.life > 0
 
@@ -65,13 +65,10 @@ class HeartParticle:
 
     @staticmethod
     def _draw_heart(screen, cx, cy, size, alpha):
-        """Draw a simple heart shape using two circles and a triangle."""
         surf = pygame.Surface((int(size * 4), int(size * 4)), pygame.SRCALPHA)
         r = int(size)
-        # Two circles for top of heart
         pygame.draw.circle(surf, (255, 80, 120, alpha), (r, r), r)
         pygame.draw.circle(surf, (255, 80, 120, alpha), (r * 3, r), r)
-        # Triangle for bottom
         pts = [(0, r), (r * 4, r), (r * 2, r * 4)]
         pygame.draw.polygon(surf, (255, 80, 120, alpha), pts)
         screen.blit(surf, (cx - r * 2, cy - r * 2))
@@ -91,18 +88,13 @@ class FishEgg:
     ):
         self.x, self.y = x, y
         self.traits = traits
-        self.parent1 = parent1
-        self.parent2 = parent2
-        self.is_cleaner = is_cleaner
-        self.is_predator = is_predator
+        self.parent1, self.parent2 = parent1, parent2
+        self.is_cleaner, self.is_predator = is_cleaner, is_predator
         self.brain = brain
         self.timer = FISH_EGG_HATCH_TIME
         self.pulse_offset = random.uniform(0, math.pi * 2)
-        # Cluster eggs slightly
         self.x += random.uniform(-18, 18)
         self.y += random.uniform(-8, 8)
-        # Spawn burst particles (drawn externally via particle_system)
-        self._just_spawned = True
 
     def update(self, dt, world):
         self.timer -= dt
@@ -114,32 +106,21 @@ class FishEgg:
     def draw(self, screen, camera):
         time = pygame.time.get_ticks() * 0.001
         pulse = (math.sin(time * 3 + self.pulse_offset) + 1) * 0.5
-
-        # Larger, more visible eggs
         if self.is_predator:
-            base_color = (255, 80, 80)
-            glow_color = (255, 160, 160)
+            base_color, glow_color = (255, 80, 80), (255, 160, 160)
         elif self.is_cleaner:
-            base_color = (100, 200, 255)
-            glow_color = (180, 230, 255)
+            base_color, glow_color = (100, 200, 255), (180, 230, 255)
         else:
-            base_color = (255, 210, 80)
-            glow_color = (255, 240, 160)
+            base_color, glow_color = (255, 210, 80), (255, 240, 160)
 
         egg_r = 9 + pulse * 3
-
         surf = pygame.Surface((50, 50), pygame.SRCALPHA)
         cx, cy = 25, 25
-
-        # Outer glow
         pygame.draw.circle(surf, (*glow_color, 60), (cx, cy), int(egg_r + 8))
-        # Mid glow
         pygame.draw.circle(surf, (*glow_color, 120), (cx, cy), int(egg_r + 4))
-        # Egg body
         pygame.draw.circle(surf, (*base_color, 220), (cx, cy), int(egg_r))
-        # Bright ring
         pygame.draw.circle(surf, (255, 255, 255, 180), (cx, cy), int(egg_r), 2)
-        # Inner embryo dot (grows as hatching approaches)
+
         hatch_progress = 1.0 - (self.timer / FISH_EGG_HATCH_TIME)
         embryo_r = max(2, int(egg_r * 0.35 * (0.5 + hatch_progress * 0.5)))
         embryo_color = tuple(max(0, c - 60) for c in base_color)
@@ -147,12 +128,3 @@ class FishEgg:
 
         pos = camera.apply((self.x, self.y))
         screen.blit(surf, (int(pos[0]) - cx, int(pos[1]) - cy))
-
-        # Hatching shimmer when close
-        if hatch_progress > 0.8:
-            shimmer_a = int((hatch_progress - 0.8) / 0.2 * 200 * pulse)
-            shimmer_surf = pygame.Surface((60, 60), pygame.SRCALPHA)
-            pygame.draw.circle(
-                shimmer_surf, (255, 255, 200, shimmer_a), (30, 30), int(egg_r + 6), 3
-            )
-            screen.blit(shimmer_surf, (int(pos[0]) - 30, int(pos[1]) - 30))
