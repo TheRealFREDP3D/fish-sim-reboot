@@ -3,7 +3,14 @@
 import pygame
 import random
 import math
-from config import *
+from config import (
+    WORLD_WIDTH,
+    WORLD_HEIGHT,
+    WATER_LINE_Y,
+    MUTATION_RATE,
+    MUTATION_STRENGTH,
+)
+from plant_rules import is_valid_depth
 
 
 class Seed:
@@ -64,9 +71,7 @@ class Seed:
         if self.y >= terrain_y - 3:
             depth_ratio = world.get_depth_ratio(terrain_y)
 
-            # Consistently check depth using the centralized plant logic
-            from plants import is_valid_depth
-
+            # Check depth using the centralized plant logic
             if is_valid_depth(self.plant_type, depth_ratio):
                 return True
 

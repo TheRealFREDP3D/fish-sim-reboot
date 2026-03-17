@@ -3,25 +3,83 @@
 import pygame
 import math
 import random
-from config import *
+from config import (
+    WATER_LINE_Y,
+    WORLD_HEIGHT,
+    WORLD_WIDTH,
+    KELP_HEIGHT_MIN,
+    KELP_HEIGHT_MAX,
+    KELP_SWAY_SPEED,
+    KELP_SWAY_AMPLITUDE,
+    KELP_COLOR,
+    KELP_HIGHLIGHT,
+    KELP_WIDTH,
+    SEAGRASS_HEIGHT_MIN,
+    SEAGRASS_HEIGHT_MAX,
+    SEAGRASS_SWAY_SPEED,
+    SEAGRASS_SWAY_AMPLITUDE,
+    SEAGRASS_COLOR,
+    SEAGRASS_HIGHLIGHT,
+    SEAGRASS_WIDTH,
+    ALGAE_HEIGHT_MIN,
+    ALGAE_HEIGHT_MAX,
+    ALGAE_SWAY_SPEED,
+    ALGAE_SWAY_AMPLITUDE,
+    ALGAE_COLOR,
+    ALGAE_HIGHLIGHT,
+    ALGAE_WIDTH,
+    RED_SEAWEED_HEIGHT_MIN,
+    RED_SEAWEED_HEIGHT_MAX,
+    RED_SEAWEED_SWAY_SPEED,
+    RED_SEAWEED_SWAY_AMPLITUDE,
+    RED_SEAWEED_COLOR,
+    RED_SEAWEED_HIGHLIGHT,
+    RED_SEAWEED_WIDTH,
+    RED_SEAWEED_GLOW_INTENSITY,
+    LILY_PAD_COLOR,
+    LILY_PAD_HIGHLIGHT,
+    LILY_PAD_SIZE_MIN,
+    LILY_PAD_SIZE_MAX,
+    LILY_PAD_FLOWER_COLOR,
+    TUBE_SPONGE_HEIGHT_MIN,
+    TUBE_SPONGE_HEIGHT_MAX,
+    TUBE_SPONGE_SEGMENTS,
+    TUBE_SPONGE_FILTER_RATE,
+    TUBE_SPONGE_COLOR,
+    TUBE_SPONGE_HIGHLIGHT,
+    TUBE_SPONGE_WIDTH,
+    FAN_CORAL_HEIGHT_MIN,
+    FAN_CORAL_HEIGHT_MAX,
+    FAN_CORAL_SWAY_SPEED,
+    FAN_CORAL_SWAY_AMPLITUDE,
+    FAN_CORAL_BRANCH_FACTOR,
+    FAN_CORAL_COLOR,
+    FAN_CORAL_HIGHLIGHT,
+    FAN_CORAL_WIDTH,
+    ANEMONE_HEIGHT_MIN,
+    ANEMONE_HEIGHT_MAX,
+    ANEMONE_SWAY_SPEED,
+    ANEMONE_TENTACLES,
+    ANEMONE_COLOR,
+    ANEMONE_HIGHLIGHT,
+    ANEMONE_WIDTH,
+    ANEMONE_PULSE_SPEED,
+    ANEMONE_GLOW_COLOR,
+    PLANT_GRAZE_DAMAGE,
+    PLANT_GRAZE_ENERGY_GAIN,
+    GRAZING_VISUAL_DURATION,
+    PLANKTON_PER_PLANT_CHANCE,
+    ROOT_BASE_GROWTH_RATE,
+    PLANT_HARD_CAP,
+    SEED_HARD_CAP,
+    BUBBLE_CHANCE,
+    BUBBLE_COLOR,
+    SOIL_MAX_NUTRIENT,
+)
+from plant_rules import is_valid_depth
 from roots import RootSystem
 from seeds import Seed
 from plant_development import PlantDevelopment
-
-
-# Move helper to top-level for seeds.py access
-def is_valid_depth(plant_type, depth_ratio):
-    rules = {
-        "kelp": lambda d: d <= KELP_DEPTH_MAX,
-        "seagrass": lambda d: SEAGRASS_DEPTH_MIN <= d <= SEAGRASS_DEPTH_MAX,
-        "algae": lambda d: d >= ALGAE_DEPTH_MIN,
-        "red_seaweed": lambda d: RED_SEAWEED_DEPTH_MIN <= d <= RED_SEAWEED_DEPTH_MAX,
-        "lily_pad": lambda d: d <= LILY_PAD_DEPTH_MAX,
-        "tube_sponge": lambda d: TUBE_SPONGE_DEPTH_MIN <= d <= TUBE_SPONGE_DEPTH_MAX,
-        "fan_coral": lambda d: FAN_CORAL_DEPTH_MIN <= d <= FAN_CORAL_DEPTH_MAX,
-        "anemone": lambda d: ANEMONE_DEPTH_MIN <= d <= ANEMONE_DEPTH_MAX,
-    }
-    return rules.get(plant_type, lambda d: True)(depth_ratio)
 
 
 _PLANT_PLANKTON_COLOR = {

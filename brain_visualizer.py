@@ -98,30 +98,6 @@ def draw_capsule_outline(surface, color, x, y, w, h, radius=None, width=1):
     )
 
 
-# ── Signal particle ───────────────────────────────────────────────────────────
-
-
-class _Particle:
-    __slots__ = ("t", "speed", "src", "dst", "col", "size")
-
-    def __init__(self, src, dst, col):
-        self.t = random.uniform(0.0, 1.0)
-        self.speed = random.uniform(0.35, 0.75)
-        self.src = src
-        self.dst = dst
-        self.col = col
-        self.size = random.uniform(2.0, 3.5)
-
-    def update(self, dt):
-        self.t = (self.t + self.speed * dt) % 1.0
-
-    def pos(self):
-        dx = (self.dst[0] - self.src[0]) * 0.45
-        p1 = (self.src[0] + dx, self.src[1])
-        p2 = (self.dst[0] - dx, self.dst[1])
-        return _cubic_bezier(self.src, p1, p2, self.dst, self.t)
-
-
 # ── Main class ────────────────────────────────────────────────────────────────
 
 
@@ -161,7 +137,6 @@ class BrainVisualizer:
             (self._GLOW * 2, self._GLOW * 2), pygame.SRCALPHA
         )
 
-        self._particles: list[_Particle] = []
         self._node_positions_built = False
         self._pos_in = []
         self._pos_h1 = []
@@ -182,15 +157,11 @@ class BrainVisualizer:
             self.prev_state = selected_fish.state
         else:
             self.slide_x = min(float(self.PANEL_W), self.slide_x + 14 * dt * 60)
-            self._particles.clear()
             self._ripples.clear()
             self._node_positions_built = False
 
         if self.state_flash > 0:
             self.state_flash = max(0.0, self.state_flash - dt)
-
-        for p in self._particles:
-            p.update(dt)
 
         self._ripples = [
             (a + dt, m, pos, col) for a, m, pos, col in self._ripples if a < m
@@ -319,7 +290,6 @@ class BrainVisualizer:
                 pos_h2,
                 pos_out,
             )
-            self._seed_particles()
             self._node_positions_built = True
 
         inp, h1, h2 = (
@@ -363,17 +333,6 @@ class BrainVisualizer:
         y += NET_H + 8
         return y
 
-    def _seed_particles(self):
-        self._particles.clear()
-        for _ in range(30):
-            self._particles.append(
-                _Particle(
-                    random.choice(self._pos_h1),
-                    random.choice(self._pos_h2),
-                    (200, 200, 200),
-                )
-            )
-
     def _draw_outputs(self, surf, fish, accent, y):
         PAD = 16
         surf.blit(self.f_small.render("BEHAVIOR DRIVES", True, TEXT_LABEL), (PAD, y))
@@ -409,10 +368,22 @@ class BrainVisualizer:
         surf.blit(self.f_small.render("HERITABLE TRAITS", True, TEXT_LABEL), (PAD, y))
         y += 18
         LW, TW, TH = 70, self.PANEL_W - PAD * 2 - 100, 8
-        for label, val in fish.traits.physical_traits.items():
-            if "mult" not in label:
+
+        # Fixed, explicit order and display labels for physical trait multipliers
+        trait_rows = [
+            ("max_speed_mult", "Speed"),
+            ("accel_mult", "Accel"),
+            ("turn_rate_mult", "Turn"),
+            ("vision_range_mult", "Vision"),
+            ("stamina_mult", "Stamina"),
+        ]
+
+        for trait_key, display_label in trait_rows:
+            if trait_key not in fish.traits.physical_traits:
                 continue
-            surf.blit(self.f_tiny.render(label[:6], True, TEXT_SECONDARY), (PAD, y + 1))
+
+            val = fish.traits.physical_traits[trait_key]
+            surf.blit(self.f_tiny.render(display_label, True, TEXT_SECONDARY), (PAD, y + 1))
             pygame.draw.rect(surf, BG_SECTION, (PAD + LW, y, TW, TH), border_radius=4)
             dev = (val - 1.0) / 0.8
             bar_width = max(0, int(abs(dev) * TW / 2))

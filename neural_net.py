@@ -56,6 +56,20 @@ class NeuralNet:
         s = sum(exps)
         return [e / s for e in exps]
 
+    def _head_slices(self):
+        """Return slices for (movement, behavior, state) in the raw output vector."""
+        m = self.MOVEMENT_OUTPUTS
+        b = self.BEHAVIOR_OUTPUTS
+        s = self.STATE_OUTPUTS
+        head_total = m + b + s
+        if self.output_size < head_total:
+            raise ValueError(f"output_size={self.output_size} < required head size={head_total}")
+        movement = slice(0, m)
+        behavior = slice(m, m + b)
+        state = slice(m + b, m + b + s)
+        extra = slice(m + b + s, self.output_size)
+        return movement, behavior, state, extra
+
     def forward(self, inputs):
         """Run forward pass. Returns (outputs, layer1_activations, layer2_activations)."""
         # Input -> Hidden 1
@@ -82,22 +96,32 @@ class NeuralNet:
             )
             raw.append(s)
 
-        outputs = [
-            self.tanh(raw[0]),
-            self.tanh(raw[1]),  # Movement
-            self.sigmoid(raw[2]),
-            self.sigmoid(raw[3]),  # Drive
-        ] + self.softmax(
-            raw[4:9]
-        )  # States
+        movement_slice, behavior_slice, state_slice, extra_slice = self._head_slices()
+
+        movement_raw = raw[movement_slice]
+        behavior_raw = raw[behavior_slice]
+        state_raw = raw[state_slice]
+
+        movement = [self.tanh(v) for v in movement_raw]
+        behavior = [self.sigmoid(v) for v in behavior_raw]
+        states = self.softmax(state_raw)
+
+        outputs = movement + behavior + states
 
         return outputs, h1, h2
 
     @staticmethod
     def blend(p1, p2):
+        """Create a child network by per-weight uniform crossover of two parents."""
+        if (p1.input_size != p2.input_size or
+            p1.hidden_size != p2.hidden_size or
+            p1.output_size != p2.output_size):
+            raise ValueError("Cannot blend networks with different architectures")
+
         child = NeuralNet(p1.input_size, p1.hidden_size, p1.output_size)
 
-        def cross_m(m1, m2):
+        def crossover_matrix(m1, m2):
+            """Per-weight uniform crossover between two matrices."""
             return [
                 [
                     m1[i][j] if random.random() < 0.5 else m2[i][j]
@@ -106,12 +130,20 @@ class NeuralNet:
                 for i in range(len(m1))
             ]
 
-        def cross_v(v1, v2):
-            return [v1[i] if random.random() < 0.5 else v2[i] for i in range(len(v1))]
+        def crossover_vector(v1, v2):
+            """Per-weight uniform crossover between two vectors."""
+            return [
+                v1[i] if random.random() < 0.5 else v2[i]
+                for i in range(len(v1))
+            ]
 
-        child.w1, child.b1 = cross_m(p1.w1, p2.w1), cross_v(p1.b1, p2.b1)
-        child.w2, child.b2 = cross_m(p1.w2, p2.w2), cross_v(p1.b2, p2.b2)
-        child.w3, child.b3 = cross_m(p1.w3, p2.w3), cross_v(p1.b3, p2.b3)
+        child.w1 = crossover_matrix(p1.w1, p2.w1)
+        child.b1 = crossover_vector(p1.b1, p2.b1)
+        child.w2 = crossover_matrix(p1.w2, p2.w2)
+        child.b2 = crossover_vector(p1.b2, p2.b2)
+        child.w3 = crossover_matrix(p1.w3, p2.w3)
+        child.b3 = crossover_vector(p1.b3, p2.b3)
+
         return child
 
     def mutate(self, rate=0.1, strength=0.2):
