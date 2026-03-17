@@ -136,7 +136,7 @@ class NeuralNet:
         return child
 
     def mutate(self, mutation_rate=0.1, mutation_strength=0.2):
-        """Create a mutated copy for offspring."""
+        """Create a mutated copy for offspring with layer-specific exploration rates."""
         child = NeuralNet(self.input_size, self.hidden_size, self.output_size)
 
         child.w1 = [row[:] for row in self.w1]
@@ -146,19 +146,24 @@ class NeuralNet:
         child.w3 = [row[:] for row in self.w3]
         child.b3 = self.b3[:]
 
-        def mutate_list(lst):
+        def mutate_list(lst, strength):
             for i in range(len(lst)):
                 if isinstance(lst[i], list):
-                    mutate_list(lst[i])
+                    mutate_list(lst[i], strength)
                 elif random.random() < mutation_rate:
-                    lst[i] += random.gauss(0, mutation_strength)
+                    lst[i] += random.gauss(0, strength)
                     lst[i] = max(-2.0, min(2.0, lst[i]))
 
-        mutate_list(child.w1)
-        mutate_list(child.b1)
-        mutate_list(child.w2)
-        mutate_list(child.b2)
-        mutate_list(child.w3)
-        mutate_list(child.b3)
+        # Early layers explore more (higher strength)
+        mutate_list(child.w1, mutation_strength * 1.2)
+        mutate_list(child.b1, mutation_strength * 1.2)
+
+        # Middle layer standard strength
+        mutate_list(child.w2, mutation_strength)
+        mutate_list(child.b2, mutation_strength)
+
+        # Output layer mutates conservatively (lower strength)
+        mutate_list(child.w3, mutation_strength * 0.5)
+        mutate_list(child.b3, mutation_strength * 0.5)
 
         return child
