@@ -286,7 +286,7 @@ class PlantDevelopment:
         """
         if season == 3:  # Winter — stay dormant as seed
             return
-        if season == 2:  # Autumn — too late to germinate this year
+        if season == 2:  # Autumn — wait for next spring
             return
 
         # Spring: high chance to germinate
