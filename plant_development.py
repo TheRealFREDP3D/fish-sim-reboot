@@ -6,6 +6,9 @@ Season index:  0=Spring  1=Summer  2=Autumn  3=Winter
 Lifecycle (linear, one-way):
   seed → germinating → seedling → mature → flowering → seeding → dormant/dying → decomposing
 
+FIXED: Plants now return to mature after flowering (if healthy) instead of dying.
+This allows sustainable reproduction cycles.
+
 Strict seasonal rules ──────────────────────
   Spring  – seeds germinate, dormant plants wake up, roots/growth begins
   Summer  – peak growth, photosynthesis at max, some seeding allowed
@@ -44,6 +47,7 @@ from config import (
     AUTUMN_SEED_BASE_PROBABILITY,
     SUMMER_SEED_BASE_PROBABILITY,
     SEED_ENERGY_COST,
+    WINTER_MAINTENANCE_MULT,
 )
 
 
@@ -59,7 +63,7 @@ class PlantDevelopment:
         self.is_mature = False
         self.is_flowering = False
         self.time_in_stage = 0.0
-        self._has_flowered = False
+        self._has_flowered = False  # Reset each spring
         self._winter_roll_made = False
         self._dormant_seasons = 0  # how many winters survived dormant
         self._last_season = -1  # track season transitions
@@ -162,15 +166,13 @@ class PlantDevelopment:
             self.energy += photo * 1.2 * dt
             self.energy += growth_nutrients * 8.0 * dt
 
-            # Maintenance cost
+            # Maintenance cost - REDUCED for better survival
             maintenance = (
                 PLANT_BASE_MAINTENANCE
                 + self.current_height * PLANT_SIZE_MAINTENANCE_FACTOR * 0.005
             )
             if season_index == 3:
-                maintenance *= (
-                    1.4  # winter stress (reduced from 1.6 for better survival)
-                )
+                maintenance *= WINTER_MAINTENANCE_MULT  # Reduced winter stress
             self.energy = max(0.0, self.energy - maintenance * dt)
 
         self._update_dimensions(dt, season_index)
@@ -204,14 +206,31 @@ class PlantDevelopment:
                 self._transition("dying")
 
         elif self.stage == "mature":
-            # Autumn AND Summer: try to flower; old age or starvation: die
+            # Summer AND Autumn: try to flower; old age or starvation: die
             if season_index in (1, 2):  # Summer or Autumn — flowering window
                 self._try_enter_flowering(season_index)
-            if self.age > PLANT_MAX_AGE * 0.95 or self.energy <= 0:
+            # Check for old age death
+            if self.age > PLANT_MAX_AGE * 0.95:
+                self._transition("dying")
+            # Energy-based death only at very low levels
+            elif self.energy <= 0.1:  # Changed from <= 0 to give buffer
                 self._transition("dying")
 
         elif self.stage == "flowering":
-            if self.time_in_stage >= FLOWERING_DURATION or self.energy < 1.0:
+            # FIXED: After flowering duration, return to mature if healthy
+            if self.time_in_stage >= FLOWERING_DURATION:
+                # Check if plant is healthy enough to continue
+                if self.energy >= MATURE_ENERGY_THRESHOLD * 0.5:
+                    # Return to mature to continue producing seeds
+                    self._transition("mature")
+                elif self.energy < 0.5:
+                    # Only die if critically low energy
+                    self._transition("dying")
+                else:
+                    # Marginal energy - return to mature anyway
+                    self._transition("mature")
+            # Die during flowering only if critically starved
+            elif self.energy < 0.3:
                 self._transition("dying")
 
         elif self.stage == "dying":
@@ -229,7 +248,7 @@ class PlantDevelopment:
         if not season_changed:
             # Mid-season: only handle ongoing winter stress for non-dormant plants
             if season == 3 and self.stage in ("mature", "flowering", "seedling"):
-                if self.energy <= 0:
+                if self.energy <= 0.05:  # Very low energy threshold
                     self._transition("dying")
             return
 
@@ -264,6 +283,9 @@ class PlantDevelopment:
         elif season == 0:  # Just entered Spring
             self._winter_roll_made = False
 
+            # FIXED: Reset flowering flag so plants can flower again this year
+            self._has_flowered = False
+
             if self.stage == "dormant":
                 # Wake up from dormancy in spring
                 wake_chance = 0.7 + 0.25 * self.traits.get("growth_rate_mult", 1.0)
@@ -276,7 +298,7 @@ class PlantDevelopment:
 
         elif season == 2:  # Just entered Autumn
             # Autumn provides another chance for mature plants to flower if they haven't yet
-            # Note: _has_flowered is NOT reset here - plants can only flower once per year
+            # Note: _has_flowered is reset in spring, so plants can flower each year
             pass
 
     def _update_as_seed(self, dt, season):
@@ -309,8 +331,8 @@ class PlantDevelopment:
         """
         # Very slow energy drain to simulate basal metabolism
         self.energy = max(
-            DORMANT_ENERGY_MINIMUM, self.energy - 0.003 * dt
-        )  # reduced from 0.004
+            DORMANT_ENERGY_MINIMUM, self.energy - 0.002 * dt  # Reduced from 0.003
+        )
 
         # If energy runs out mid-dormancy, the plant dies
         if (
@@ -320,7 +342,7 @@ class PlantDevelopment:
             self._transition("dying")
 
     def _try_enter_flowering(self, season_index):
-        """Called in Summer and Autumn. Each plant flowers at most once per year."""
+        """Called in Summer and Autumn. Each plant flowers at most once per YEAR (reset in spring)."""
         if self._has_flowered:
             return
         pref = FLOWERING_SEASON_PREFERENCE.get(season_index, 0.0)
@@ -329,7 +351,7 @@ class PlantDevelopment:
         if (
             self.energy >= FLOWERING_ENERGY_THRESHOLD
             and random.random() < FLOWERING_BASE_CHANCE * pref
-        ):  # increased from 0.012
+        ):
             self._transition("flowering")
 
     def _transition(self, new_stage):
@@ -411,7 +433,7 @@ class PlantDevelopment:
         if season_index == 2:  # Autumn
             base_p = AUTUMN_SEED_BASE_PROBABILITY
         else:  # Summer
-            base_p = SUMMER_SEED_BASE_PROBABILITY  # much rarer in summer
+            base_p = SUMMER_SEED_BASE_PROBABILITY
 
         if self.stage == "flowering":
             base_p *= 5.0  # flowering is peak seeding time
@@ -419,9 +441,7 @@ class PlantDevelopment:
         if random.random() > base_p * seed_dispersal_modifier:
             return False
 
-        energy_cost = (
-            SEED_ENERGY_COST  # reduced from 2.5 to make seeding more affordable
-        )
+        energy_cost = SEED_ENERGY_COST  # Reduced in config
         if self.energy < energy_cost:
             return False
 
