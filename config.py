@@ -141,12 +141,15 @@ ROOT_BASE_COLOR, ROOT_ACTIVE_COLOR, ROOT_TIP_COLOR = (
     (255, 220, 150),
 )
 
-# Plant lifecycle
-SEED_GROWTH_ENERGY, MATURE_ENERGY_THRESHOLD = 0.8, 2.5
-PLANT_BASE_MAINTENANCE, PLANT_SIZE_MAINTENANCE_FACTOR = 0.10, 0.30
+# Plant lifecycle - ADJUSTED FOR BETTER SURVIVAL
+SEED_GROWTH_ENERGY = 0.8
+MATURE_ENERGY_THRESHOLD = 1.8  # Lowered from 2.5 - easier to reach maturity
+PLANT_BASE_MAINTENANCE = 0.05  # Lowered from 0.10 - reduced energy drain
+PLANT_SIZE_MAINTENANCE_FACTOR = 0.12  # Lowered from 0.30 - less size penalty
 PLANT_MAX_AGE = 90.0
 SEED_PRODUCTION_ENERGY, SEED_PRODUCTION_COST = 4.0, 1.2
-FLOWERING_ENERGY_THRESHOLD, FLOWERING_DURATION = 3.5, 18.0
+FLOWERING_ENERGY_THRESHOLD = 2.5  # Lowered from 3.5 - easier to flower
+FLOWERING_DURATION = 35.0  # Increased from 18.0 - more time to produce seeds
 DECOMPOSITION_NUTRIENT_RETURN, DECOMPOSITION_DURATION = 0.9, 8.0
 PLANT_HARD_CAP, SEED_HARD_CAP = 80, 100
 
@@ -216,11 +219,11 @@ GERMINATION_FAILURE_ENERGY_THRESHOLD, GERMINATION_FAILURE_TIME = 0.5, 60.0
 SEEDLING_DEATH_TIME, DORMANT_ENERGY_MINIMUM, DORMANT_DEATH_TIME = 25.0, 0.05, 30.0
 SPRING_GERMINATION_BASE_CHANCE, SUMMER_GERMINATION_BASE_CHANCE = 0.015, 0.006
 SEED_ENERGY_THRESHOLD, FLOWERING_BASE_CHANCE = 0.4, 0.025
-AUTUMN_SEED_BASE_PROBABILITY, SUMMER_SEED_BASE_PROBABILITY, SEED_ENERGY_COST = (
-    0.008,
-    0.003,
-    1.2,
-)
+
+# INCREASED seed production rates for sustainable reproduction
+AUTUMN_SEED_BASE_PROBABILITY = 0.028  # Increased from 0.008
+SUMMER_SEED_BASE_PROBABILITY = 0.014  # Increased from 0.003
+SEED_ENERGY_COST = 0.5  # Decreased from 1.2 - cheaper to produce seeds
 
 # Soft state-machine biases
 STATE_BIAS_FLEE_THREAT = 3.5
@@ -250,15 +253,16 @@ SEASONAL_PARTICLE_CHANCE = {2: 0.004, 3: 0.003}
 LEAF_COLORS = [(180, 80, 20), (210, 130, 30), (160, 60, 10), (200, 160, 40)]
 SNOW_COLOR = (220, 235, 255)
 
+# IMPROVED winter survival chances - plants are more resilient
 WINTER_SURVIVAL_CHANCE = {
-    "kelp": 0.30,
-    "seagrass": 0.55,
-    "algae": 0.15,
-    "red_seaweed": 0.25,
-    "lily_pad": 0.80,
-    "tube_sponge": 0.60,
-    "fan_coral": 0.40,
-    "anemone": 0.70,
+    "kelp": 0.55,        # Increased from 0.30
+    "seagrass": 0.70,    # Increased from 0.55
+    "algae": 0.35,       # Increased from 0.15
+    "red_seaweed": 0.45, # Increased from 0.25
+    "lily_pad": 0.90,    # Increased from 0.80
+    "tube_sponge": 0.75, # Increased from 0.60
+    "fan_coral": 0.60,   # Increased from 0.40
+    "anemone": 0.85,     # Increased from 0.70
 }
 SPRING_GERMINATION_BOOST, WINTER_PHOTOSYNTHESIS_BASE = 4.0, 0.08
 FLOWERING_SEASON_PREFERENCE = {0: 0.3, 1: 1.4, 2: 1.0, 3: 0.0}
@@ -272,7 +276,7 @@ _SEASON_PHOTO_MOD = {
     3: 0.2,
 }  # Photosynthesis modifiers by season
 _SEASON_CAN_SEED = {0: False, 1: True, 2: True, 3: False}  # Which seasons allow seeding
-_SEASON_SEED_COOLDOWN = {0: 30.0, 1: 20.0, 2: 15.0, 3: 40.0}  # Seed cooldown by season
+_SEASON_SEED_COOLDOWN = {0: 30.0, 1: 15.0, 2: 12.0, 3: 40.0}  # Shorter cooldowns for more seeds
 
 # Fish-Plant Interaction Mechanics
 PLANT_COVER_RADIUS = 85.0
@@ -288,3 +292,6 @@ PLANT_COVER_STRENGTH = {
 }
 PLANT_GRAZE_RANGE, PLANT_GRAZE_ENERGY_GAIN, PLANT_GRAZE_DAMAGE = 38.0, 7.5, 1.35
 GRAZING_COOLDOWN, GRAZING_VISUAL_DURATION = 3.8, 2.5
+
+# Winter maintenance multiplier - reduced stress
+WINTER_MAINTENANCE_MULT = 1.15  # Reduced from hardcoded 1.4
