@@ -122,6 +122,16 @@ INPUT_LABELS = [
 
 OUTPUT_LABELS = ["Str", "Thr", "Hide", "Spr", "Rest", "Hunt", "Flee", "Mate", "Nest"]
 
+# Temporal input indices for maintainability
+TEMPORAL_TIME_IDX = 18
+TEMPORAL_SEASON_IDX = 19
+TEMPORAL_WAS_REST_IDX = 20
+TEMPORAL_WAS_HUNT_IDX = 21
+TEMPORAL_WAS_FLEE_IDX = 22
+TEMPORAL_WAS_MATE_IDX = 23
+TEMPORAL_WAS_NEST_IDX = 24
+TEMPORAL_HUNGER_IDX = 25
+
 
 class BrainVisualizer:
     PANEL_W = BRAIN_PANEL_WIDTH
@@ -318,10 +328,10 @@ class BrainVisualizer:
             )
             self._node_positions_built = True
 
-        inp = list(fish.last_inputs) if hasattr(fish, 'last_inputs') else []
-        h1 = list(fish.last_hidden1) if hasattr(fish, 'last_hidden1') else []
-        h2 = list(fish.last_hidden) if hasattr(fish, 'last_hidden') else []
-        out = list(fish.last_outputs) if hasattr(fish, 'last_outputs') else []
+        inp = list(fish.last_inputs)
+        h1 = list(fish.last_hidden1)
+        h2 = list(fish.last_hidden)
+        out = list(fish.last_outputs)
 
         # Draw connections
         def draw_connections(src_pos, dst_pos, src_acts):
@@ -380,7 +390,7 @@ class BrainVisualizer:
         PAD = 16
         surf.blit(self.f_small.render("BEHAVIOR DRIVES", True, TEXT_LABEL), (PAD, y))
         y += 18
-        out = fish.last_outputs if hasattr(fish, 'last_outputs') else [0.5] * NN_OUTPUT_COUNT
+        out = fish.last_outputs
         gx, gw, gh = PAD + 52, self.PANEL_W - PAD * 2 - 80, 10
 
         drives = [
@@ -413,18 +423,18 @@ class BrainVisualizer:
         y += 18
         gx, gw, gh = PAD + 52, self.PANEL_W - PAD * 2 - 80, 8
 
-        inp = fish.last_inputs if hasattr(fish, 'last_inputs') else []
+        inp = fish.last_inputs
         
         # Temporal inputs are at indices 18-25
         temporal_labels = [
-            ("TIME", 18),
-            ("SEASON", 19),
-            ("WAS_REST", 20),
-            ("WAS_HUNT", 21),
-            ("WAS_FLEE", 22),
-            ("WAS_MATE", 23),
-            ("WAS_NEST", 24),
-            ("HUNGER", 25),
+            ("TIME", TEMPORAL_TIME_IDX),
+            ("SEASON", TEMPORAL_SEASON_IDX),
+            ("WAS_REST", TEMPORAL_WAS_REST_IDX),
+            ("WAS_HUNT", TEMPORAL_WAS_HUNT_IDX),
+            ("WAS_FLEE", TEMPORAL_WAS_FLEE_IDX),
+            ("WAS_MATE", TEMPORAL_WAS_MATE_IDX),
+            ("WAS_NEST", TEMPORAL_WAS_NEST_IDX),
+            ("HUNGER", TEMPORAL_HUNGER_IDX),
         ]
         
         for label, idx in temporal_labels:

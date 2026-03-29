@@ -229,7 +229,7 @@ class NeuralNet:
         
         if self.recurrent:
             child.w_rec = [row[:] for row in self.w_rec]
-            child.hidden_state = self.hidden_state[:]
+            child.hidden_state = [0.0] * self.hidden2_size
             
         return child
 

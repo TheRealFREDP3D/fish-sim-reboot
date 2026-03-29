@@ -7,6 +7,7 @@ from config import (
     FISH_MAX_ENERGY,
     FISH_POPULATION_FLOOR,
     CLEANER_POPULATION_FLOOR,
+    PREDATOR_POPULATION_FLOOR,
     FISH_CARRYING_CAPACITY,
     FISH_CARRYING_CAPACITY_STRENGTH,
     WATER_LINE_Y,
@@ -178,6 +179,34 @@ class FishSystem:
                     self._kill_fish(f, f_list)
                     continue
 
+                # Handle predator reproduction separately since they can't enter MATING state
+                if f.is_predator and hasattr(f, 'try_reproduce'):
+                    if f.try_reproduce():
+                        # Predator successfully reproduced, create egg
+                        egg_data = (
+                            "egg",
+                            f.physics.pos.x,
+                            f.physics.pos.y,
+                            f.traits,
+                            f.brain,
+                            f.is_cleaner,
+                            f.is_predator,
+                            f.mate.brain if f.mate else None,
+                        )
+                        self.eggs.append(
+                            FishEgg(
+                                egg_data[1],
+                                egg_data[2],
+                                egg_data[3],
+                                egg_data[4],
+                                egg_data[5],
+                                egg_data[6],
+                                egg_data[7],
+                                egg_data[8] if len(egg_data) > 8 else None,
+                            )
+                        )
+                        f.mate = None  # Clear mate reference
+
                 if can_mate and f.state == FishState.MATING:
                     self.try_mate(f, f_list)
 
@@ -187,6 +216,9 @@ class FishSystem:
 
         if len(self.cleaner_fish) < CLEANER_POPULATION_FLOOR:
             self.cleaner_fish.append(CleanerFish(self.world))
+
+        if len(self.predators) < PREDATOR_POPULATION_FLOOR:
+            self.predators.append(PredatorFish(self.world))
 
         # 7. Update eat effects with real dt
         self.particle_system.eat_effects = [

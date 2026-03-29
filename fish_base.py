@@ -74,16 +74,26 @@ from environment_objects import PoopParticle
 
 # Glow surface cache
 _GLOW_SURF_SIZE = 60
-_glow_surf = None
+_mating_glow_surf = None
+_biolum_glow_surf = None
 
 
-def _get_glow_surf():
-    global _glow_surf
-    if _glow_surf is None:
-        _glow_surf = pygame.Surface(
+def _get_mating_glow_surf():
+    global _mating_glow_surf
+    if _mating_glow_surf is None:
+        _mating_glow_surf = pygame.Surface(
             (_GLOW_SURF_SIZE * 2, _GLOW_SURF_SIZE * 2), pygame.SRCALPHA
         )
-    return _glow_surf
+    return _mating_glow_surf
+
+
+def _get_biolum_glow_surf():
+    global _biolum_glow_surf
+    if _biolum_glow_surf is None:
+        _biolum_glow_surf = pygame.Surface(
+            (_GLOW_SURF_SIZE * 2, _GLOW_SURF_SIZE * 2), pygame.SRCALPHA
+        )
+    return _biolum_glow_surf
 
 
 def get_life_stage_size_mult(age):
@@ -112,6 +122,9 @@ class NeuralFish:
     # Network architecture constants
     INPUT_COUNT = NN_INPUT_COUNT
     OUTPUT_COUNT = NN_OUTPUT_COUNT
+    
+    # Cached font for mating heart symbol
+    _mating_font = pygame.font.Font(None, 18)
 
     def __init__(
         self,
@@ -131,8 +144,8 @@ class NeuralFish:
         self.brain = brain if brain else NeuralNet()
 
         # Starting position
-        start_x = start_x or random.uniform(100, WORLD_WIDTH - 100)
-        start_y = start_y or random.uniform(WATER_LINE_Y + 100, WORLD_HEIGHT - 200)
+        start_x = start_x if start_x is not None else random.uniform(100, WORLD_WIDTH - 100)
+        start_y = start_y if start_y is not None else random.uniform(WATER_LINE_Y + 100, WORLD_HEIGHT - 200)
         self.physics = SteeringPhysics(start_x, start_y, FISH_MAX_SPEED, FISH_MAX_FORCE)
         
         # Apply trait modifiers to physics
@@ -162,7 +175,7 @@ class NeuralFish:
         self.last_hidden1 = [0.0] * self.brain.hidden_size
         self.last_hidden = [0.0] * self.brain.hidden2_size
         self.last_outputs = [0.0] * self.OUTPUT_COUNT
-        self.last_state_probs = [0.2] * 5
+        self.last_state_probs = [0.2] * len(FISH_STATE_ORDER)
         self.output_history = collections.deque(maxlen=60)
 
         # Lifetime statistics
@@ -318,7 +331,7 @@ class NeuralFish:
                         break
 
         # ── NEW: One-hot encode previous state ─────────────────────────────
-        state_onehot = [0.0] * 5
+        state_onehot = [0.0] * len(FISH_STATE_ORDER)
         state_onehot[FISH_STATE_ORDER.index(self._prev_state)] = 1.0
 
         # ── NEW: Time and season inputs ───────────────────────────────────
@@ -331,7 +344,7 @@ class NeuralFish:
             self._last_food_count = self.food_eaten
         else:
             self._frames_since_meal += 1
-        hunger_memory = min(1.0, self._frames_since_meal / 600.0)
+        hunger_memory = max(0.0, min(1.0, self._frames_since_meal / 600.0))
 
         # ── Assemble NORMALIZED inputs ────────────────────────────────────
         stats = [
@@ -800,7 +813,7 @@ class NeuralFish:
             )
             glow_r = int(size * 4 + 10 * pulse)
             glow_r = min(glow_r, _GLOW_SURF_SIZE - 1)
-            gs = _get_glow_surf()
+            gs = _get_mating_glow_surf()
             gs.fill((0, 0, 0, 0))
             glow_alpha = int(glow_intensity * 140)
             pygame.draw.circle(
@@ -834,7 +847,7 @@ class NeuralFish:
 
             glow_r = int(size * 3 + 6)
             glow_r = min(glow_r, _GLOW_SURF_SIZE - 1)
-            gs = _get_glow_surf()
+            gs = _get_biolum_glow_surf()
             gs.fill((0, 0, 0, 0))
             pygame.draw.circle(
                 gs,
@@ -913,8 +926,7 @@ class NeuralFish:
         # Mating state heart
         if self.state == FishState.MATING and self._mating_glow_timer > 0.3:
             heart_y = int(screen_pos[1]) - int(size * 4) - 8
-            sym_font = pygame.font.Font(None, 18)
-            sym = sym_font.render("♥", True, (255, 100, 150))
+            sym = self._mating_font.render("♥", True, (255, 100, 150))
             screen.blit(sym, (int(screen_pos[0]) - sym.get_width() // 2, heart_y))
 
     def _draw_tail(self, screen, pos, angle, size, color, sec_color, tail_config, time):

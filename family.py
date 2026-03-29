@@ -18,7 +18,7 @@ class Family:
         # Update children list: keep only those still alive in the correct population
         new_children = []
         for child in self.children:
-            if child in self.fish_system.fish or child in self.fish_system.cleaner_fish:
+            if child in self.fish_system.fish or child in self.fish_system.cleaner_fish or child in self.fish_system.predators:
                 new_children.append(child)
         self.children = new_children
 
@@ -26,7 +26,7 @@ class Family:
         self.parents = [
             p
             for p in self.parents
-            if p in self.fish_system.fish or p in self.fish_system.cleaner_fish
+            if p in self.fish_system.fish or p in self.fish_system.cleaner_fish or p in self.fish_system.predators
         ]
 
         # Dissolve if no children left or all children mature
@@ -41,7 +41,7 @@ class Family:
     def get_family_members(self, exclude_self=None):
         """Return all living family members except optional excluded one"""
         # Combine all living fish into a set for efficient lookup
-        living_fish = set(self.fish_system.fish) | set(self.fish_system.cleaner_fish)
+        living_fish = set(self.fish_system.fish) | set(self.fish_system.cleaner_fish) | set(self.fish_system.predators)
 
         members = self.parents + self.children
         if exclude_self:

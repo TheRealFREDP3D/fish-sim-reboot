@@ -138,8 +138,9 @@ class CleanerFish(NeuralFish):
     ):
         self._cleaning_cooldown = max(0.0, self._cleaning_cooldown - dt)
 
-        # Separate poop from plankton
+        # Separate poop from plankton and track original poop instances
         poops = [t for t in targets if hasattr(t, "nutrition") and not getattr(t, "is_plankton", False)]
+        original_poop_set = set(poops)  # Track which poop we started with
 
         # ═══════════════════════════════════════════════════════════════════
         # PILLAR 1 — Cleaning Mutualism (highest priority)
@@ -209,7 +210,7 @@ class CleanerFish(NeuralFish):
                 self.physics.apply_force(seek)
 
         # Parent update (NN, state machine, physics, food collision)
-        return super().update(
+        result = super().update(
             dt,
             all_fish,
             targets,
@@ -217,3 +218,14 @@ class CleanerFish(NeuralFish):
             plant_manager,
             time_system=time_system,
         )
+        
+        # Fix infinite energy exploit: Remove consumed poop from original poops list
+        # The base class removes items from the targets copy, not from self.poops
+        if hasattr(self.world, "fish_system") and original_poop_set:
+            # Check which poop from our original set is no longer in targets (was consumed)
+            consumed_poop = original_poop_set - set(targets)
+            for poop in consumed_poop:
+                if poop in self.world.fish_system.poops:
+                    self.world.fish_system.poops.remove(poop)
+        
+        return result
