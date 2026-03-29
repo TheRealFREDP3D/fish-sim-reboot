@@ -141,14 +141,17 @@ ROOT_BASE_COLOR, ROOT_ACTIVE_COLOR, ROOT_TIP_COLOR = (
     (255, 220, 150),
 )
 
-# Plant lifecycle - ADJUSTED FOR BETTER SURVIVAL
+# Plant lifecycle — FIXED: lifespans now match season durations
+# With SEASON_DURATION = 840s, plants need to live 2-4 seasons to reproduce.
+# PLANT_MAX_AGE = 800 age-seconds. At rate 0.25/s in spring, that's ~3040s real
+# time ≈ 3.6 seasons — enough to flower, seed, and sustain the ecosystem.
 SEED_GROWTH_ENERGY = 0.8
-MATURE_ENERGY_THRESHOLD = 1.8  # Lowered from 2.5 - easier to reach maturity
+MATURE_ENERGY_THRESHOLD = 1.2  # Lowered from 1.8 for faster maturity
 PLANT_BASE_MAINTENANCE = 0.05  # Lowered from 0.10 - reduced energy drain
 PLANT_SIZE_MAINTENANCE_FACTOR = 0.12  # Lowered from 0.30 - less size penalty
-PLANT_MAX_AGE = 90.0
+PLANT_MAX_AGE = 800.0  # FIX: was 90 — plants now live multiple seasons
 SEED_PRODUCTION_ENERGY, SEED_PRODUCTION_COST = 4.0, 1.2
-FLOWERING_ENERGY_THRESHOLD = 2.5  # Lowered from 3.5 - easier to flower
+FLOWERING_ENERGY_THRESHOLD = 1.5  # FIX: was 2.5 — easier to start flowering
 FLOWERING_DURATION = 35.0  # Increased from 18.0 - more time to produce seeds
 DECOMPOSITION_NUTRIENT_RETURN, DECOMPOSITION_DURATION = 0.9, 8.0
 PLANT_HARD_CAP, SEED_HARD_CAP = 80, 100
@@ -248,8 +251,9 @@ SEEDLING_DEATH_TIME, DORMANT_ENERGY_MINIMUM, DORMANT_DEATH_TIME = 25.0, 0.05, 30
 SPRING_GERMINATION_BASE_CHANCE, SUMMER_GERMINATION_BASE_CHANCE = 0.015, 0.006
 SEED_ENERGY_THRESHOLD, FLOWERING_BASE_CHANCE = 0.4, 0.025
 
-AUTUMN_SEED_BASE_PROBABILITY = 0.028
-SUMMER_SEED_BASE_PROBABILITY = 0.014
+AUTUMN_SEED_BASE_PROBABILITY = 0.05  # FIX: was 0.028 — higher seed output in autumn
+SUMMER_SEED_BASE_PROBABILITY = 0.035  # FIX: was 0.014 — higher seed output in summer
+SPRING_SEED_BASE_PROBABILITY = 0.018  # FIX: new — allow seed production in spring
 SEED_ENERGY_COST = 0.5
 
 # Soft state-machine biases
@@ -291,12 +295,15 @@ WINTER_SURVIVAL_CHANCE = {
     "anemone": 0.85,
 }
 SPRING_GERMINATION_BOOST, WINTER_PHOTOSYNTHESIS_BASE = 4.0, 0.08
-FLOWERING_SEASON_PREFERENCE = {0: 0.3, 1: 1.4, 2: 1.0, 3: 0.0}
+FLOWERING_SEASON_PREFERENCE = {0: 0.8, 1: 1.4, 2: 1.0, 3: 0.0}  # FIX: spring 0.3→0.8
 
-_SEASON_AGE_RATE = {0: 1.2, 1: 1.5, 2: 1.0, 3: 0.3}
+# FIX: Age rates scaled down ~5× so plants live multiple seasons instead of <2 days
+_SEASON_AGE_RATE = {0: 0.25, 1: 0.35, 2: 0.20, 3: 0.05}
 _SEASON_PHOTO_MOD = {0: 0.8, 1: 1.2, 2: 0.9, 3: 0.2}
-_SEASON_CAN_SEED = {0: False, 1: True, 2: True, 3: False}
-_SEASON_SEED_COOLDOWN = {0: 30.0, 1: 15.0, 2: 12.0, 3: 40.0}
+# FIX: Spring now allowed to produce seeds
+_SEASON_CAN_SEED = {0: True, 1: True, 2: True, 3: False}
+# FIX: Reduced cooldowns for more frequent seed production
+_SEASON_SEED_COOLDOWN = {0: 15.0, 1: 10.0, 2: 8.0, 3: 40.0}
 
 # Fish-Plant Interaction Mechanics
 PLANT_COVER_RADIUS = 85.0

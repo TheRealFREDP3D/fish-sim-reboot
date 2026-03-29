@@ -46,6 +46,7 @@ from config import (
     FLOWERING_BASE_CHANCE,
     AUTUMN_SEED_BASE_PROBABILITY,
     SUMMER_SEED_BASE_PROBABILITY,
+    SPRING_SEED_BASE_PROBABILITY,
     SEED_ENERGY_COST,
     WINTER_MAINTENANCE_MULT,
 )
@@ -206,8 +207,9 @@ class PlantDevelopment:
                 self._transition("dying")
 
         elif self.stage == "mature":
-            # Summer AND Autumn: try to flower; old age or starvation: die
-            if season_index in (1, 2):  # Summer or Autumn — flowering window
+            # FIX: Spring, Summer AND Autumn: try to flower
+            # Previously only (1, 2) — plants in Spring couldn't flower at all
+            if season_index in (0, 1, 2):  # Spring, Summer, Autumn
                 self._try_enter_flowering(season_index)
             # Check for old age death
             if self.age > PLANT_MAX_AGE * 0.95:
@@ -342,7 +344,7 @@ class PlantDevelopment:
             self._transition("dying")
 
     def _try_enter_flowering(self, season_index):
-        """Called in Summer and Autumn. Each plant flowers at most once per YEAR (reset in spring)."""
+        """Called in Spring, Summer and Autumn. Each plant flowers at most once per YEAR (reset in spring)."""
         if self._has_flowered:
             return
         pref = FLOWERING_SEASON_PREFERENCE.get(season_index, 0.0)
@@ -416,13 +418,15 @@ class PlantDevelopment:
 
     def can_produce_seed(self, seed_dispersal_modifier, season_index):
         """
-        Seeds are released primarily in Autumn, with some in Summer.
+        Seeds are released primarily in Autumn, with good output in Summer,
+        and moderate output in Spring (FIX: Spring was previously blocked).
+
         Flowering plants release more seeds; mature plants release fewer.
         """
         if not _SEASON_CAN_SEED.get(season_index, True):
             return False
-        # Allow seeding in Summer (season 1) and Autumn (season 2)
-        if season_index not in (1, 2):
+        # FIX: Allow seeding in Spring (0), Summer (1) and Autumn (2)
+        if season_index not in (0, 1, 2):
             return False
         if self.stage not in ("mature", "flowering"):
             return False
@@ -432,6 +436,8 @@ class PlantDevelopment:
         # Base probability — Autumn is primary seeding window
         if season_index == 2:  # Autumn
             base_p = AUTUMN_SEED_BASE_PROBABILITY
+        elif season_index == 0:  # Spring — new: moderate seed output
+            base_p = SPRING_SEED_BASE_PROBABILITY
         else:  # Summer
             base_p = SUMMER_SEED_BASE_PROBABILITY
 
