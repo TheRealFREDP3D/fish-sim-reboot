@@ -123,8 +123,8 @@ class NeuralFish:
     INPUT_COUNT = NN_INPUT_COUNT
     OUTPUT_COUNT = NN_OUTPUT_COUNT
     
-    # Cached font for mating heart symbol
-    _mating_font = pygame.font.Font(None, 18)
+    # Cached font for mating heart symbol (initialized lazily)
+    _mating_font_cache = None
 
     def __init__(
         self,
@@ -206,6 +206,13 @@ class NeuralFish:
     @property
     def pos(self):
         return self.physics.pos
+
+    @property
+    def _mating_font(self):
+        """Lazy initialization of the mating font."""
+        if NeuralFish._mating_font_cache is None:
+            NeuralFish._mating_font_cache = pygame.font.Font(None, 18)
+        return NeuralFish._mating_font_cache
 
     def get_current_size_mult(self):
         return get_life_stage_size_mult(self.age) * self.traits.physical_traits.get(
