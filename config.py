@@ -321,3 +321,38 @@ PLANT_GRAZE_RANGE, PLANT_GRAZE_ENERGY_GAIN, PLANT_GRAZE_DAMAGE = 38.0, 7.5, 1.35
 GRAZING_COOLDOWN, GRAZING_VISUAL_DURATION = 3.8, 2.5
 
 WINTER_MAINTENANCE_MULT = 1.15
+
+# ── Dead Fish & Decomposition ────────────────────────────────────────────
+DEAD_FISH_SINK_SPEED = 40.0        # pixels per second sinking speed
+DEAD_FISH_DECOMPOSITION_TIME = 12.0 # seconds for full decomposition at bottom
+DEAD_FISH_NUTRIENT_RETURN = 1.8    # nutrients deposited into soil per dead fish
+DEAD_FISH_COLOR_FADE_SPEED = 0.06  # how fast the corpse colour fades to grey
+
+# ── Blood Effect (predator bite) ─────────────────────────────────────────
+BLOOD_DROP_COUNT = 10              # number of blood droplets per bite
+BLOOD_DROP_DURATION = 1.2          # seconds blood drops are visible
+BLOOD_DROP_BASE_COLOR = (200, 30, 30)
+BLOOD_DROP_COLORS = [
+    (200, 30, 30),
+    (220, 50, 40),
+    (180, 20, 25),
+    (230, 60, 50),
+    (170, 15, 20),
+]
+
+# ── Fish Anti-Clustering & Exploration ─────────────────────────────────
+FISH_HIDE_THREAT_THRESHOLD = 0.25  # minimum threat_level to trigger plant-seeking
+FISH_HIDE_WEIGHT = 0.7             # hide_drive force weight (was 1.6 — too strong)
+FISH_EXPLORATION_FORCE = 1.2       # random wander strength when safe & well-fed
+FISH_SEPARATION_RADIUS = 50.0      # distance below which fish push apart
+FISH_SEPARATION_FORCE = 1.8         # repulsion strength between nearby fish
+FISH_PLANT_RESTLESSNESS = 0.4      # force pushing fish AWAY from plants when safe
+FISH_PLANT_LINGER_MAX = 8.0        # seconds near a plant before restlessness kicks in
+FISH_COVER_STAMINA_BONUS = 10.0    # stamina/sec from cover (was 18 — too strong)
+FISH_COVER_STAMINA_PREDATOR = 4.0  # predators get less cover stamina
+
+# ── Population Control ───────────────────────────────────────────────────
+FISH_POPULATION_FLOOR = 4          # minimum common fish (was 6)
+CLEANER_POPULATION_FLOOR = 2       # minimum cleaner fish (was 3)
+FISH_CARRYING_CAPACITY = 50        # soft cap — mating urge suppressed above this
+FISH_CARRYING_CAPACITY_STRENGTH = 3.0  # how strongly suppressed

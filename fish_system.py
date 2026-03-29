@@ -1,12 +1,32 @@
-from config import *
-from fish_base import NeuralFish
-from environment_objects import PoopParticle, FishEgg
+import random
+from config import (
+    FISH_MAX_POPULATION,
+    CLEANER_FISH_MAX_POPULATION,
+    PREDATOR_MAX_POPULATION,
+    FISH_MAX_AGE,
+    FISH_MAX_ENERGY,
+    FISH_POPULATION_FLOOR,
+    CLEANER_POPULATION_FLOOR,
+    FISH_CARRYING_CAPACITY,
+    FISH_CARRYING_CAPACITY_STRENGTH,
+    WATER_LINE_Y,
+    WORLD_HEIGHT,
+    WORLD_WIDTH,
+    SCREEN_WIDTH,
+    SCREEN_HEIGHT,
+    SOIL_MAX_NUTRIENT,
+    FISH_REPRODUCTION_COST,
+    PREDATOR_PREY_RATIO_MIN,
+)
+from fish_base import NeuralFish, FishState
+from environment_objects import PoopParticle, FishEgg, DeadFish, BloodEffect
 from fish_traits import FishTraits
 from family import Family
 from brain_visualizer import BrainVisualizer
 from neural_net import NeuralNet
 from cleaner_fish import CleanerFish
 from predator_fish import PredatorFish
+
 
 class FishSystem:
     def __init__(self, particle_system, plant_manager, world):
@@ -26,6 +46,10 @@ class FishSystem:
         self.selected_fish = None
         self.families = []
 
+        # ── NEW: Dead fish and blood effect management ────────────────────
+        self.dead_fish: list[DeadFish] = []
+        self.blood_effects: list[BloodEffect] = []
+
         self.brain_visualizer = BrainVisualizer(SCREEN_WIDTH, SCREEN_HEIGHT)
 
     def handle_click(self, pos, camera):
@@ -42,8 +66,40 @@ class FishSystem:
         else:
             self.selected_fish = None
 
+    def _kill_fish(self, f, f_list):
+        """
+        Remove a fish from its population list and spawn a DeadFish corpse
+        that sinks to the bottom and decomposes into soil nutrients.
+        """
+        # Deselect if this fish was selected
+        if f == self.selected_fish:
+            self.selected_fish = None
+
+        # Remove from family if applicable
+        if f.family and f.family.active:
+            f.family.active = False
+
+        # Create a DeadFish corpse at the fish's position
+        color = f.get_color()
+        size = f.get_current_size_mult()
+        heading = f.physics.heading
+        corpse = DeadFish(f.physics.pos.x, f.physics.pos.y, color, size, heading)
+        self.dead_fish.append(corpse)
+
+        # Remove from the living list
+        if f in f_list:
+            f_list.remove(f)
+
     def update(self, dt, time_system=None):
         all_fish = self.fish + self.cleaner_fish + self.predators
+
+        # ── 1. Update dead fish (sinking & decomposition) ─────────────────
+        for corpse in self.dead_fish[:]:
+            if not corpse.update(dt, self.world):
+                self.dead_fish.remove(corpse)
+
+        # ── 2. Update blood effects ──────────────────────────────────────
+        self.blood_effects = [b for b in self.blood_effects if b.update(dt)]
 
         # 2. Update eggs — hatch and spawn at egg location
         for egg in self.eggs[:]:
@@ -119,19 +175,17 @@ class FishSystem:
                     "lifespan_mult", 1.0
                 )
                 if f.energy <= 0 or f.age > lifespan:
-                    if f == self.selected_fish:
-                        self.selected_fish = None
-                    f_list.remove(f)
+                    self._kill_fish(f, f_list)
                     continue
 
                 if can_mate and f.state == FishState.MATING:
                     self.try_mate(f, f_list)
 
         # 6. Population floors — ensure minimum viable populations
-        if len(self.fish) < 6:
+        if len(self.fish) < FISH_POPULATION_FLOOR:
             self.fish.append(NeuralFish(self.world))
 
-        if len(self.cleaner_fish) < 3:
+        if len(self.cleaner_fish) < CLEANER_POPULATION_FLOOR:
             self.cleaner_fish.append(CleanerFish(self.world))
 
         # 7. Update eat effects with real dt
@@ -142,6 +196,16 @@ class FishSystem:
     def try_mate(self, f, f_list):
         if f.is_pregnant:
             return
+
+        # ── Carrying capacity pressure on common fish ────────────────────
+        total_population = len(self.fish) + len(self.cleaner_fish)
+        if not f.is_predator and not f.is_cleaner:
+            if total_population >= FISH_CARRYING_CAPACITY:
+                return  # hard block at carrying capacity
+            # Soft suppression as we approach the cap
+            overage_ratio = total_population / FISH_CARRYING_CAPACITY
+            if overage_ratio > 0.7 and random.random() > (1.0 - overage_ratio):
+                return  # probabilistic suppression near cap
 
         # Predator reproduction requires healthy prey population
         if f.is_predator:
@@ -218,6 +282,14 @@ class FishSystem:
         self.brain_visualizer.update(dt, self.selected_fish)
 
         biolum = time_system.get_bioluminescence_alpha() if time_system else 0
+
+        # Draw dead fish corpses (behind living fish)
+        for corpse in self.dead_fish:
+            corpse.draw(screen, camera)
+
+        # Draw blood effects
+        for blood in self.blood_effects:
+            blood.draw(screen, camera)
 
         for e in self.eggs:
             e.draw(screen, camera)

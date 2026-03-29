@@ -104,6 +104,12 @@ class NeuralFish:
         self._fin_phase = random.uniform(0, math.pi * 2)
         self._pattern_seed = random.randint(0, 10000)  # For consistent pattern rendering
 
+        # ── Anti-clustering: track how long fish has been near a plant ─
+        self._plant_linger_timer = 0.0
+        # ── Exploration: a slowly-changing wander direction ─
+        self._wander_angle = random.uniform(0, math.pi * 2)
+        self._wander_timer = 0.0
+
         # ── Cleaning mutualism state ─────────────────────────────────────
         # All fish can be "clients" that benefit from cleaner fish attention.
         # needs_cleaning rises with stress/damage and decays when cleaned.
@@ -353,6 +359,7 @@ class NeuralFish:
         full_inputs = self.get_radar_inputs(all_fish, targets, plant_manager)
         threat_level = sum(full_inputs[3:6])
         cover_quality = full_inputs[13]
+        ambush_alert = full_inputs[16]
 
         self.grazing_cooldown = max(0.0, self.grazing_cooldown - dt)
 
@@ -378,12 +385,12 @@ class NeuralFish:
                             )
                         break
 
-        # ── Cover stamina — predators get reduced benefit ────────────────
+        # ═══════════════════════════════════════════════════════════════════
+        # FIX: Cover stamina — reduced bonus, predators get less
+        # ═══════════════════════════════════════════════════════════════════
         if cover_quality > 0.3:
-            if self.is_predator:
-                self.stamina = min(100.0, self.stamina + 6.0 * cover_quality * dt)
-            else:
-                self.stamina = min(100.0, self.stamina + 18.0 * cover_quality * dt)
+            bonus = FISH_COVER_STAMINA_PREDATOR if self.is_predator else FISH_COVER_STAMINA_BONUS
+            self.stamina = min(100.0, self.stamina + bonus * cover_quality * dt)
 
         # ── Neural net forward pass ──────────────────────────────────────
         mating_drive = time_system.mating_drive_modifier if time_system else 1.0
@@ -412,24 +419,100 @@ class NeuralFish:
             raw_state_probs, threat_level, night_rest_factor, mating_drive, activity_mod
         )
 
-        # ── Behavioral Lever — Hide Drive (predator vs prey) ────────────
+        # ═══════════════════════════════════════════════════════════════════
+        # FIX: Hide Drive — now GATED behind actual threats
+        # Only seek plant cover when predators are nearby (threat_level > threshold)
+        # This prevents the NN from learning "always hide near plant" as the
+        # dominant strategy, which caused fish to cluster and orbit plants.
+        # ═══════════════════════════════════════════════════════════════════
         if self.closest_plant:
-            if self.is_predator:
-                ambush_weight = hide_drive * 0.4
-                ambush_force = self.physics.seek(
-                    self.closest_plant.x,
-                    self.closest_plant.base_y,
-                    weight=ambush_weight,
+            should_hide = (
+                threat_level > FISH_HIDE_THREAT_THRESHOLD
+                or ambush_alert > 0.5
+            )
+
+            if should_hide:
+                # Active threat — seek plant cover
+                if self.is_predator:
+                    ambush_weight = hide_drive * 0.3
+                    ambush_force = self.physics.seek(
+                        self.closest_plant.x,
+                        self.closest_plant.base_y,
+                        weight=ambush_weight,
+                    )
+                    self.physics.apply_force(ambush_force)
+                else:
+                    hide_weight = hide_drive * FISH_HIDE_WEIGHT
+                    hide_force = self.physics.seek(
+                        self.closest_plant.x,
+                        self.closest_plant.base_y,
+                        weight=hide_weight,
+                    )
+                    self.physics.apply_force(hide_force)
+                    self._plant_linger_timer = 0.0  # reset since hiding is valid
+
+            # ═══════════════════════════════════════════════════════════════
+            # FIX: Plant Restlessness — push away from plants when safe
+            # If no threats nearby and fish has been lingering near a plant,
+            # apply a gentle force AWAY to prevent orbiting.
+            # ═══════════════════════════════════════════════════════════════
+            elif self.closest_plant and not self.is_predator:
+                dist_to_plant = self.physics.pos.distance_to(
+                    (self.closest_plant.x, self.closest_plant.base_y)
                 )
-                self.physics.apply_force(ambush_force)
-            else:
-                hide_weight = hide_drive * 1.6
-                hide_force = self.physics.seek(
-                    self.closest_plant.x,
-                    self.closest_plant.base_y,
-                    weight=hide_weight,
-                )
-                self.physics.apply_force(hide_force)
+                if dist_to_plant < PLANT_COVER_RADIUS:
+                    self._plant_linger_timer += dt
+                    if self._plant_linger_timer > FISH_PLANT_LINGER_MAX:
+                        # Push AWAY from the plant — gentle anti-clustering
+                        away_force = self.physics.seek(
+                            self.closest_plant.x,
+                            self.closest_plant.base_y,
+                            weight=-FISH_PLANT_RESTLESSNESS,
+                        )
+                        self.physics.apply_force(away_force)
+
+                    # Also dampen lingering near plants even before the timer
+                    # by reducing the linger timer slowly when safe
+                    if self._plant_linger_timer > FISH_PLANT_LINGER_MAX * 0.5:
+                        self._plant_linger_timer -= dt * 0.1
+
+        # ═══════════════════════════════════════════════════════════════════
+        # FIX: Exploration / Wanderlust — random wander when safe and fed
+        # This gives fish a natural tendency to explore the environment
+        # instead of huddling near plants.
+        # ═══════════════════════════════════════════════════════════════════
+        is_safe = threat_level < FISH_HIDE_THREAT_THRESHOLD
+        is_well_fed = self.energy > FISH_MAX_ENERGY * 0.5
+        if is_safe and is_well_fed and not self.is_hidden:
+            # Slowly evolve a wander direction
+            self._wander_timer += dt
+            if self._wander_timer > 2.0:
+                self._wander_angle += random.uniform(-1.2, 1.2)
+                self._wander_timer = 0.0
+
+            wander_fx = math.cos(self._wander_angle) * FISH_EXPLORATION_FORCE
+            wander_fy = math.sin(self._wander_angle) * FISH_EXPLORATION_FORCE
+            self.physics.apply_force((wander_fx, wander_fy))
+
+        # ═══════════════════════════════════════════════════════════════════
+        # FIX: Fish Separation — prevent tight clustering
+        # Fish that are too close together push apart, breaking up the
+        # circular orbit pattern around plants.
+        # ═══════════════════════════════════════════════════════════════════
+        for other in all_fish:
+            if other is self or other.is_predator != self.is_predator:
+                continue
+            sep_dist = self.physics.pos.distance_to(other.physics.pos)
+            if 0 < sep_dist < FISH_SEPARATION_RADIUS:
+                # Stronger push the closer they are
+                strength = FISH_SEPARATION_FORCE * (1.0 - sep_dist / FISH_SEPARATION_RADIUS)
+                # Direction: away from the other fish
+                dx = self.physics.pos.x - other.physics.pos.x
+                dy = self.physics.pos.y - other.physics.pos.y
+                if sep_dist > 0:
+                    self.physics.apply_force(
+                        (dx / sep_dist * strength, dy / sep_dist * strength)
+                    )
 
         # ── Mating display timers ─────────────────────────────────────────
         if self.state == FishState.MATING:
@@ -751,7 +834,6 @@ class NeuralFish:
         tail_shape = tail_config["shape"]
 
         if tail_shape == TAIL_POINTED:
-            # Sharp, angular tail
             pts = [
                 (pos[0], pos[1]),
                 (pos[0] + math.cos(tail_angle - 0.5) * tail_size * tail_spread,
@@ -764,7 +846,6 @@ class NeuralFish:
             pygame.draw.polygon(screen, color, pts)
             
         elif tail_shape == TAIL_FORKED:
-            # Split tail (like tuna)
             fork_depth = 0.6
             pts_left = [
                 (pos[0], pos[1]),
@@ -784,7 +865,6 @@ class NeuralFish:
             pygame.draw.polygon(screen, color, pts_right)
             
         elif tail_shape == TAIL_ROUNDED:
-            # Soft, rounded tail
             pts = [
                 (pos[0], pos[1]),
                 (pos[0] + math.cos(tail_angle - 0.6) * tail_size * tail_spread * 0.8,
@@ -801,7 +881,6 @@ class NeuralFish:
             pygame.draw.polygon(screen, color, pts)
             
         elif tail_shape == TAIL_LYRE:
-            # Elegant curved tail
             wave = math.sin(time * 6) * 0.2
             pts = [
                 (pos[0], pos[1]),

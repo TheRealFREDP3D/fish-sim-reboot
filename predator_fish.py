@@ -9,12 +9,14 @@ Fixes implemented:
   #7  Seasonal activity passed to NN via parent activity_mod
   #8  Egg scavenging fallback when desperate
   #9  try_reproduce() removed — predators now mate through the NN state machine
+  #11 Blood drops visible on bite (BloodEffect replaces generic EatEffect)
 """
 
 import math
 import random
 from fish_base import NeuralFish, get_life_stage_size_mult
 from config import *
+from environment_objects import BloodEffect
 
 
 class PredatorFish(NeuralFish):
@@ -151,6 +153,7 @@ class PredatorFish(NeuralFish):
         self._bite_cooldown = max(0.0, self._bite_cooldown - dt)
 
         # ── FIX #5: Damage-based hunting instead of instant kill ─────────
+        # ── FIX #11: Blood drops visible on each bite ────────────────────
         if is_hungry:
             for prey in prey_targets:
                 collision_radius = 20 * self.get_current_size_mult()
@@ -176,12 +179,16 @@ class PredatorFish(NeuralFish):
                     self.energy = min(FISH_MAX_ENERGY, self.energy + energy_gain)
                     self._bite_cooldown = PREDATOR_BITE_COOLDOWN
 
-                    # Visual feedback — red burst for predator bite
-                    particle_system.spawn_eat_effect(
-                        prey.physics.pos.x,
-                        prey.physics.pos.y,
-                        (255, 100, 100),
-                    )
+                    # ── Blood drops spray from the wound ─────────────────
+                    # Spawn at the prey's position, angled away from attacker
+                    bite_x = prey.physics.pos.x
+                    bite_y = prey.physics.pos.y
+                    blood = BloodEffect(bite_x, bite_y, self.physics.heading)
+                    # Add to the fish system's blood effects list
+                    fish_system = getattr(self.world, "fish_system", None)
+                    if fish_system:
+                        fish_system.blood_effects.append(blood)
+
                     break
 
         # ── FIX #8: Scavenging fallback — eat eggs when desperate ────────
@@ -196,9 +203,9 @@ class PredatorFish(NeuralFish):
                             self.energy + PREDATOR_SCAVENGE_ENERGY_GAIN,
                         )
                         fish_system.eggs.remove(egg)
-                        particle_system.spawn_eat_effect(
-                            egg.x, egg.y, (255, 200, 80)
-                        )
+                        # Scavenging eggs — small blood tint (yolk-like)
+                        blood = BloodEffect(egg.x, egg.y, self.physics.heading)
+                        fish_system.blood_effects.append(blood)
                         break
 
         return res
