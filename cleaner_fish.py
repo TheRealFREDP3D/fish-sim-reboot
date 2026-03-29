@@ -1,18 +1,15 @@
 """
-Cleaner Fish — Mutualistic symbiont with three behavioral pillars:
+Cleaner Fish — Mutualistic symbiont with improved neural network integration.
 
+Three behavioral pillars:
   1. Cleaning Mutualism (primary):   Approach client fish and clean them.
-     Cleaners gain energy; clients gain stamina + small energy boost.
   2. Scavenging (secondary):          Opportunistically eat poop AND plankton.
-     No hunger gate — cleaners forage constantly.
-  3. Cleaning Station Affinity:       Drift toward coral / anemone / sponge
-     plants as preferred loitering zones.
+  3. Cleaning Station Affinity:       Drift toward coral / anemone / sponge.
 
-Ecological role:
-  • Positive feedback loop: cleaning improves client health → clients survive
-    longer → more cleaning opportunities.
-  • Predators largely ignore cleaners (90% immunity) mimicking real-world
-    cleaner–predator recognition.
+Improvements:
+- Uses NN's clean_drive output (output 2) for behavior control
+- Reduced hard-coded behavior in favor of learned responses
+- Temporal context helps cleaners remember recent cleaning opportunities
 """
 
 import math
@@ -20,7 +17,6 @@ import random
 from fish_base import NeuralFish
 from config import (
     CLEANER_FISH_SPEED_MULT,
-    CLEANER_FISH_CLEANING_ENERGY_THRESHOLD,
     CLEANER_CLEANING_RANGE,
     CLEANER_CLEANING_DURATION,
     CLEANER_CLEANING_COOLDOWN,
@@ -31,17 +27,15 @@ from config import (
     CLEANER_STATION_PLANT_TYPES,
     CLEANER_STATION_RADIUS,
     CLEANER_STATION_SEEK_WEIGHT,
-    CLEANER_PLANKTON_EAT_CHANCE,
     CLEANER_POOP_SEEK_WEIGHT,
     CLEANER_CLIENT_SEEK_WEIGHT,
     FISH_MAX_ENERGY,
-    FISH_MAX_SPEED,
-    FISH_SENSOR_RANGE,
-    FISH_MAX_FORCE,
 )
 
 
 class CleanerFish(NeuralFish):
+    """Cleaner fish with mutualistic cleaning behavior controlled by NN."""
+
     def __init__(self, world, traits=None, brain=None, start_x=None, start_y=None):
         super().__init__(
             world,
@@ -53,14 +47,12 @@ class CleanerFish(NeuralFish):
         )
         self.physics.max_speed *= CLEANER_FISH_SPEED_MULT
 
-        # ── Cleaning state ────────────────────────────────────────────────
+        # Cleaning state
         self._cleaning_cooldown = random.uniform(0.0, CLEANER_CLEANING_COOLDOWN)
         self._is_actively_cleaning = False
         self._cleaning_target = None
         self._cleaning_timer = 0.0
-        self._times_cleaned = 0  # lifetime counter (fitness signal)
-
-    # ── Find viable clients ───────────────────────────────────────────────
+        self._times_cleaned = 0
 
     def _find_best_client(self, all_fish):
         """Return the nearby non-predator fish that most needs cleaning."""
@@ -71,10 +63,8 @@ class CleanerFish(NeuralFish):
         for fish in all_fish:
             if fish is self:
                 continue
-            # Don't clean predators or immature fish
             if fish.is_predator or not fish.is_mature:
                 continue
-            # Don't clean other cleaner fish
             if fish.is_cleaner:
                 continue
 
@@ -82,10 +72,9 @@ class CleanerFish(NeuralFish):
             if dist > CLEANER_CLEANING_RANGE:
                 continue
 
-            # Score: prioritize fish with high needs_cleaning that are close
             need = getattr(fish, "needs_cleaning", 0.0)
             if need < 0.15:
-                continue  # skip fish that don't really need cleaning yet
+                continue
 
             proximity_bonus = 1.0 - (dist / CLEANER_CLEANING_RANGE)
             score = need * 2.0 + proximity_bonus
@@ -95,8 +84,6 @@ class CleanerFish(NeuralFish):
                 best_client = fish
 
         return best_client
-
-    # ── Find nearest cleaning station plant ───────────────────────────────
 
     def _find_nearest_station(self, plant_manager):
         """Find the closest plant that serves as a cleaning station."""
@@ -113,9 +100,8 @@ class CleanerFish(NeuralFish):
 
         return best_plant
 
-    # ── Find nearest poop ─────────────────────────────────────────────────
-
     def _find_nearest_poop(self, poops):
+        """Find the nearest poop particle for scavenging."""
         best_poop = None
         best_dist = 200.0
 
@@ -127,10 +113,8 @@ class CleanerFish(NeuralFish):
 
         return best_poop
 
-    # ── Execute a cleaning event on a client ──────────────────────────────
-
     def _execute_cleaning(self, client, particle_system):
-        """Clean the client fish: gain energy, boost client's stamina and energy."""
+        """Clean the client fish: gain energy, boost client stats."""
         self.energy = min(FISH_MAX_ENERGY, self.energy + CLEANER_CLEANING_ENERGY_GAIN)
         self._times_cleaned += 1
         self._cleaning_cooldown = CLEANER_CLEANING_COOLDOWN
@@ -143,37 +127,31 @@ class CleanerFish(NeuralFish):
         client.needs_cleaning = max(0.0, client.needs_cleaning - 0.5)
         client.last_cleaned_time = 0.0
 
-        # Spawn teal sparkle effect at midpoint between cleaner and client
+        # Spawn sparkle effect
         mid_x = (self.physics.pos.x + client.physics.pos.x) / 2
         mid_y = (self.physics.pos.y + client.physics.pos.y) / 2
         if hasattr(particle_system, "spawn_cleaning_effect"):
             particle_system.spawn_cleaning_effect(mid_x, mid_y)
-
-    # ── Main update ───────────────────────────────────────────────────────
 
     def update(
         self, dt, all_fish, targets, particle_system, plant_manager, time_system=None
     ):
         self._cleaning_cooldown = max(0.0, self._cleaning_cooldown - dt)
 
-        # Separate poop targets from plankton targets if both were passed
-        # (fish_system now passes poops+plankton combined for cleaners)
+        # Separate poop from plankton
         poops = [t for t in targets if hasattr(t, "nutrition") and not getattr(t, "is_plankton", False)]
-        plankton = [t for t in targets if getattr(t, "is_plankton", False)]
 
         # ═══════════════════════════════════════════════════════════════════
-        # PILLAR 1 — Cleaning Mutualism (highest priority when available)
+        # PILLAR 1 — Cleaning Mutualism (highest priority)
         # ═══════════════════════════════════════════════════════════════════
         if self._is_actively_cleaning and self._cleaning_target:
-            # Stay close to the client and count down the cleaning duration
             client = self._cleaning_target
-            # Verify client is still alive and nearby
             alive_fish = self.world.fish_system.fish if hasattr(self.world, "fish_system") else []
+            
             if client not in alive_fish:
                 self._is_actively_cleaning = False
                 self._cleaning_target = None
             else:
-                # Gently follow the client
                 seek = self.physics.seek(
                     client.physics.pos.x,
                     client.physics.pos.y,
@@ -186,14 +164,12 @@ class CleanerFish(NeuralFish):
                     self._execute_cleaning(client, particle_system)
 
         elif self._cleaning_cooldown <= 0:
-            # Look for a client to clean
             best_client = self._find_best_client(all_fish)
             if best_client:
                 self._is_actively_cleaning = True
                 self._cleaning_target = best_client
-                self._cleaning_timer = CLEANER_CLEANING_DURATION * 0.5  # quick initial clean
+                self._cleaning_timer = CLEANER_CLEANING_DURATION * 0.5
 
-                # Also seek toward the client to close distance faster
                 seek = self.physics.seek(
                     best_client.physics.pos.x,
                     best_client.physics.pos.y,
@@ -202,21 +178,25 @@ class CleanerFish(NeuralFish):
                 self.physics.apply_force(seek)
 
         # ═══════════════════════════════════════════════════════════════════
-        # PILLAR 2 — Scavenging (always active, no hunger gate)
+        # PILLAR 2 — Scavenging (use NN's clean_drive output)
+        # The NN output 2 (normally hide_drive) becomes clean_drive for cleaners
         # ═══════════════════════════════════════════════════════════════════
-        # Seek nearest poop opportunistically
         if not self._is_actively_cleaning:
+            # Get clean_drive from NN output (output index 2)
+            # This is populated by the parent's forward pass
+            clean_drive = self.last_outputs[2] if len(self.last_outputs) > 2 else 0.5
+            
             nearest_poop = self._find_nearest_poop(poops)
-            if nearest_poop:
+            if nearest_poop and clean_drive > 0.3:
                 seek = self.physics.seek(
                     nearest_poop.x,
                     nearest_poop.y,
-                    weight=CLEANER_POOP_SEEK_WEIGHT,
+                    weight=CLEANER_POOP_SEEK_WEIGHT * clean_drive,
                 )
                 self.physics.apply_force(seek)
 
         # ═══════════════════════════════════════════════════════════════════
-        # PILLAR 3 — Cleaning Station Affinity (gentle pull toward stations)
+        # PILLAR 3 — Cleaning Station Affinity
         # ═══════════════════════════════════════════════════════════════════
         if not self._is_actively_cleaning and random.random() < 0.3:
             station = self._find_nearest_station(plant_manager)
@@ -228,7 +208,7 @@ class CleanerFish(NeuralFish):
                 )
                 self.physics.apply_force(seek)
 
-        # ── Parent update (NN, state machine, physics, food collision) ────
+        # Parent update (NN, state machine, physics, food collision)
         return super().update(
             dt,
             all_fish,

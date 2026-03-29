@@ -1,13 +1,78 @@
+"""Base fish class with improved neural network integration.
+
+Key improvements:
+- Normalized inputs (all clamped to [0, 1] or [-1, 1])
+- Reduced state override biases (allows NN to learn)
+- Temporal context inputs (time, season, previous state, hunger memory)
+- Consolidated movement control
+"""
+
 import pygame
 import math
 import random
 import collections
 from neural_net import NeuralNet
-from fish_traits import FishTraits, BODY_SHAPE_STREAMLINED, BODY_SHAPE_STANDARD, BODY_SHAPE_ROUNDED, FIN_STYLE_MINIMAL, FIN_STYLE_STANDARD, FIN_STYLE_ELEGANT, FIN_STYLE_DRAMATIC, TAIL_POINTED, TAIL_FORKED, TAIL_ROUNDED, TAIL_LYRE, PATTERN_SOLID, PATTERN_STRIPES, PATTERN_SPOTS, PATTERN_GRADIENT, PATTERN_BANDS, PATTERN_MARBLED
+from fish_traits import (
+    FishTraits,
+    BODY_SHAPE_STREAMLINED, BODY_SHAPE_STANDARD, BODY_SHAPE_ROUNDED,
+    FIN_STYLE_MINIMAL, FIN_STYLE_STANDARD, FIN_STYLE_ELEGANT, FIN_STYLE_DRAMATIC,
+    TAIL_POINTED, TAIL_FORKED, TAIL_ROUNDED, TAIL_LYRE,
+    PATTERN_SOLID, PATTERN_STRIPES, PATTERN_SPOTS, PATTERN_GRADIENT,
+    PATTERN_BANDS, PATTERN_MARBLED
+)
 from fish_physics import SteeringPhysics
-from config import *
+from config import (
+    NN_INPUT_COUNT,
+    NN_OUTPUT_COUNT,
+    FishState,
+    FISH_STATE_ORDER,
+    FISH_MAX_ENERGY,
+    FISH_MAX_AGE,
+    FISH_MAX_SPEED,
+    FISH_MAX_FORCE,
+    FISH_DRAG,
+    FISH_TURN_RATE_SCALAR,
+    FISH_STEERING_FORCE_FACTOR,
+    FISH_SENSOR_RANGE,
+    FISH_SENSOR_ARC,
+    FISH_LARVA_DURATION,
+    FISH_JUVENILE_DURATION,
+    FISH_HUNGER_THRESHOLD,
+    FISH_MATING_THRESHOLD,
+    FISH_REPRODUCTION_COST,
+    WATER_LINE_Y,
+    WORLD_HEIGHT,
+    WORLD_WIDTH,
+    PLANT_COVER_RADIUS,
+    PLANT_COVER_STRENGTH,
+    PLANT_GRAZE_RANGE,
+    PLANT_GRAZE_ENERGY_GAIN,
+    PLANT_GRAZE_DAMAGE,
+    GRAZING_COOLDOWN,
+    GRAZING_VISUAL_DURATION,
+    FISH_HIDE_THREAT_THRESHOLD,
+    FISH_HIDE_WEIGHT,
+    FISH_EXPLORATION_FORCE,
+    FISH_SEPARATION_RADIUS,
+    FISH_SEPARATION_FORCE,
+    FISH_PLANT_RESTLESSNESS,
+    FISH_PLANT_LINGER_MAX,
+    FISH_COVER_STAMINA_BONUS,
+    FISH_COVER_STAMINA_PREDATOR,
+    STATE_BIAS_FLEE_THREAT,
+    STATE_BIAS_HUNT_HUNGER,
+    STATE_BIAS_MATE_DRIVE,
+    STATE_BIAS_REST_NIGHT,
+    STATE_BLOCK_IMMATURE,
+    MATING_HEART_SPAWN_INTERVAL,
+    MATING_HEART_RANDOM_RANGE,
+    MATING_GLOW_DECAY_RATE,
+    BIOLUM_COLORS,
+    INPUT_MAX_ABS_VALUE,
+)
 from environment_objects import PoopParticle
 
+# Glow surface cache
 _GLOW_SURF_SIZE = 60
 _glow_surf = None
 
@@ -22,9 +87,10 @@ def _get_glow_surf():
 
 
 def get_life_stage_size_mult(age):
+    """Calculate size multiplier based on life stage."""
     larva_end = FISH_LARVA_DURATION
     juv_end = larva_end + max(0.1, FISH_JUVENILE_DURATION)
-    adult_end = juv_end + max(0.1, FISH_ADULT_DURATION)
+    adult_end = juv_end + max(0.1, FISH_MAX_AGE - larva_end - FISH_JUVENILE_DURATION - 80.0)
 
     if age < larva_end:
         return 0.35
@@ -33,7 +99,7 @@ def get_life_stage_size_mult(age):
         t = (age - larva_end) / juv_duration
         return 0.35 + t * 0.40
     elif age < adult_end:
-        adult_duration = max(0.1, FISH_ADULT_DURATION)
+        adult_duration = max(0.1, FISH_MAX_AGE - larva_end - FISH_JUVENILE_DURATION - 80.0)
         t = (age - juv_end) / adult_duration
         return 0.75 + t * 0.25
     else:
@@ -41,8 +107,11 @@ def get_life_stage_size_mult(age):
 
 
 class NeuralFish:
-    INPUT_COUNT = 18
-    OUTPUT_COUNT = 9  # 2 movement + 2 behavior + 5 state logits
+    """Fish controlled by an improved neural network with temporal memory."""
+
+    # Network architecture constants
+    INPUT_COUNT = NN_INPUT_COUNT
+    OUTPUT_COUNT = NN_OUTPUT_COUNT
 
     def __init__(
         self,
@@ -57,18 +126,20 @@ class NeuralFish:
         self.is_cleaner = is_cleaner
         self.is_predator = False
         self.traits = traits if traits else FishTraits()
-        self.brain = (
-            brain if brain else NeuralNet(self.INPUT_COUNT, 12, self.OUTPUT_COUNT)
-        )
+        
+        # Initialize neural network with new architecture
+        self.brain = brain if brain else NeuralNet()
 
+        # Starting position
         start_x = start_x or random.uniform(100, WORLD_WIDTH - 100)
         start_y = start_y or random.uniform(WATER_LINE_Y + 100, WORLD_HEIGHT - 200)
-
         self.physics = SteeringPhysics(start_x, start_y, FISH_MAX_SPEED, FISH_MAX_FORCE)
-
+        
+        # Apply trait modifiers to physics
         self.physics.max_speed *= self.traits.physical_traits.get("max_speed_mult", 1.0)
         self.physics.max_force *= self.traits.physical_traits.get("turn_rate_mult", 1.0)
 
+        # Vital statistics
         self.age = 0.0
         self.energy = FISH_MAX_ENERGY * 0.8
         self.stamina = 100.0
@@ -82,39 +153,42 @@ class NeuralFish:
         self.pregnancy_partner = None
         self.family = None
 
+        # Plant interaction
         self.closest_plant = None
         self.grazing_cooldown = 0.0
 
+        # Neural network state (for visualization)
         self.last_inputs = [0.0] * self.INPUT_COUNT
-        self.last_hidden = [0.0] * self.brain.hidden2_size
         self.last_hidden1 = [0.0] * self.brain.hidden_size
+        self.last_hidden = [0.0] * self.brain.hidden2_size
         self.last_outputs = [0.0] * self.OUTPUT_COUNT
-        # State probabilities exposed for the brain visualizer
         self.last_state_probs = [0.2] * 5
         self.output_history = collections.deque(maxlen=60)
 
+        # Lifetime statistics
         self.food_eaten = 0
         self.distance_traveled = 0.0
         self.offspring_count = 0
 
+        # Mating display
         self._mating_glow_timer = 0.0
         self._heart_timer = 0.0
 
-        # Animation state for appearance
+        # Animation state
         self._fin_phase = random.uniform(0, math.pi * 2)
-        self._pattern_seed = random.randint(0, 10000)  # For consistent pattern rendering
+        self._pattern_seed = random.randint(0, 10000)
 
-        # ── Anti-clustering: track how long fish has been near a plant ─
+        # ── NEW: Temporal context for neural network ───────────────────────
+        self._prev_state = FishState.RESTING
+        self._frames_since_meal = 0
+        self._last_food_count = 0
         self._plant_linger_timer = 0.0
-        # ── Exploration: a slowly-changing wander direction ─
         self._wander_angle = random.uniform(0, math.pi * 2)
         self._wander_timer = 0.0
 
-        # ── Cleaning mutualism state ─────────────────────────────────────
-        # All fish can be "clients" that benefit from cleaner fish attention.
-        # needs_cleaning rises with stress/damage and decays when cleaned.
-        self.needs_cleaning = random.uniform(0.0, 0.3)  # start with mild need
-        self.last_cleaned_time = 0.0  # seconds since last cleaning event
+        # Cleaning state
+        self.needs_cleaning = random.uniform(0.0, 0.3)
+        self.last_cleaned_time = 0.0
 
     @property
     def pos(self):
@@ -125,22 +199,30 @@ class NeuralFish:
             "size_mult", 1.0
         )
 
-    # ── Radar / sensory inputs ─────────────────────────────────────────────
+    # ═════════════════════════════════════════════════════════════════════════
+    # IMPROVED: Normalized Sensory Inputs with Temporal Context
+    # ═════════════════════════════════════════════════════════════════════════
 
-    def get_radar_inputs(self, all_fish, targets, plant_manager):
+    def get_radar_inputs(self, all_fish, targets, plant_manager, time_system=None):
+        """Collect and NORMALIZE all sensory inputs for the neural network.
+        
+        All inputs are clamped to [0, 1] or [-1, 1] range for consistent learning.
+        """
         radar = [0.0] * 9
         self.is_hidden = False
-        min_plant_dist = 9999
+        min_plant_dist = 9999.0
         self.closest_plant = None
 
         plant_food = [0.0, 0.0, 0.0]
         cover_quality = 0.0
-        closest_cover_dist = 9999
+        closest_cover_dist = 9999.0
 
+        # Scan plants
         for plant in plant_manager.plants:
             if plant.biomass < 1.0:
                 continue
             dist = self.physics.pos.distance_to((plant.x, plant.base_y))
+            
             if dist < PLANT_COVER_RADIUS * 2:
                 angle = (
                     math.atan2(
@@ -149,6 +231,7 @@ class NeuralFish:
                     - self.physics.heading
                 )
                 angle = (angle + math.pi) % (2 * math.pi) - math.pi
+                
                 if abs(angle) < FISH_SENSOR_ARC * 1.5:
                     sector = int(
                         (angle + FISH_SENSOR_ARC * 1.5) / (3 * FISH_SENSOR_ARC) * 3
@@ -170,17 +253,18 @@ class NeuralFish:
             if dist < 60:
                 self.is_hidden = True
 
+        # ── NORMALIZE cover and plant_food ─────────────────────────────────
+        cover_quality = min(1.0, max(0.0, cover_quality / 2.0))
+        plant_food_total = min(1.0, max(0.0, sum(plant_food) / 3.0))
+
+        # Fill radar for food, predators, mates
         def fill_radar(objects, offset, is_threat_radar=False, bias_multiplier=1.0):
             min_d = FISH_SENSOR_RANGE
             for obj in objects:
                 if is_threat_radar and getattr(obj, "is_hidden", False):
                     continue
-                ox = getattr(
-                    obj, "x", obj.physics.pos.x if hasattr(obj, "physics") else 0
-                )
-                oy = getattr(
-                    obj, "y", obj.physics.pos.y if hasattr(obj, "physics") else 0
-                )
+                ox = getattr(obj, "x", obj.physics.pos.x if hasattr(obj, "physics") else 0)
+                oy = getattr(obj, "y", obj.physics.pos.y if hasattr(obj, "physics") else 0)
                 dist = self.physics.pos.distance_to((ox, oy))
                 detection_range = FISH_SENSOR_RANGE
                 if is_threat_radar and self.is_hidden:
@@ -204,7 +288,7 @@ class NeuralFish:
             return min_d
 
         fill_radar(targets, 0)
-        fill_radar(
+        min_pred_dist = fill_radar(
             [f for f in all_fish if getattr(f, "is_predator", False)],
             3,
             is_threat_radar=True,
@@ -221,7 +305,7 @@ class NeuralFish:
             6,
         )
 
-        # ── Ambush Alert (is a predator near my plant?) ──────────────────
+        # ── Ambush Alert ──────────────────────────────────────────────────
         ambush_alert = 0.0
         if self.closest_plant:
             for f in all_fish:
@@ -233,23 +317,62 @@ class NeuralFish:
                         ambush_alert = 1.0
                         break
 
+        # ── NEW: One-hot encode previous state ─────────────────────────────
+        state_onehot = [0.0] * 5
+        state_onehot[FISH_STATE_ORDER.index(self._prev_state)] = 1.0
+
+        # ── NEW: Time and season inputs ───────────────────────────────────
+        time_of_day = time_system.time_of_day if time_system else 0.5
+        season_norm = time_system.season_index / 3.0 if time_system else 0.0
+
+        # ── NEW: Hunger memory ────────────────────────────────────────────
+        if self.food_eaten > self._last_food_count:
+            self._frames_since_meal = 0
+            self._last_food_count = self.food_eaten
+        else:
+            self._frames_since_meal += 1
+        hunger_memory = min(1.0, self._frames_since_meal / 600.0)
+
+        # ── Assemble NORMALIZED inputs ────────────────────────────────────
         stats = [
-            self.energy / FISH_MAX_ENERGY,
-            self.stamina / 100.0,
-            (self.physics.pos.y - WATER_LINE_Y) / (WORLD_HEIGHT - WATER_LINE_Y),
-            self.physics.vel.length() / self.physics.max_speed,
+            # Core physiology (0-1)
+            max(0.0, min(1.0, self.energy / FISH_MAX_ENERGY)),
+            max(0.0, min(1.0, self.stamina / 100.0)),
+            
+            # Spatial awareness (0-1)
+            max(0.0, min(1.0, (self.physics.pos.y - WATER_LINE_Y) / (WORLD_HEIGHT - WATER_LINE_Y))),
+            max(0.0, min(1.0, self.physics.vel.length() / max(1.0, self.physics.max_speed))),
+            
+            # Environment (0-1, normalized)
             cover_quality,
-            sum(plant_food) / 3.0,
-            # 15: Normalized distance to closest plant
-            min(1.0, min_plant_dist / FISH_SENSOR_RANGE),
-            # 16: Ambush Alert
-            ambush_alert,
-            # 17: Closest Mate Distance
-            min(1.0, min_mate_dist / FISH_SENSOR_RANGE),
+            plant_food_total,
+            min(1.0, max(0.0, min_plant_dist / FISH_SENSOR_RANGE)),
+            
+            # Threats (0-1)
+            min(1.0, max(0.0, ambush_alert)),
+            min(1.0, max(0.0, min_mate_dist / FISH_SENSOR_RANGE)),
+            
+            # ════════════════════════════════════════════════════════════
+            # NEW: Temporal context inputs
+            # ════════════════════════════════════════════════════════════
+            time_of_day,           # 0-1: fraction of day
+            season_norm,           # 0-1: 0=spring, 1=winter
+            
+            # Previous state one-hot (5 values)
+            *state_onehot,
+            
+            # Hunger memory (0-1): time since last meal
+            hunger_memory,
+            
+            # Life stage (0-1)
+            min(1.0, max(0.0, self.age / FISH_MAX_AGE)),
         ]
+        
         return radar + stats
 
-    # ── Soft state selection ───────────────────────────────────────────────
+    # ═════════════════════════════════════════════════════════════════════════
+    # IMPROVED: Reduced State Biases (allows NN to learn)
+    # ═════════════════════════════════════════════════════════════════════════
 
     def _pick_state(
         self,
@@ -259,10 +382,10 @@ class NeuralFish:
         mating_drive,
         activity_mod=1.0,
     ):
-        """
-        Apply physiological biases to the NN's raw softmax state probabilities.
-
-        activity_mod parameter allows predator seasonal suppression.
+        """Apply REDUCED physiological biases to NN state probabilities.
+        
+        Key improvement: Biases are now gentle nudges instead of hard overrides,
+        allowing the neural network to learn optimal behaviors.
         """
         if self.is_pregnant:
             return FishState.NESTING
@@ -270,50 +393,55 @@ class NeuralFish:
         # Convert probabilities back to log-space for bias addition
         logits = [math.log(max(p, 1e-9)) for p in raw_state_probs]
 
-        # Threat → nudge FLEE
+        # ── REDUCED biases — let the NN learn! ───────────────────────────
+        # Threat → nudge FLEE (reduced from 3.5 to 0.6)
         logits[2] += threat_level * STATE_BIAS_FLEE_THREAT
 
-        # Hunger → nudge HUNT
+        # Hunger → nudge HUNT (reduced from 2.5 to 0.4)
         hunger_signal = max(0.0, 1.0 - self.energy / FISH_MAX_ENERGY)
         logits[1] += hunger_signal * STATE_BIAS_HUNT_HUNGER
 
-        # Mating readiness → nudge MATE
+        # Mating readiness → nudge MATE (reduced from 2.0 to 0.3)
         if (
             self.is_mature
-            and self.energy > FISH_MATING_THRESHOLD / mating_drive
+            and self.energy > FISH_MATING_THRESHOLD / max(0.1, mating_drive)
             and self.mating_cooldown <= 0
         ):
             logits[3] += STATE_BIAS_MATE_DRIVE * mating_drive
 
-        # Night → nudge REST
+        # Night → nudge REST (reduced from 1.5 to 0.3)
         logits[0] += (1.0 - night_rest_factor) * STATE_BIAS_REST_NIGHT
 
-        # ── Predator-specific seasonal suppression ───────────────────────
+        # ── Predator seasonal suppression ───────────────────────────────
         if self.is_predator and activity_mod < 0.8:
-            logits[1] -= (1.0 - activity_mod) * 3.0  # Suppress HUNTING
-            logits[0] += (1.0 - activity_mod) * 2.0  # Encourage RESTING
+            logits[1] -= (1.0 - activity_mod) * 2.0  # Suppress HUNTING
+            logits[0] += (1.0 - activity_mod) * 1.5  # Encourage RESTING
 
-        # ── Predator soft NN bias — discourage MATING when prey scarce ────
+        # ── Predator population control ──────────────────────────────────
         if self.is_predator and hasattr(self.world, "fish_system"):
             prey_count = len(self.world.fish_system.fish)
             pred_count = len(self.world.fish_system.predators)
-            if pred_count > 0 and (prey_count / pred_count) < PREDATOR_PREY_RATIO_MIN:
-                logits[3] -= 5.0  # Strongly discourage MATING
+            if pred_count > 0 and (prey_count / pred_count) < 5.0:
+                logits[3] -= 3.0  # Discourage MATING when prey scarce
+            from config import PREDATOR_MAX_POPULATION
             if pred_count >= PREDATOR_MAX_POPULATION:
                 logits[3] = -1e9  # Hard block at population cap
 
+        # ── SOFT blocks for immature fish (instead of hard -1e9) ──────────
         if not self.is_mature:
-            logits[1] = -1e9  # Block HUNTING for immature fish
-            logits[3] = -1e9  # Block MATING for immature fish
+            logits[1] -= STATE_BLOCK_IMMATURE  # Discourage HUNTING
+            logits[3] -= STATE_BLOCK_IMMATURE  # Discourage MATING
 
-        # Predators never enter MATING state
+        # Predators never enter MATING state through NN (handled elsewhere)
         if self.is_predator:
-            logits[3] = -1e9  # Block MATING state completely
+            logits[3] = -1e9
 
         best_idx = logits.index(max(logits))
         return FISH_STATE_ORDER[best_idx]
 
-    # ── Update ─────────────────────────────────────────────────────────────
+    # ═════════════════════════════════════════════════════════════════════════
+    # Main Update Loop
+    # ═════════════════════════════════════════════════════════════════════════
 
     def update(
         self, dt, all_fish, targets, particle_system, plant_manager, time_system=None
@@ -321,12 +449,11 @@ class NeuralFish:
         self.age += dt
         self.last_cleaned_time += dt
 
-        # Update fin animation phase
+        # Update fin animation
         self._fin_phase += dt * 8.0
 
-        # ── needs_cleaning: rises with age and low energy, decays when cleaned ─
+        # ── needs_cleaning accumulation ───────────────────────────────────
         if self.last_cleaned_time > 5.0:
-            # Fish gradually "need cleaning" as they swim around
             age_pressure = min(1.0, self.age / FISH_MAX_AGE)
             energy_pressure = max(0.0, 1.0 - self.energy / FISH_MAX_ENERGY)
             self.needs_cleaning = min(
@@ -334,8 +461,8 @@ class NeuralFish:
                 self.needs_cleaning
                 + (0.02 * age_pressure + 0.03 * energy_pressure) * dt,
             )
-        # When recently cleaned, needs_cleaning is reset to near-zero by the cleaner
 
+        # ── Metabolism ────────────────────────────────────────────────────
         metabolism_mod = time_system.metabolism_modifier if time_system else 1.0
         metabolism_rate = (
             0.1
@@ -348,7 +475,7 @@ class NeuralFish:
 
         night_rest_factor = 0.5 if (time_system and time_system.is_night) else 1.0
 
-        # ── Skip speed-based stamina drain while predator is dashing ──────
+        # ── Stamina management ────────────────────────────────────────────
         speed_ratio = self.physics.vel.length() / max(1.0, self.physics.max_speed)
         if speed_ratio > 0.8 and not getattr(self, "is_dashing", False):
             self.stamina = max(0.0, self.stamina - 15.0 * speed_ratio * dt)
@@ -356,13 +483,15 @@ class NeuralFish:
             recovery = 8.0 * self.traits.physical_traits.get("stamina_mult", 1.0) * dt
             self.stamina = min(100.0, self.stamina + recovery)
 
-        full_inputs = self.get_radar_inputs(all_fish, targets, plant_manager)
-        threat_level = sum(full_inputs[3:6])
+        # ── Get NORMALIZED inputs with temporal context ───────────────────
+        full_inputs = self.get_radar_inputs(all_fish, targets, plant_manager, time_system)
+        threat_level = min(1.0, sum(full_inputs[3:6]))
         cover_quality = full_inputs[13]
         ambush_alert = full_inputs[16]
 
         self.grazing_cooldown = max(0.0, self.grazing_cooldown - dt)
 
+        # ── Plant grazing (when hungry) ───────────────────────────────────
         if (
             not self.is_predator
             and self.energy < FISH_HUNGER_THRESHOLD * 0.7
@@ -385,14 +514,12 @@ class NeuralFish:
                             )
                         break
 
-        # ═══════════════════════════════════════════════════════════════════
-        # FIX: Cover stamina — reduced bonus, predators get less
-        # ═══════════════════════════════════════════════════════════════════
+        # ── Cover stamina bonus ───────────────────────────────────────────
         if cover_quality > 0.3:
             bonus = FISH_COVER_STAMINA_PREDATOR if self.is_predator else FISH_COVER_STAMINA_BONUS
             self.stamina = min(100.0, self.stamina + bonus * cover_quality * dt)
 
-        # ── Neural net forward pass ──────────────────────────────────────
+        # ── Neural network forward pass ──────────────────────────────────
         mating_drive = time_system.mating_drive_modifier if time_system else 1.0
         activity_mod = (
             time_system.predator_activity_modifier
@@ -400,6 +527,10 @@ class NeuralFish:
             else 1.0
         )
 
+        # Store previous state for next frame's temporal context
+        self._prev_state = self.state
+
+        # Forward pass
         self.last_inputs = full_inputs
         outputs, hidden1, hidden2 = self.brain.forward(self.last_inputs)
         self.last_hidden1 = hidden1
@@ -407,6 +538,7 @@ class NeuralFish:
         self.last_outputs = outputs
         self.output_history.append(list(outputs[:4]))
 
+        # Parse outputs
         steer_out = outputs[0]
         thrust_out = outputs[1]
         hide_drive = outputs[2]
@@ -414,17 +546,17 @@ class NeuralFish:
         raw_state_probs = outputs[4:9]
         self.last_state_probs = raw_state_probs
 
-        # ── Soft state selection (now receives activity_mod) ─────────────
+        # ── State selection (with REDUCED biases) ────────────────────────
         self.state = self._pick_state(
             raw_state_probs, threat_level, night_rest_factor, mating_drive, activity_mod
         )
 
-        # ═══════════════════════════════════════════════════════════════════
-        # FIX: Hide Drive — now GATED behind actual threats
-        # Only seek plant cover when predators are nearby (threat_level > threshold)
-        # This prevents the NN from learning "always hide near plant" as the
-        # dominant strategy, which caused fish to cluster and orbit plants.
-        # ═══════════════════════════════════════════════════════════════════
+        # ═════════════════════════════════════════════════════════════════
+        # IMPROVED: Consolidated Movement Control
+        # The NN now has primary control; parallel systems are reduced
+        # ═════════════════════════════════════════════════════════════════
+
+        # ── Hide Drive (gated by actual threats) ────────────────────────
         if self.closest_plant:
             should_hide = (
                 threat_level > FISH_HIDE_THREAT_THRESHOLD
@@ -432,8 +564,8 @@ class NeuralFish:
             )
 
             if should_hide:
-                # Active threat — seek plant cover
                 if self.is_predator:
+                    # Ambush behavior
                     ambush_weight = hide_drive * 0.3
                     ambush_force = self.physics.seek(
                         self.closest_plant.x,
@@ -442,6 +574,7 @@ class NeuralFish:
                     )
                     self.physics.apply_force(ambush_force)
                 else:
+                    # Flee to cover
                     hide_weight = hide_drive * FISH_HIDE_WEIGHT
                     hide_force = self.physics.seek(
                         self.closest_plant.x,
@@ -449,13 +582,9 @@ class NeuralFish:
                         weight=hide_weight,
                     )
                     self.physics.apply_force(hide_force)
-                    self._plant_linger_timer = 0.0  # reset since hiding is valid
+                    self._plant_linger_timer = 0.0
 
-            # ═══════════════════════════════════════════════════════════════
-            # FIX: Plant Restlessness — push away from plants when safe
-            # If no threats nearby and fish has been lingering near a plant,
-            # apply a gentle force AWAY to prevent orbiting.
-            # ═══════════════════════════════════════════════════════════════
+            # ── Plant restlessness (anti-clustering) ────────────────────
             elif self.closest_plant and not self.is_predator:
                 dist_to_plant = self.physics.pos.distance_to(
                     (self.closest_plant.x, self.closest_plant.base_y)
@@ -463,7 +592,6 @@ class NeuralFish:
                 if dist_to_plant < PLANT_COVER_RADIUS:
                     self._plant_linger_timer += dt
                     if self._plant_linger_timer > FISH_PLANT_LINGER_MAX:
-                        # Push AWAY from the plant — gentle anti-clustering
                         away_force = self.physics.seek(
                             self.closest_plant.x,
                             self.closest_plant.base_y,
@@ -471,20 +599,10 @@ class NeuralFish:
                         )
                         self.physics.apply_force(away_force)
 
-                    # Also dampen lingering near plants even before the timer
-                    # by reducing the linger timer slowly when safe
-                    if self._plant_linger_timer > FISH_PLANT_LINGER_MAX * 0.5:
-                        self._plant_linger_timer -= dt * 0.1
-
-        # ═══════════════════════════════════════════════════════════════════
-        # FIX: Exploration / Wanderlust — random wander when safe and fed
-        # This gives fish a natural tendency to explore the environment
-        # instead of huddling near plants.
-        # ═══════════════════════════════════════════════════════════════════
+        # ── Exploration / Wanderlust (when safe and fed) ────────────────
         is_safe = threat_level < FISH_HIDE_THREAT_THRESHOLD
         is_well_fed = self.energy > FISH_MAX_ENERGY * 0.5
         if is_safe and is_well_fed and not self.is_hidden:
-            # Slowly evolve a wander direction
             self._wander_timer += dt
             if self._wander_timer > 2.0:
                 self._wander_angle += random.uniform(-1.2, 1.2)
@@ -494,19 +612,13 @@ class NeuralFish:
             wander_fy = math.sin(self._wander_angle) * FISH_EXPLORATION_FORCE
             self.physics.apply_force((wander_fx, wander_fy))
 
-        # ═══════════════════════════════════════════════════════════════════
-        # FIX: Fish Separation — prevent tight clustering
-        # Fish that are too close together push apart, breaking up the
-        # circular orbit pattern around plants.
-        # ═══════════════════════════════════════════════════════════════════
+        # ── Fish Separation (anti-clustering) ───────────────────────────
         for other in all_fish:
             if other is self or other.is_predator != self.is_predator:
                 continue
             sep_dist = self.physics.pos.distance_to(other.physics.pos)
             if 0 < sep_dist < FISH_SEPARATION_RADIUS:
-                # Stronger push the closer they are
                 strength = FISH_SEPARATION_FORCE * (1.0 - sep_dist / FISH_SEPARATION_RADIUS)
-                # Direction: away from the other fish
                 dx = self.physics.pos.x - other.physics.pos.x
                 dy = self.physics.pos.y - other.physics.pos.y
                 if sep_dist > 0:
@@ -514,7 +626,7 @@ class NeuralFish:
                         (dx / sep_dist * strength, dy / sep_dist * strength)
                     )
 
-        # ── Mating display timers ─────────────────────────────────────────
+        # ── Mating display timers ───────────────────────────────────────
         if self.state == FishState.MATING:
             self._mating_glow_timer += dt
             self._heart_timer = max(0.0, self._heart_timer - dt)
@@ -528,12 +640,10 @@ class NeuralFish:
                 0.0, self._mating_glow_timer - dt * MATING_GLOW_DECAY_RATE
             )
 
-        # ── Speed ceiling ─────────────────────────────────────────────────
+        # ── Speed ceiling by state ──────────────────────────────────────
         stamina_factor = max(0.3, self.stamina / 100.0)
         if self.state == FishState.FLEEING:
-            speed_ceiling = (
-                self.physics.max_speed * 1.3 * stamina_factor * night_rest_factor
-            )
+            speed_ceiling = self.physics.max_speed * 1.3 * stamina_factor * night_rest_factor
         elif self.state == FishState.HUNTING:
             speed_ceiling = self.physics.max_speed * 1.0 * night_rest_factor
         elif self.state == FishState.MATING:
@@ -543,10 +653,11 @@ class NeuralFish:
         else:
             speed_ceiling = self.physics.max_speed * 0.35 * night_rest_factor
 
-        # ── Behavioral Lever: Sprint Drive ────────────────────────────────
+        # Apply sprint drive
         speed_ceiling *= 1.0 + sprint_drive * 0.5
         speed_ceiling = min(speed_ceiling, self.physics.max_speed * 1.8)
 
+        # ── Steering from NN outputs ────────────────────────────────────
         turn_rate = FISH_TURN_RATE_SCALAR * self.traits.physical_traits.get(
             "turn_rate_mult", 1.0
         )
@@ -569,7 +680,7 @@ class NeuralFish:
 
         self.physics.apply_force((steer_force_x, steer_force_y))
 
-        # Egg laying
+        # ── Egg laying ──────────────────────────────────────────────────
         if self.is_pregnant and self.closest_plant:
             dist_to_plant = self.physics.pos.distance_to(
                 (self.closest_plant.x, self.closest_plant.base_y)
@@ -593,7 +704,7 @@ class NeuralFish:
                     getattr(self, "pregnancy_brain", None),
                 )
 
-        # ── Family cohesion ───────────────────────────────────────────────
+        # ── Family cohesion ─────────────────────────────────────────────
         if self.family and self.family.active:
             if self.is_mature and not self.is_pregnant:
                 child_positions = [
@@ -622,6 +733,7 @@ class NeuralFish:
                         self.physics.seek(avg_x, avg_y, weight=child_weight)
                     )
 
+        # ── Physics update ──────────────────────────────────────────────
         self.physics.bounce_bounds(
             0,
             WATER_LINE_Y + 20,
@@ -631,7 +743,7 @@ class NeuralFish:
         self.physics.update(dt, FISH_DRAG, speed_ceiling)
         self.distance_traveled += self.physics.vel.length() * dt
 
-        # ── Food collision ────────────────────────────────────────────────
+        # ── Food collision ──────────────────────────────────────────────
         for t in targets[:]:
             if self.is_predator:
                 break
@@ -664,7 +776,9 @@ class NeuralFish:
             return PoopParticle(self.physics.pos.x, self.physics.pos.y)
         return None
 
-    # ── Drawing with Heritable Appearance ────────────────────────────────────
+    # ═════════════════════════════════════════════════════════════════════════
+    # Drawing Methods (unchanged from original)
+    # ═════════════════════════════════════════════════════════════════════════
 
     def draw(self, screen, camera, time, selected, biolum_alpha=0):
         pos = self.physics.pos
@@ -678,7 +792,7 @@ class NeuralFish:
 
         app = self.traits.appearance_traits
 
-        # ── Mating glow ──────────────────────────────────────────────────
+        # Mating glow
         if self._mating_glow_timer > 0:
             pulse = (math.sin(time * 6.0) + 1) * 0.5
             glow_intensity = min(1.0, self._mating_glow_timer / 0.5) * (
@@ -709,7 +823,7 @@ class NeuralFish:
                 ),
             )
 
-        # ── Bioluminescence glow ─────────────────────────────────────────
+        # Bioluminescence glow
         if biolum_alpha > 10:
             if self.is_predator:
                 glow_col = BIOLUM_COLORS["predator"]
@@ -736,59 +850,36 @@ class NeuralFish:
                 ),
             )
 
-        # ═══════════════════════════════════════════════════════════════════
-        # HERITABLE APPEARANCE RENDERING
-        # ═══════════════════════════════════════════════════════════════════
-
-        # Get body proportions based on appearance traits
+        # Get body proportions
         body_len, body_wid = self.traits.get_body_proportions()
         body_len *= size
         body_wid *= size
 
-        # Get fin configuration
+        # Get fin and tail config
         fin_config = self.traits.get_fin_config()
-        
-        # Get tail configuration  
         tail_config = self.traits.get_tail_config()
-        
-        # Get pattern configuration
         pattern_config = self.traits.get_pattern_config()
         
-        # Calculate secondary color
         sec_color_offset = app["secondary_color_offset"]
         base = self._get_base_species_color()
         sec_color = tuple(
             max(0, min(255, base[i] + sec_color_offset[i])) for i in range(3)
         )
 
-        # ── Draw Tail ────────────────────────────────────────────────────────
-        self._draw_tail(
-            screen, screen_pos, angle, size, color, sec_color, tail_config, time
-        )
+        # Draw components
+        self._draw_tail(screen, screen_pos, angle, size, color, sec_color, tail_config, time)
+        self._draw_fins(screen, screen_pos, angle, size, color, sec_color, fin_config, app, time)
+        self._draw_body(screen, screen_pos, angle, body_len, body_wid, color, sec_color, 
+                        pattern_config, app, time)
 
-        # ── Draw Fins ─────────────────────────────────────────────────────────
-        self._draw_fins(
-            screen, screen_pos, angle, size, color, sec_color, fin_config, app, time
-        )
-
-        # ── Draw Body ─────────────────────────────────────────────────────────
-        self._draw_body(
-            screen, screen_pos, angle, body_len, body_wid, color, sec_color, 
-            pattern_config, app, time
-        )
-
-        # ── Draw Pattern Overlay ─────────────────────────────────────────────
         if pattern_config["type"] != PATTERN_SOLID:
-            self._draw_pattern(
-                screen, screen_pos, angle, body_len, body_wid, sec_color, 
-                pattern_config, app, time
-            )
+            self._draw_pattern(screen, screen_pos, angle, body_len, body_wid, sec_color, 
+                              pattern_config, app, time)
 
-        # ── Draw Scale Shine ─────────────────────────────────────────────────
         if app["scale_shine"] > 0.2:
             self._draw_shine(screen, screen_pos, angle, body_len, body_wid, app, time)
 
-        # ── Draw Eye ─────────────────────────────────────────────────────────
+        # Eye
         eye_size = max(1, int(2 * app["eye_size_mult"]))
         eye_offset = 1.3 + app["eye_position"]
         eye_x = screen_pos[0] + math.cos(angle + 0.35) * size * eye_offset
@@ -796,11 +887,11 @@ class NeuralFish:
         pygame.draw.circle(screen, (255, 255, 255), (int(eye_x), int(eye_y)), eye_size + 1)
         pygame.draw.circle(screen, (0, 0, 0), (int(eye_x), int(eye_y)), eye_size)
 
-        # ── Draw Barbels (whiskers) ──────────────────────────────────────────
+        # Barbels
         if app["has_barbels"]:
             self._draw_barbels(screen, screen_pos, angle, size, app, time)
 
-        # ── Pregnancy indicator ──────────────────────────────────────────────
+        # Pregnancy indicator
         if self.is_pregnant:
             pygame.draw.circle(
                 screen,
@@ -809,7 +900,7 @@ class NeuralFish:
                 int(size * 1.2),
             )
 
-        # ── Selection ring ───────────────────────────────────────────────────
+        # Selection ring
         if selected:
             pygame.draw.circle(
                 screen,
@@ -819,7 +910,7 @@ class NeuralFish:
                 2,
             )
 
-        # ── Mating state ♥ label ─────────────────────────────────────────────
+        # Mating state heart
         if self.state == FishState.MATING and self._mating_glow_timer > 0.3:
             heart_y = int(screen_pos[1]) - int(size * 4) - 8
             sym_font = pygame.font.Font(None, 18)
@@ -827,7 +918,9 @@ class NeuralFish:
             screen.blit(sym, (int(screen_pos[0]) - sym.get_width() // 2, heart_y))
 
     def _draw_tail(self, screen, pos, angle, size, color, sec_color, tail_config, time):
-        """Draw the fish tail based on tail_shape trait"""
+        """Draw the fish tail based on tail_shape trait."""
+        from fish_traits import TAIL_POINTED, TAIL_FORKED, TAIL_ROUNDED, TAIL_LYRE
+        
         tail_angle = angle + math.pi + math.sin(time * 10) * 0.4
         tail_size = size * tail_config["size"] * 2.5
         tail_spread = tail_config["spread"]
@@ -898,10 +991,12 @@ class NeuralFish:
             pygame.draw.polygon(screen, color, pts)
 
     def _draw_fins(self, screen, pos, angle, size, color, sec_color, fin_config, app, time):
-        """Draw dorsal, pectoral, and anal fins"""
+        """Draw dorsal, pectoral, and anal fins."""
+        from fish_traits import FIN_STYLE_ELEGANT, FIN_STYLE_DRAMATIC
+        
         fin_anim = math.sin(self._fin_phase) * 0.3
         
-        # Dorsal fin (top)
+        # Dorsal fin
         dorsal_size = size * fin_config["dorsal"] * 1.5
         if dorsal_size > 1:
             dorsal_x = pos[0] + math.cos(angle - math.pi/2) * size * 0.3
@@ -909,7 +1004,6 @@ class NeuralFish:
             
             fin_style = app["fin_style"]
             if fin_style == FIN_STYLE_ELEGANT or fin_style == FIN_STYLE_DRAMATIC:
-                # Longer, flowing fin
                 pts = [
                     (dorsal_x, dorsal_y),
                     (dorsal_x + math.cos(angle - math.pi/2 - 0.3 + fin_anim) * dorsal_size * 1.2,
@@ -920,7 +1014,6 @@ class NeuralFish:
                      dorsal_y + math.sin(angle) * size * 0.5),
                 ]
             else:
-                # Standard triangular fin
                 pts = [
                     (dorsal_x, dorsal_y),
                     (dorsal_x + math.cos(angle - math.pi/2) * dorsal_size,
@@ -928,17 +1021,9 @@ class NeuralFish:
                     (dorsal_x + math.cos(angle) * size * 0.3,
                      dorsal_y + math.sin(angle) * size * 0.3),
                 ]
-            
-            # Draw with slight transparency
-            fin_surf = pygame.Surface((int(dorsal_size * 3), int(dorsal_size * 3)), pygame.SRCALPHA)
-            fin_color = (*color, 180)
-            # Translate points for the surface
-            offset_pts = [(p[0] - dorsal_x + dorsal_size * 1.5, p[1] - dorsal_y + dorsal_size * 1.5) for p in pts]
-            if len(offset_pts) >= 3:
-                pygame.draw.polygon(fin_surf, fin_color, offset_pts)
-                screen.blit(fin_surf, (int(dorsal_x - dorsal_size * 1.5), int(dorsal_y - dorsal_size * 1.5)))
+            pygame.draw.polygon(screen, color, pts)
 
-        # Pectoral fins (sides) - draw on both sides
+        # Pectoral fins
         pectoral_size = size * fin_config["pectoral"] * 0.8
         if pectoral_size > 1:
             for side in [-1, 1]:
@@ -956,7 +1041,7 @@ class NeuralFish:
                 ]
                 pygame.draw.polygon(screen, color, pts)
 
-        # Anal fin (bottom)
+        # Anal fin
         anal_size = size * fin_config["anal"] * 1.0
         if anal_size > 1:
             anal_x = pos[0] + math.cos(angle + math.pi/2) * size * 0.2 - math.cos(angle) * size * 0.3
@@ -971,30 +1056,26 @@ class NeuralFish:
             ]
             pygame.draw.polygon(screen, color, pts)
 
-    def _draw_body(self, screen, pos, angle, body_len, body_wid, color, sec_color, pattern_config, app, time):
-        """Draw the fish body with proper proportions"""
-        # Create body surface
+    def _draw_body(self, screen, pos, angle, body_len, body_wid, color, sec_color, 
+                   pattern_config, app, time):
+        """Draw the fish body with proper proportions."""
+        from fish_traits import BODY_SHAPE_STREAMLINED, BODY_SHAPE_ROUNDED
+        
         surf_w = int(body_len * 6) + 4
         surf_h = int(body_wid * 4) + 4
         body_surf = pygame.Surface((surf_w, surf_h), pygame.SRCALPHA)
         
         cx, cy = surf_w // 2, surf_h // 2
         
-        # Draw body based on shape
         body_shape = app["body_shape"]
-        snout_len = app["snout_length"]
         belly_curve = app["belly_curve"]
         
         if body_shape == BODY_SHAPE_STREAMLINED:
-            # Long, pointed body
-            # Generate bezier-like curve for streamlined shape
             pts = []
             for i in range(20):
                 t = i / 19
-                # Parametric curve for streamlined body
                 x = cx - body_len * 2 + t * body_len * 4
                 y_offset = body_wid * 1.5 * math.sin(t * math.pi) * (1 - abs(t - 0.5) * 0.4)
-                # Add snout elongation at front
                 if t < 0.2:
                     y_offset *= 0.5 + t * 2.5
                 pts.append((x, cy - y_offset))
@@ -1004,14 +1085,12 @@ class NeuralFish:
                 y_offset = body_wid * 1.5 * math.sin(t * math.pi) * (1 - abs(t - 0.5) * 0.4)
                 if t < 0.2:
                     y_offset *= 0.5 + t * 2.5
-                # Apply belly curve
                 if t > 0.3 and t < 0.8:
                     y_offset *= (1 + belly_curve * (1 - abs(t - 0.55) * 4))
                 pts.append((x, cy + y_offset))
             pygame.draw.polygon(body_surf, (*color, 255), pts)
             
         elif body_shape == BODY_SHAPE_ROUNDED:
-            # Short, round body
             pts = []
             for i in range(20):
                 t = i / 19
@@ -1027,26 +1106,26 @@ class NeuralFish:
             pygame.draw.polygon(body_surf, (*color, 255), pts)
             
         else:  # BODY_SHAPE_STANDARD
-            # Balanced ellipse
             pygame.draw.ellipse(body_surf, (*color, 255), 
                               (cx - body_len * 2, cy - body_wid * 1.5, 
                                body_len * 4, body_wid * 3))
 
-        # Rotate and blit
         rotated_body = pygame.transform.rotate(body_surf, -math.degrees(angle))
         screen.blit(
             rotated_body,
             rotated_body.get_rect(center=(int(pos[0]), int(pos[1]))),
         )
 
-    def _draw_pattern(self, screen, pos, angle, body_len, body_wid, sec_color, pattern_config, app, time):
-        """Draw pattern overlay based on pattern_type"""
+    def _draw_pattern(self, screen, pos, angle, body_len, body_wid, sec_color, 
+                      pattern_config, app, time):
+        """Draw pattern overlay based on pattern_type."""
+        from fish_traits import PATTERN_STRIPES, PATTERN_SPOTS, PATTERN_GRADIENT, PATTERN_BANDS, PATTERN_MARBLED
+        
         pattern_type = pattern_config["type"]
         intensity = pattern_config["intensity"]
         scale = pattern_config["scale"]
         density = pattern_config["density"]
         
-        # Create pattern surface
         surf_w = int(body_len * 6) + 4
         surf_h = int(body_wid * 4) + 4
         pattern_surf = pygame.Surface((surf_w, surf_h), pygame.SRCALPHA)
@@ -1055,54 +1134,47 @@ class NeuralFish:
         pattern_color = (*sec_color, int(200 * intensity))
         
         if pattern_type == PATTERN_STRIPES:
-            # Horizontal stripes
             stripe_count = int(5 * density * scale)
             stripe_width = int(body_wid * 0.4 / max(1, stripe_count))
             for i in range(stripe_count):
-                y = cy - body_wid * 1.2 + i * (body_wid * 2.4 / stripe_count)
+                y = cy - body_wid * 1.2 + i * (body_wid * 2.4 / max(1, stripe_count))
                 pygame.draw.line(pattern_surf, pattern_color,
                                (cx - body_len * 1.5, y),
                                (cx + body_len * 1.5, y), max(1, stripe_width))
                                
         elif pattern_type == PATTERN_SPOTS:
-            # Polka dot pattern
             random.seed(self._pattern_seed)
             spot_count = int(15 * density)
             for _ in range(spot_count):
                 sx = cx + random.uniform(-body_len * 1.5, body_len * 1.5)
                 sy = cy + random.uniform(-body_wid * 1.2, body_wid * 1.2)
-                # Check if inside body ellipse
-                if ((sx - cx) / (body_len * 1.8)) ** 2 + ((sy - cy) / (body_wid * 1.3)) ** 2 < 1:
+                if ((sx - cx) / max(1, body_len * 1.8)) ** 2 + ((sy - cy) / max(1, body_wid * 1.3)) ** 2 < 1:
                     spot_r = int(random.uniform(1, 3) * scale)
                     pygame.draw.circle(pattern_surf, pattern_color, (int(sx), int(sy)), max(1, spot_r))
                     
         elif pattern_type == PATTERN_GRADIENT:
-            # Color fade from head to tail
             for i in range(int(body_len * 3)):
                 x = cx - body_len * 1.5 + i
-                alpha = int(200 * intensity * (i / (body_len * 3)))
+                alpha = int(200 * intensity * (i / max(1, body_len * 3)))
                 grad_color = (*sec_color, alpha)
                 pygame.draw.line(pattern_surf, grad_color,
                                (x, cy - body_wid * 1.3),
                                (x, cy + body_wid * 1.3), 1)
                                
         elif pattern_type == PATTERN_BANDS:
-            # Vertical bands
             band_count = int(4 * density)
             band_width = int(body_len * 0.3 * scale)
             for i in range(band_count):
-                x = cx - body_len * 1.2 + i * (body_len * 2.4 / band_count)
+                x = cx - body_len * 1.2 + i * (body_len * 2.4 / max(1, band_count))
                 pygame.draw.line(pattern_surf, pattern_color,
                                (x, cy - body_wid * 1.3),
                                (x, cy + body_wid * 1.3), max(1, band_width))
                                
         elif pattern_type == PATTERN_MARBLED:
-            # Swirly, organic pattern
             random.seed(self._pattern_seed)
             for _ in range(int(8 * density)):
                 start_x = cx + random.uniform(-body_len * 1.3, body_len * 1.3)
                 start_y = cy + random.uniform(-body_wid * 1.0, body_wid * 1.0)
-                # Draw curved line
                 pts = [(start_x, start_y)]
                 for j in range(5):
                     pts.append((
@@ -1112,7 +1184,6 @@ class NeuralFish:
                 if len(pts) >= 2:
                     pygame.draw.lines(pattern_surf, pattern_color, False, pts, max(1, int(2 * scale)))
 
-        # Rotate and blit pattern
         rotated_pattern = pygame.transform.rotate(pattern_surf, -math.degrees(angle))
         screen.blit(
             rotated_pattern,
@@ -1120,24 +1191,20 @@ class NeuralFish:
         )
 
     def _draw_shine(self, screen, pos, angle, body_len, body_wid, app, time):
-        """Draw scale shine/iridescence effect"""
+        """Draw scale shine/iridescence effect."""
         shine = app["scale_shine"]
         iridescence = app["iridescence"]
         
-        # Create shine surface
         surf_w = int(body_len * 3) + 4
         surf_h = int(body_wid * 2) + 4
         shine_surf = pygame.Surface((surf_w, surf_h), pygame.SRCALPHA)
         cx, cy = surf_w // 2, surf_h // 2
         
-        # Animate iridescence
         hue_shift = math.sin(time * 2 + self._pattern_seed) * iridescence * 30
         
-        # Draw highlight arc
         for i in range(int(body_len * 1.5)):
             x = cx - body_len * 0.5 + i * 0.5
-            alpha = int(60 * shine * (1 - i / (body_len * 1.5)))
-            # Iridescent color shift
+            alpha = int(60 * shine * (1 - i / max(1, body_len * 1.5)))
             shine_color = (
                 min(255, 200 + int(hue_shift)),
                 min(255, 220 + int(hue_shift * 0.5)),
@@ -1147,7 +1214,6 @@ class NeuralFish:
                            (x, cy - body_wid * 0.8 + i * 0.2),
                            (x, cy - body_wid * 0.3), 1)
 
-        # Rotate and blit
         rotated_shine = pygame.transform.rotate(shine_surf, -math.degrees(angle))
         screen.blit(
             rotated_shine,
@@ -1155,7 +1221,7 @@ class NeuralFish:
         )
 
     def _draw_barbels(self, screen, pos, angle, size, app, time):
-        """Draw whisker-like barbels"""
+        """Draw whisker-like barbels."""
         barbel_len = size * app["barbel_length"] * 3
         wave = math.sin(time * 5) * 0.3
         
@@ -1171,7 +1237,7 @@ class NeuralFish:
                            (int(end_x), int(end_y)), 1)
 
     def _get_base_species_color(self):
-        """Get the base color for this fish's species"""
+        """Get the base color for this fish's species."""
         if self.is_predator:
             base = [220, 60, 60]
         elif self.is_cleaner:
@@ -1181,6 +1247,7 @@ class NeuralFish:
         return base
 
     def get_color(self):
+        """Get the fish's current color with age fade."""
         if self.is_predator:
             base = [220, 60, 60]
         elif self.is_cleaner:

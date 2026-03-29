@@ -1,6 +1,11 @@
 """
-Brain Visualizer — Bioluminescent deep-sea neuron aesthetic.
-Organic curves, flowing signal particles, living pulse rhythms.
+Brain Visualizer — Updated for improved neural network architecture.
+
+Displays:
+- Input layer (26 neurons): sensors + temporal context
+- Hidden layer 1 (14 neurons): tanh activation
+- Hidden layer 2 (8 neurons): tanh + recurrent
+- Output layer (9 neurons): movement, behavior, states
 """
 
 import pygame
@@ -11,6 +16,10 @@ from config import (
     BRAIN_PANEL_HEIGHT,
     FishState,
     FISH_MAX_ENERGY,
+    NN_INPUT_COUNT,
+    NN_HIDDEN1_SIZE,
+    NN_HIDDEN2_SIZE,
+    NN_OUTPUT_COUNT,
 )
 
 # ── Palette ────────────────────────────────────────────────────────────────────
@@ -29,6 +38,8 @@ AMBER = (255, 185, 55)
 AMBER_DIM = (140, 95, 20)
 RED_ACC = (255, 100, 110)
 RED_DIM = (130, 45, 50)
+PURPLE = (180, 100, 255)
+PURPLE_DIM = (90, 50, 130)
 
 # Neural activation colours
 COL_POS_HI = (80, 255, 220)
@@ -90,15 +101,26 @@ def draw_capsule(surface, color, x, y, w, h, radius=None):
     pygame.draw.rect(surface, color, pygame.Rect(x, y, w, h), border_radius=radius)
 
 
-def draw_capsule_outline(surface, color, x, y, w, h, radius=None, width=1):
-    if radius is None:
-        radius = h // 2
-    pygame.draw.rect(
-        surface, color, pygame.Rect(x, y, w, h), border_radius=radius, width=width
-    )
+# ── Input Labels for New Architecture ───────────────────────────────────────────
 
+INPUT_LABELS = [
+    # Radar inputs (0-8)
+    "Food L", "Food C", "Food R",
+    "Pred L", "Pred C", "Pred R",
+    "Mate L", "Mate C", "Mate R",
+    # Core stats (9-12)
+    "Energy", "Stamina", "Depth", "Speed",
+    # Environment (13-16)
+    "Cover", "PlantFood", "PlantDist", "Ambush",
+    # Mate distance (17)
+    "MateDist",
+    # Temporal context (18-25) - NEW
+    "Time", "Season",
+    "WasRest", "WasHunt", "WasFlee", "WasMate", "WasNest",
+    "Hunger", "Age",
+]
 
-# ── Main class ────────────────────────────────────────────────────────────────
+OUTPUT_LABELS = ["Str", "Thr", "Hide", "Spr", "Rest", "Hunt", "Flee", "Mate", "Nest"]
 
 
 class BrainVisualizer:
@@ -142,11 +164,12 @@ class BrainVisualizer:
         self._pos_h1 = []
         self._pos_h2 = []
         self._pos_out = []
-        self._ripples: list[tuple] = []
-        self._node_phases: dict = {}
+        self._ripples = []
+        self._recurrent_pulse = 0.0
 
     def update(self, dt, selected_fish):
         self.anim_t += dt
+        self._recurrent_pulse = (self._recurrent_pulse + dt * 3) % (math.pi * 2)
 
         if selected_fish is not None:
             self.slide_x = max(0.0, self.slide_x - 14 * dt * 60)
@@ -167,14 +190,15 @@ class BrainVisualizer:
             (a + dt, m, pos, col) for a, m, pos, col in self._ripples if a < m
         ]
 
+        # Trigger ripples on active inputs
         if self._pos_in and selected_fish is not None:
             inp = selected_fish.last_inputs
-            if len(inp) == 18:
+            if len(inp) >= NN_INPUT_COUNT:
                 for i, node_pos in enumerate(self._pos_in):
                     act = inp[i] if i < len(inp) else 0.0
-                    if abs(act) > 0.25 and random.random() < abs(act) * dt * 4:
+                    if abs(act) > 0.3 and random.random() < abs(act) * dt * 3:
                         self._ripples.append(
-                            (0.0, 0.7, node_pos, activation_color(act))
+                            (0.0, 0.6, node_pos, activation_color(act))
                         )
 
     def draw(self, screen, selected_fish, time):
@@ -192,6 +216,7 @@ class BrainVisualizer:
             (selected_fish.is_cleaner, selected_fish.is_predator), AMBER_DIM
         )
 
+        # Side glow
         for gx in range(4):
             a = int(80 * (1 - gx / 4) * (0.8 + 0.2 * math.sin(self.anim_t * 2.5)))
             pygame.draw.line(surf, (*accent, a), (gx, 0), (gx, self.panel_h))
@@ -205,9 +230,9 @@ class BrainVisualizer:
         y = self._draw_divider(surf, y)
         y = self._draw_outputs(surf, selected_fish, accent, y)
         y = self._draw_divider(surf, y)
-        y = self._draw_traits(surf, selected_fish, accent, y)
+        y = self._draw_temporal_context(surf, selected_fish, accent, y)
         y = self._draw_divider(surf, y)
-        self._draw_stats(surf, selected_fish, accent, y)
+        self._draw_traits(surf, selected_fish, accent, y)
 
         dest_x = self.screen_w - self.PANEL_W + int(self.slide_x)
         screen.blit(surf, (dest_x, 0))
@@ -263,25 +288,26 @@ class BrainVisualizer:
 
     def _draw_network(self, surf, fish, accent, accent_dim, y):
         PAD = 16
-        surf.blit(self.f_small.render("NEURAL NETWORK", True, TEXT_LABEL), (PAD, y))
+        surf.blit(self.f_small.render("NEURAL NETWORK (Improved)", True, TEXT_LABEL), (PAD, y))
         y += 20
-        NET_H = 240
+        NET_H = 200
         net_top = y
         W = self.PANEL_W
         xs = {
-            "in": int(W * 0.13),
-            "h1": int(W * 0.38),
-            "h2": int(W * 0.64),
+            "in": int(W * 0.12),
+            "h1": int(W * 0.35),
+            "h2": int(W * 0.60),
             "out": int(W * 0.88),
         }
 
         def col_nodes(x, n):
             return [(x, net_top + int((i + 0.5) * NET_H / n)) for i in range(n)]
 
-        pos_in = col_nodes(xs["in"], 18)  # 18 inputs
-        pos_h1 = col_nodes(xs["h1"], 12)
-        pos_h2 = col_nodes(xs["h2"], 6)
-        pos_out = col_nodes(xs["out"], 4)
+        # Build node positions for current architecture
+        pos_in = col_nodes(xs["in"], NN_INPUT_COUNT)
+        pos_h1 = col_nodes(xs["h1"], NN_HIDDEN1_SIZE)
+        pos_h2 = col_nodes(xs["h2"], NN_HIDDEN2_SIZE)
+        pos_out = col_nodes(xs["out"], NN_OUTPUT_COUNT)
 
         if not self._node_positions_built:
             self._pos_in, self._pos_h1, self._pos_h2, self._pos_out = (
@@ -292,26 +318,34 @@ class BrainVisualizer:
             )
             self._node_positions_built = True
 
-        inp, h1, h2 = (
-            list(fish.last_inputs),
-            list(fish.last_hidden1),
-            list(fish.last_hidden),
-        )
-        out = list(fish.last_outputs[:4])
+        inp = list(fish.last_inputs) if hasattr(fish, 'last_inputs') else []
+        h1 = list(fish.last_hidden1) if hasattr(fish, 'last_hidden1') else []
+        h2 = list(fish.last_hidden) if hasattr(fish, 'last_hidden') else []
+        out = list(fish.last_outputs) if hasattr(fish, 'last_outputs') else []
 
+        # Draw connections
         def draw_connections(src_pos, dst_pos, src_acts):
             for i, sp in enumerate(src_pos):
                 act = src_acts[i] if i < len(src_acts) else 0.0
                 for dp in dst_pos:
-                    pts = _bezier_points(sp, dp, steps=14)
+                    pts = _bezier_points(sp, dp, steps=12)
                     pygame.draw.lines(surf, _COL_DIM_WIRE, False, pts, 1)
-                    if abs(act) > 0.2:
+                    if abs(act) > 0.25:
                         pygame.draw.lines(surf, activation_color(act), False, pts, 1)
 
         draw_connections(pos_in, pos_h1, inp)
         draw_connections(pos_h1, pos_h2, h1)
         draw_connections(pos_h2, pos_out, h2)
 
+        # Draw recurrent loop indicator on h2
+        if fish.brain.recurrent if hasattr(fish, 'brain') else False:
+            pulse_alpha = int(100 + 50 * math.sin(self._recurrent_pulse))
+            rec_color = (*PURPLE, pulse_alpha)
+            for pos in pos_h2:
+                # Small loop arc
+                pygame.draw.circle(surf, PURPLE_DIM, (int(pos[0]) - 8, int(pos[1])), 5, 1)
+
+        # Draw nodes
         def draw_node(pos, act, r=5, label=None):
             col = activation_color(act)
             pygame.draw.circle(surf, col, pos, r)
@@ -319,16 +353,25 @@ class BrainVisualizer:
                 tl = self.f_tiny.render(label, True, TEXT_LABEL)
                 surf.blit(tl, (pos[0] + r + 3, pos[1] - 6))
 
+        # Input nodes (smaller, more of them)
         for i, pos in enumerate(pos_in):
-            draw_node(pos, inp[i], r=4)
-        for i, pos in enumerate(pos_h1):
-            draw_node(pos, h1[i], r=5)
-        for i, pos in enumerate(pos_h2):
-            draw_node(pos, h2[i], r=6)
+            draw_node(pos, inp[i] if i < len(inp) else 0.0, r=3)
 
-        OUT_LABELS = ["Str", "Thr", "Hid", "Spr"]
+        # Hidden 1 nodes
+        for i, pos in enumerate(pos_h1):
+            draw_node(pos, h1[i] if i < len(h1) else 0.0, r=4)
+
+        # Hidden 2 nodes (with recurrent indicator)
+        for i, pos in enumerate(pos_h2):
+            draw_node(pos, h2[i] if i < len(h2) else 0.0, r=5)
+            # Recurrent pulse
+            if fish.brain.recurrent if hasattr(fish, 'brain') else False:
+                pulse = int(4 + 2 * math.sin(self._recurrent_pulse + i))
+                pygame.draw.circle(surf, (*PURPLE, 100), pos, pulse + 3, 1)
+
+        # Output nodes
         for i, pos in enumerate(pos_out):
-            draw_node(pos, out[i] if i < len(out) else 0.0, r=7, label=OUT_LABELS[i])
+            draw_node(pos, out[i] if i < len(out) else 0.0, r=6, label=OUTPUT_LABELS[i] if i < len(OUTPUT_LABELS) else None)
 
         y += NET_H + 8
         return y
@@ -337,14 +380,14 @@ class BrainVisualizer:
         PAD = 16
         surf.blit(self.f_small.render("BEHAVIOR DRIVES", True, TEXT_LABEL), (PAD, y))
         y += 18
-        out = fish.last_outputs
+        out = fish.last_outputs if hasattr(fish, 'last_outputs') else [0.5] * NN_OUTPUT_COUNT
         gx, gw, gh = PAD + 52, self.PANEL_W - PAD * 2 - 80, 10
 
         drives = [
             ("STEER", out[0], True),
-            ("THRUST", (out[1] + 1) / 2, False),
-            ("HIDE", out[2], False),
-            ("SPRINT", out[3], False),
+            ("THRUST", (out[1] + 1) / 2 if len(out) > 1 else 0.5, False),
+            ("HIDE/AMBUSH", out[2] if len(out) > 2 else 0.5, False),
+            ("SPRINT/DASH", out[3] if len(out) > 3 else 0.5, False),
         ]
 
         for label, val, dual in drives:
@@ -358,9 +401,40 @@ class BrainVisualizer:
                 )
             else:
                 pygame.draw.rect(
-                    surf, accent, (gx, y, int(gw * val), gh), border_radius=5
+                    surf, accent, (gx, y, int(gw * max(0, min(1, val))), gh), border_radius=5
                 )
             y += 16
+        return y + 4
+
+    def _draw_temporal_context(self, surf, fish, accent, y):
+        """Display the new temporal context inputs."""
+        PAD = 16
+        surf.blit(self.f_small.render("TEMPORAL CONTEXT (NEW)", True, PURPLE), (PAD, y))
+        y += 18
+        gx, gw, gh = PAD + 52, self.PANEL_W - PAD * 2 - 80, 8
+
+        inp = fish.last_inputs if hasattr(fish, 'last_inputs') else []
+        
+        # Temporal inputs are at indices 18-25
+        temporal_labels = [
+            ("TIME", 18),
+            ("SEASON", 19),
+            ("WAS_REST", 20),
+            ("WAS_HUNT", 21),
+            ("WAS_FLEE", 22),
+            ("WAS_MATE", 23),
+            ("WAS_NEST", 24),
+            ("HUNGER", 25),
+        ]
+        
+        for label, idx in temporal_labels:
+            val = inp[idx] if idx < len(inp) else 0.0
+            surf.blit(self.f_tiny.render(label, True, TEXT_SECONDARY), (PAD, y + 1))
+            pygame.draw.rect(surf, BG_SECTION, (gx, y, gw, gh), border_radius=4)
+            pygame.draw.rect(
+                surf, PURPLE_DIM, (gx, y, int(gw * max(0, min(1, val))), gh), border_radius=4
+            )
+            y += 12
         return y + 4
 
     def _draw_traits(self, surf, fish, accent, y):
@@ -369,13 +443,12 @@ class BrainVisualizer:
         y += 18
         LW, TW, TH = 70, self.PANEL_W - PAD * 2 - 100, 8
 
-        # Fixed, explicit order and display labels for physical trait multipliers
         trait_rows = [
             ("max_speed_mult", "Speed"),
-            ("accel_mult", "Accel"),
-            ("turn_rate_mult", "Turn"),
-            ("vision_range_mult", "Vision"),
             ("stamina_mult", "Stamina"),
+            ("turn_rate_mult", "Turn"),
+            ("metabolism_mult", "Metab"),
+            ("size_mult", "Size"),
         ]
 
         for trait_key, display_label in trait_rows:
@@ -396,6 +469,3 @@ class BrainVisualizer:
             )
             y += 14
         return y + 4
-
-    def _draw_stats(self, surf, fish, accent, y):
-        return y
