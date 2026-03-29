@@ -5,7 +5,8 @@ from fish_traits import FishTraits
 from family import Family
 from brain_visualizer import BrainVisualizer
 from neural_net import NeuralNet
-
+from cleaner_fish import CleanerFish
+from predator_fish import PredatorFish
 
 class FishSystem:
     def __init__(self, particle_system, plant_manager, world):
@@ -17,9 +18,6 @@ class FishSystem:
         self.world.fish_system = self
 
         self.fish = [NeuralFish(world) for _ in range(FISH_MAX_POPULATION // 2)]
-        from cleaner_fish import CleanerFish
-        from predator_fish import PredatorFish
-
         self.cleaner_fish = [
             CleanerFish(world) for _ in range(CLEANER_FISH_MAX_POPULATION // 2)
         ]
@@ -47,27 +45,6 @@ class FishSystem:
     def update(self, dt, time_system=None):
         all_fish = self.fish + self.cleaner_fish + self.predators
 
-        # 1. Predator Reproduction Cycle
-        for predator in self.predators:
-            if (
-                hasattr(predator, "try_reproduce")
-                and predator.try_reproduce()
-                and len(self.predators) < PREDATOR_MAX_POPULATION
-            ):
-                mate = predator.mate
-                blended_brain = NeuralNet.blend(predator.brain, mate.brain)
-                egg = FishEgg(
-                    predator.physics.pos.x,
-                    predator.physics.pos.y,
-                    predator.traits.mutate(),
-                    parent1=predator,
-                    parent2=mate,
-                    is_predator=True,
-                    brain=blended_brain.mutate(),
-                )
-                self.eggs.append(egg)
-                predator.mate = None
-
         # 2. Update eggs — hatch and spawn at egg location
         for egg in self.eggs[:]:
             if egg.update(dt, self.world):
@@ -80,21 +57,36 @@ class FishSystem:
             if not family.active:
                 self.families.remove(family)
 
-        # 4. Sediment/Fertilizer
+        # 4. Sediment/Fertilizer — update poop (some may be eaten by cleaners
+        #    before they land, which is fine — cleaner_fish handles removal)
         for p in self.poops[:]:
             if not p.update(dt, self.world):
                 self.poops.remove(p)
 
         # 5. Core Simulation Loop
+        # Build the plankton list once for reuse
         plankton = [p for p in self.particle_system.particles if p.is_plankton]
 
         pred_activity = time_system.predator_activity_modifier if time_system else 1.0
 
+        # ── Simulation groups ─────────────────────────────────────────────
+        # Common fish: eat plankton
         sim_groups = [
             (self.fish, plankton, True),
-            (self.cleaner_fish, self.poops, True),
-            (self.predators, self.fish + self.cleaner_fish, False),
         ]
+
+        # Cleaner fish: eat BOTH poop AND plankton (opportunistic omnivores)
+        # The poop list reference is shared — when cleaners eat poop via the
+        # base class collision loop, the poop is removed from self.poops.
+        # We snapshot plankton separately so cleaners don't consume the same
+        # plankton instances that common fish might eat this frame.
+        cleaner_targets = list(self.poops) + list(plankton)
+        sim_groups.append((self.cleaner_fish, cleaner_targets, True))
+
+        # Predators: hunt common fish + cleaner fish (with immunity check)
+        sim_groups.append(
+            (self.predators, self.fish + self.cleaner_fish, True)
+        )
 
         for f_list, targets, can_mate in sim_groups:
             for f in f_list[:]:
@@ -135,10 +127,14 @@ class FishSystem:
                 if can_mate and f.state == FishState.MATING:
                     self.try_mate(f, f_list)
 
+        # 6. Population floors — ensure minimum viable populations
         if len(self.fish) < 6:
             self.fish.append(NeuralFish(self.world))
 
-        # 6. Update eat effects with real dt
+        if len(self.cleaner_fish) < 3:
+            self.cleaner_fish.append(CleanerFish(self.world))
+
+        # 7. Update eat effects with real dt
         self.particle_system.eat_effects = [
             e for e in self.particle_system.eat_effects if e.update(dt)
         ]
@@ -146,6 +142,14 @@ class FishSystem:
     def try_mate(self, f, f_list):
         if f.is_pregnant:
             return
+
+        # Predator reproduction requires healthy prey population
+        if f.is_predator:
+            prey_count = len(self.fish)
+            pred_count = len(self.predators)
+            if prey_count / max(1, pred_count) < PREDATOR_PREY_RATIO_MIN:
+                return
+
         for partner in f_list:
             if (
                 partner != f
@@ -176,8 +180,6 @@ class FishSystem:
         spawn_y = max(WATER_LINE_Y + 30, min(WORLD_HEIGHT - 100, egg.y))
 
         if egg.is_cleaner:
-            from cleaner_fish import CleanerFish
-
             child = CleanerFish(
                 self.world,
                 traits=egg.traits,
@@ -187,8 +189,6 @@ class FishSystem:
             )
             self.cleaner_fish.append(child)
         elif egg.is_predator:
-            from predator_fish import PredatorFish
-
             child = PredatorFish(
                 self.world,
                 traits=egg.traits,

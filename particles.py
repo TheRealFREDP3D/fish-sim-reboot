@@ -272,6 +272,7 @@ class ParticleSystem:
         )
         self.eat_effects: list[EatEffect] = []
         self.mating_effects: list[MatingBurstEffect] = []
+        self.cleaning_effects: list = []
         # Hearts are imported lazily to avoid circular imports
         self._heart_particles: list = []
 
@@ -305,6 +306,12 @@ class ParticleSystem:
         if color is None:
             color = (120, 230, 160)
         self.eat_effects.append(EatEffect(x, y, color))
+
+    def spawn_cleaning_effect(self, x, y):
+        """Spawn a teal sparkle at the point where a cleaner fish cleans a client."""
+        from environment_objects import CleaningEffect
+
+        self.cleaning_effects.append(CleaningEffect(x, y))
 
     def spawn_mating_burst(self, x, y):
         """Call when two fish successfully mate / lay eggs."""
@@ -342,6 +349,7 @@ class ParticleSystem:
         # In-place filtering for better performance
         self.eat_effects = [e for e in self.eat_effects if e.update(dt)]
         self.mating_effects = [e for e in self.mating_effects if e.update(dt)]
+        self.cleaning_effects = [e for e in self.cleaning_effects if e.update(dt)]
         self._heart_particles = [h for h in self._heart_particles if h.update(dt)]
 
     def draw(self, screen, camera, time_system=None):
@@ -421,6 +429,8 @@ class ParticleSystem:
         for effect in self.eat_effects:
             effect.draw(screen, camera)
         for effect in self.mating_effects:
+            effect.draw(screen, camera)
+        for effect in self.cleaning_effects:
             effect.draw(screen, camera)
         for heart in self._heart_particles:
             heart.draw(screen, camera)

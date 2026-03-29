@@ -185,6 +185,34 @@ PREDATOR_DASH_COOLDOWN, PREDATOR_DASH_STAMINA_THRESHOLD = 3.5, 20.0
 PREDATOR_DASH_STAMINA_DRAIN, PREDATOR_DASH_FORCE_MULT = 30.0, 3.5
 PREDATOR_SIZE_ADVANTAGE_MULTIPLIER = 1.2
 PREY_PREDATOR_MIN_DISTANCE = 400
+PREDATOR_PREY_RATIO_MIN = 5.0  # Minimum prey per predator for reproduction
+
+# ── Predator hunt mechanics ──────────────────────────────────────────────
+PREDATOR_DAMAGE_PER_BITE = 28.0
+PREDATOR_BACKSTAB_MULTIPLIER = 1.5
+PREDATOR_BITE_COOLDOWN = 3.0
+PREDATOR_CANNIBAL_SIZE_RATIO = 2.0
+
+# ── Predator ecosystem balance ───────────────────────────────────────────
+PREDATOR_SCAVENGE_THRESHOLD = 15.0
+PREDATOR_SCAVENGE_ENERGY_GAIN = 5.0
+
+# ── Cleaner Fish – Mutualism & Scavenging ────────────────────────────────
+CLEANER_CLEANING_RANGE = 60.0             # Distance to initiate cleaning on a client fish
+CLEANER_CLEANING_DURATION = 1.8           # Seconds a cleaning event lasts
+CLEANER_CLEANING_COOLDOWN = 4.0           # Seconds between cleaning attempts
+CLEANER_CLEANING_ENERGY_GAIN = 10.0       # Energy the cleaner gains per cleaning event
+CLIENT_STAMINA_GAIN = 12.0               # Stamina the client fish gains from being cleaned
+CLIENT_ENERGY_GAIN = 3.0                  # Small energy boost for the client fish
+CLEANER_IMMUNITY_CHANCE = 0.90            # 90% chance predators ignore cleaner fish
+CLEANER_STATION_PLANT_TYPES = ("fan_coral", "anemone", "tube_sponge")
+CLEANER_STATION_RADIUS = 100.0            # Affinity radius around cleaning stations
+CLEANER_STATION_SEEK_WEIGHT = 0.35        # How strongly cleaners are drawn to stations
+CLEANER_PLANKTON_EAT_CHANCE = 0.6         # Probability to seek plankton alongside poop
+CLEANER_POOP_SEEK_WEIGHT = 0.7            # Seek weight for poop (no hunger gate)
+CLEANER_CLIENT_SEEK_WEIGHT = 0.8          # Seek weight toward nearby client fish
+CLEANER_CLEANING_FLASH_DURATION = 0.5     # Duration of the sparkle effect per tick
+CLEANER_NEED_CLEANING_DECAY = 0.05        # How fast the "needs_cleaning" score decays per second
 
 # Fish Logic
 FISH_MAX_ENERGY, FISH_HUNGER_THRESHOLD = 50.0, 30.0
@@ -220,10 +248,9 @@ SEEDLING_DEATH_TIME, DORMANT_ENERGY_MINIMUM, DORMANT_DEATH_TIME = 25.0, 0.05, 30
 SPRING_GERMINATION_BASE_CHANCE, SUMMER_GERMINATION_BASE_CHANCE = 0.015, 0.006
 SEED_ENERGY_THRESHOLD, FLOWERING_BASE_CHANCE = 0.4, 0.025
 
-# INCREASED seed production rates for sustainable reproduction
-AUTUMN_SEED_BASE_PROBABILITY = 0.028  # Increased from 0.008
-SUMMER_SEED_BASE_PROBABILITY = 0.014  # Increased from 0.003
-SEED_ENERGY_COST = 0.5  # Decreased from 1.2 - cheaper to produce seeds
+AUTUMN_SEED_BASE_PROBABILITY = 0.028
+SUMMER_SEED_BASE_PROBABILITY = 0.014
+SEED_ENERGY_COST = 0.5
 
 # Soft state-machine biases
 STATE_BIAS_FLEE_THREAT = 3.5
@@ -253,30 +280,23 @@ SEASONAL_PARTICLE_CHANCE = {2: 0.004, 3: 0.003}
 LEAF_COLORS = [(180, 80, 20), (210, 130, 30), (160, 60, 10), (200, 160, 40)]
 SNOW_COLOR = (220, 235, 255)
 
-# IMPROVED winter survival chances - plants are more resilient
 WINTER_SURVIVAL_CHANCE = {
-    "kelp": 0.55,        # Increased from 0.30
-    "seagrass": 0.70,    # Increased from 0.55
-    "algae": 0.35,       # Increased from 0.15
-    "red_seaweed": 0.45, # Increased from 0.25
-    "lily_pad": 0.90,    # Increased from 0.80
-    "tube_sponge": 0.75, # Increased from 0.60
-    "fan_coral": 0.60,   # Increased from 0.40
-    "anemone": 0.85,     # Increased from 0.70
+    "kelp": 0.55,
+    "seagrass": 0.70,
+    "algae": 0.35,
+    "red_seaweed": 0.45,
+    "lily_pad": 0.90,
+    "tube_sponge": 0.75,
+    "fan_coral": 0.60,
+    "anemone": 0.85,
 }
 SPRING_GERMINATION_BOOST, WINTER_PHOTOSYNTHESIS_BASE = 4.0, 0.08
 FLOWERING_SEASON_PREFERENCE = {0: 0.3, 1: 1.4, 2: 1.0, 3: 0.0}
 
-# Seasonal plant development modifiers
-_SEASON_AGE_RATE = {0: 1.2, 1: 1.5, 2: 1.0, 3: 0.3}  # Spring, Summer, Autumn, Winter
-_SEASON_PHOTO_MOD = {
-    0: 0.8,
-    1: 1.2,
-    2: 0.9,
-    3: 0.2,
-}  # Photosynthesis modifiers by season
-_SEASON_CAN_SEED = {0: False, 1: True, 2: True, 3: False}  # Which seasons allow seeding
-_SEASON_SEED_COOLDOWN = {0: 30.0, 1: 15.0, 2: 12.0, 3: 40.0}  # Shorter cooldowns for more seeds
+_SEASON_AGE_RATE = {0: 1.2, 1: 1.5, 2: 1.0, 3: 0.3}
+_SEASON_PHOTO_MOD = {0: 0.8, 1: 1.2, 2: 0.9, 3: 0.2}
+_SEASON_CAN_SEED = {0: False, 1: True, 2: True, 3: False}
+_SEASON_SEED_COOLDOWN = {0: 30.0, 1: 15.0, 2: 12.0, 3: 40.0}
 
 # Fish-Plant Interaction Mechanics
 PLANT_COVER_RADIUS = 85.0
@@ -293,5 +313,4 @@ PLANT_COVER_STRENGTH = {
 PLANT_GRAZE_RANGE, PLANT_GRAZE_ENERGY_GAIN, PLANT_GRAZE_DAMAGE = 38.0, 7.5, 1.35
 GRAZING_COOLDOWN, GRAZING_VISUAL_DURATION = 3.8, 2.5
 
-# Winter maintenance multiplier - reduced stress
-WINTER_MAINTENANCE_MULT = 1.15  # Reduced from hardcoded 1.4
+WINTER_MAINTENANCE_MULT = 1.15

@@ -37,6 +37,71 @@ class PoopParticle:
         pygame.draw.polygon(screen, self.color, pts)
 
 
+class CleaningEffect:
+    """Short-lived sparkle burst at the point where a cleaner fish cleans a client."""
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.age = 0.0
+        self.duration = CLEANER_CLEANING_FLASH_DURATION
+        self.sparks = [
+            {
+                "angle": random.uniform(0, math.pi * 2),
+                "speed": random.uniform(15, 45),
+                "size": random.uniform(1.5, 3.0),
+                "color": random.choice(
+                    [
+                        (100, 255, 220),
+                        (150, 255, 240),
+                        (80, 230, 200),
+                        (200, 255, 255),
+                        (120, 240, 230),
+                    ]
+                ),
+            }
+            for _ in range(8)
+        ]
+
+    def update(self, dt):
+        self.age += dt
+        return self.age < self.duration
+
+    def draw(self, screen, camera):
+        if not camera.is_visible((self.x, self.y), 50):
+            return
+        t = self.age / self.duration
+        alpha = int(255 * (1.0 - t) ** 1.5)
+        screen_pos = camera.apply((self.x, self.y))
+        sx, sy = int(screen_pos[0]), int(screen_pos[1])
+
+        # Small expanding glow ring
+        ring_r = int(5 + t * 14)
+        ring_surf = pygame.Surface((ring_r * 2 + 4, ring_r * 2 + 4), pygame.SRCALPHA)
+        pygame.draw.circle(
+            ring_surf,
+            (100, 255, 220, max(0, alpha // 3)),
+            (ring_r + 2, ring_r + 2),
+            ring_r,
+            2,
+        )
+        screen.blit(ring_surf, (sx - ring_r - 2, sy - ring_r - 2))
+
+        for spark in self.sparks:
+            dist = spark["speed"] * t
+            px = sx + math.cos(spark["angle"]) * dist
+            py = sy + math.sin(spark["angle"]) * dist
+            spark_alpha = max(0, int(alpha * 0.9))
+            r = int(spark["size"] * (1.0 - t * 0.4))
+            if r < 1:
+                continue
+            spark_surf = pygame.Surface((r * 2 + 2, r * 2 + 2), pygame.SRCALPHA)
+            pygame.draw.circle(
+                spark_surf, (*spark["color"], spark_alpha), (r + 1, r + 1), r
+            )
+            screen.blit(spark_surf, (int(px) - r, int(py) - r))
+
+
 class HeartParticle:
     """Floating heart for mating display."""
 
