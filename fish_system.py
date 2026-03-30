@@ -17,6 +17,7 @@ from config import (
     SCREEN_HEIGHT,
     SOIL_MAX_NUTRIENT,
     FISH_REPRODUCTION_COST,
+    FISH_MATING_THRESHOLD,
     PREDATOR_PREY_RATIO_MIN,
 )
 from fish_base import NeuralFish, FishState
@@ -210,7 +211,7 @@ class FishSystem:
                 if can_mate and f.state == FishState.MATING:
                     self.try_mate(f, f_list)
 
-        # 6. Population floors — ensure minimum viable populations
+        # 7. Population floors — ensure minimum viable populations
         if len(self.fish) < FISH_POPULATION_FLOOR:
             self.fish.append(NeuralFish(self.world))
 
@@ -220,13 +221,33 @@ class FishSystem:
         if len(self.predators) < PREDATOR_POPULATION_FLOOR:
             self.predators.append(PredatorFish(self.world))
 
+        # 8. Ecosystem balancing - predator population control
+        prey_count = len(self.fish)
+        pred_count = len(self.predators)
+
+        # If predator population is too high relative to prey, reduce predator reproduction
+        if pred_count > 0 and prey_count / pred_count < PREDATOR_PREY_RATIO_MIN:
+            # Make it harder for predators to reproduce by increasing their energy requirements
+            for predator in self.predators:
+                if hasattr(predator, 'try_reproduce'):
+                    # Temporarily increase mating threshold during prey scarcity
+                    original_threshold = FISH_MATING_THRESHOLD
+                    predator.mating_threshold_boost = original_threshold * 1.5
+
+        # If prey population is getting too low, spawn new prey to maintain balance
+        if prey_count < FISH_POPULATION_FLOOR * 2 and pred_count > 0:
+            # Emergency prey spawning to prevent ecosystem collapse
+            emergency_prey = NeuralFish(self.world)
+            emergency_prey.energy = FISH_MAX_ENERGY * 0.9  # Start with good energy
+            self.fish.append(emergency_prey)
+
         # 7. Update eat effects with real dt
         self.particle_system.eat_effects = [
             e for e in self.particle_system.eat_effects if e.update(dt)
         ]
 
     def try_mate(self, f, f_list):
-        if f.is_pregnant:
+        if f.is_pregnant or f.mating_cooldown > 0:
             return
 
         # ── Carrying capacity pressure on common fish ────────────────────
@@ -252,10 +273,10 @@ class FishSystem:
                 and partner.state == FishState.MATING
                 and partner.sex != f.sex
             ):
-                if f.physics.pos.distance_to(partner.physics.pos) < 45:
+                if f.physics.pos.distance_to(partner.physics.pos) < 70:
                     f.energy -= FISH_REPRODUCTION_COST
                     partner.energy -= FISH_REPRODUCTION_COST
-                    f.mating_cooldown, partner.mating_cooldown = 40.0, 40.0
+                    f.mating_cooldown, partner.mating_cooldown = 120.0, 120.0
                     child_traits = FishTraits.blend(f.traits, partner.traits)
                     blended_brain = NeuralNet.blend(f.brain, partner.brain)
                     child_brain = blended_brain.mutate()

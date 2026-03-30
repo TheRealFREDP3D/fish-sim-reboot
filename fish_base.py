@@ -5,6 +5,7 @@ Key improvements:
 - Reduced state override biases (allows NN to learn)
 - Temporal context inputs (time, season, previous state, hunger memory)
 - Consolidated movement control
+- Predator hunting bias for more aggressive behavior
 """
 
 import pygame
@@ -391,7 +392,7 @@ class NeuralFish:
         return radar + stats
 
     # ═════════════════════════════════════════════════════════════════════════
-    # IMPROVED: Reduced State Biases (allows NN to learn)
+    # IMPROVED: State biases with strong predator hunting drive
     # ═════════════════════════════════════════════════════════════════════════
 
     def _pick_state(
@@ -402,10 +403,10 @@ class NeuralFish:
         mating_drive,
         activity_mod=1.0,
     ):
-        """Apply REDUCED physiological biases to NN state probabilities.
+        """Apply physiological biases to NN state probabilities.
         
-        Key improvement: Biases are now gentle nudges instead of hard overrides,
-        allowing the neural network to learn optimal behaviors.
+        Key improvement: Biases are gentle nudges for common fish,
+        but STRONG hunting drive for predators.
         """
         if self.is_pregnant:
             return FishState.NESTING
@@ -413,29 +414,37 @@ class NeuralFish:
         # Convert probabilities back to log-space for bias addition
         logits = [math.log(max(p, 1e-9)) for p in raw_state_probs]
 
-        # ── REDUCED biases — let the NN learn! ───────────────────────────
-        # Threat → nudge FLEE (reduced from 3.5 to 0.6)
+        # ── Predator: strong baseline hunting drive ──────────────────────
+        # Predators are apex hunters — always strongly biased toward HUNTING
+        if self.is_predator:
+            logits[1] += 1.0  # Strong constant hunting drive
+            logits[0] -= 0.4  # Suppress resting
+            logits[2] -= 0.3  # Reduce fleeing tendency
+
+        # ── General biases (gentle nudges) ───────────────────────────────
+        # Threat → nudge FLEE
         logits[2] += threat_level * STATE_BIAS_FLEE_THREAT
 
-        # Hunger → nudge HUNT (reduced from 2.5 to 0.4)
+        # Hunger → nudge HUNT
         hunger_signal = max(0.0, 1.0 - self.energy / FISH_MAX_ENERGY)
         logits[1] += hunger_signal * STATE_BIAS_HUNT_HUNGER
 
-        # Mating readiness → nudge MATE (reduced from 2.0 to 0.3)
+        # Mating readiness → nudge MATE
         if (
             self.is_mature
-            and self.energy > FISH_MATING_THRESHOLD / max(0.1, mating_drive)
+            and not self.is_pregnant
+            and self.energy > FISH_MATING_THRESHOLD * mating_drive
             and self.mating_cooldown <= 0
         ):
             logits[3] += STATE_BIAS_MATE_DRIVE * mating_drive
 
-        # Night → nudge REST (reduced from 1.5 to 0.3)
+        # Night → nudge REST
         logits[0] += (1.0 - night_rest_factor) * STATE_BIAS_REST_NIGHT
 
-        # ── Predator seasonal suppression ───────────────────────────────
+        # ── Predator seasonal suppression (mild) ─────────────────────────
         if self.is_predator and activity_mod < 0.8:
-            logits[1] -= (1.0 - activity_mod) * 2.0  # Suppress HUNTING
-            logits[0] += (1.0 - activity_mod) * 1.5  # Encourage RESTING
+            logits[1] -= (1.0 - activity_mod) * 1.0  # Mild HUNTING suppression
+            logits[0] += (1.0 - activity_mod) * 0.8  # Mild REST encouragement
 
         # ── Predator population control ──────────────────────────────────
         if self.is_predator and hasattr(self.world, "fish_system"):
@@ -447,10 +456,10 @@ class NeuralFish:
             if pred_count >= PREDATOR_MAX_POPULATION:
                 logits[3] = -1e9  # Hard block at population cap
 
-        # ── SOFT blocks for immature fish (instead of hard -1e9) ──────────
+        # ── SOFT blocks for immature fish ────────────────────────────────
         if not self.is_mature:
-            logits[1] -= STATE_BLOCK_IMMATURE  # Discourage HUNTING
-            logits[3] -= STATE_BLOCK_IMMATURE  # Discourage MATING
+            logits[1] -= STATE_BLOCK_IMMATURE
+            logits[3] -= STATE_BLOCK_IMMATURE
 
         # Predators never enter MATING state through NN (handled elsewhere)
         if self.is_predator:
@@ -566,7 +575,7 @@ class NeuralFish:
         raw_state_probs = outputs[4:9]
         self.last_state_probs = raw_state_probs
 
-        # ── State selection (with REDUCED biases) ────────────────────────
+        # ── State selection (with predator hunting bias) ────────────────
         self.state = self._pick_state(
             raw_state_probs, threat_level, night_rest_factor, mating_drive, activity_mod
         )
