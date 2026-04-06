@@ -121,7 +121,6 @@ class CleanerFish(NeuralFish):
         self._is_actively_cleaning = False
         self._cleaning_target = None
 
-        # Client benefits
         client.stamina = min(100.0, client.stamina + CLIENT_STAMINA_GAIN)
         client.energy = min(FISH_MAX_ENERGY, client.energy + CLIENT_ENERGY_GAIN)
         client.needs_cleaning = max(0.0, client.needs_cleaning - 0.5)
@@ -133,22 +132,19 @@ class CleanerFish(NeuralFish):
         if hasattr(particle_system, "spawn_cleaning_effect"):
             particle_system.spawn_cleaning_effect(mid_x, mid_y)
 
-    def update(
-        self, dt, all_fish, targets, particle_system, plant_manager, time_system=None
-    ):
-        self._cleaning_cooldown = max(0.0, self._cleaning_cooldown - dt)
+    def on_food_consumed(self, food):
+        """Override to remove consumed poop from the fish system's poop list."""
+        if hasattr(self.world, "fish_system"):
+            poops = self.world.fish_system.poops
+            if food in poops:
+                poops.remove(food)
 
-        # Separate poop from plankton and track original poop instances
-        poops = [t for t in targets if hasattr(t, "nutrition") and not getattr(t, "is_plankton", False)]
-        original_poop_set = set(poops)  # Track which poop we started with
-
-        # ═══════════════════════════════════════════════════════════════════
-        # PILLAR 1 — Cleaning Mutualism (highest priority)
-        # ═══════════════════════════════════════════════════════════════════
+    def _update_cleaning(self, dt, all_fish, particle_system):
+        """Pillar 1: Cleaning mutualism behavior."""
         if self._is_actively_cleaning and self._cleaning_target:
             client = self._cleaning_target
             alive_fish = self.world.fish_system.fish if hasattr(self.world, "fish_system") else []
-            
+
             if client not in alive_fish:
                 self._is_actively_cleaning = False
                 self._cleaning_target = None
@@ -178,15 +174,10 @@ class CleanerFish(NeuralFish):
                 )
                 self.physics.apply_force(seek)
 
-        # ═══════════════════════════════════════════════════════════════════
-        # PILLAR 2 — Scavenging (use NN's clean_drive output)
-        # The NN output 2 (normally hide_drive) becomes clean_drive for cleaners
-        # ═══════════════════════════════════════════════════════════════════
+    def _update_scavenging(self, dt, poops):
+        """Pillar 2: Scavenging behavior using NN's clean_drive output."""
         if not self._is_actively_cleaning:
-            # Get clean_drive from NN output (output index 2)
-            # This is populated by the parent's forward pass
             clean_drive = self.last_outputs[2] if len(self.last_outputs) > 2 else 0.5
-            
             nearest_poop = self._find_nearest_poop(poops)
             if nearest_poop and clean_drive > 0.3:
                 seek = self.physics.seek(
@@ -196,9 +187,8 @@ class CleanerFish(NeuralFish):
                 )
                 self.physics.apply_force(seek)
 
-        # ═══════════════════════════════════════════════════════════════════
-        # PILLAR 3 — Cleaning Station Affinity
-        # ═══════════════════════════════════════════════════════════════════
+    def _update_station_affinity(self, plant_manager):
+        """Pillar 3: Cleaning station affinity behavior."""
         if not self._is_actively_cleaning and random.random() < 0.3:
             station = self._find_nearest_station(plant_manager)
             if station:
@@ -209,6 +199,19 @@ class CleanerFish(NeuralFish):
                 )
                 self.physics.apply_force(seek)
 
+    def update(
+        self, dt, all_fish, targets, particle_system, plant_manager, time_system=None
+    ):
+        self._cleaning_cooldown = max(0.0, self._cleaning_cooldown - dt)
+
+        # Separate poop from plankton
+        poops = [t for t in targets if hasattr(t, "nutrition") and not getattr(t, "is_plankton", False)]
+
+        # Behavioral pillars orchestrated through helper methods
+        self._update_cleaning(dt, all_fish, particle_system)
+        self._update_scavenging(dt, poops)
+        self._update_station_affinity(plant_manager)
+
         # Parent update (NN, state machine, physics, food collision)
         result = super().update(
             dt,
@@ -218,14 +221,5 @@ class CleanerFish(NeuralFish):
             plant_manager,
             time_system=time_system,
         )
-        
-        # Fix infinite energy exploit: Remove consumed poop from original poops list
-        # The base class removes items from the targets copy, not from self.poops
-        if hasattr(self.world, "fish_system") and original_poop_set:
-            # Check which poop from our original set is no longer in targets (was consumed)
-            consumed_poop = original_poop_set - set(targets)
-            for poop in consumed_poop:
-                if poop in self.world.fish_system.poops:
-                    self.world.fish_system.poops.remove(poop)
-        
+
         return result

@@ -395,7 +395,7 @@ class BrainVisualizer:
 
         drives = [
             ("STEER", out[0], True),
-            ("THRUST", (out[1] + 1) / 2 if len(out) > 1 else 0.5, False),
+            ("THRUST", max(0.0, min(1.0, out[1] if len(out) > 1 else 0.5)), False),
             ("HIDE/AMBUSH", out[2] if len(out) > 2 else 0.5, False),
             ("SPRINT/DASH", out[3] if len(out) > 3 else 0.5, False),
         ]

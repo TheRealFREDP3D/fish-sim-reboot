@@ -54,6 +54,9 @@ class FishSystem:
 
         self.brain_visualizer = BrainVisualizer(SCREEN_WIDTH, SCREEN_HEIGHT)
 
+        # Emergency prey spawn timer to prevent rapid population explosion
+        self._emergency_prey_spawn_timer = 0.0
+
     def handle_click(self, pos, camera):
         world_x = pos[0] + camera.x
         world_y = pos[1] + camera.y
@@ -184,26 +187,33 @@ class FishSystem:
                 if f.is_predator and hasattr(f, 'try_reproduce'):
                     if f.try_reproduce():
                         # Predator successfully reproduced, create egg
-                        egg_data = (
-                            "egg",
-                            f.physics.pos.x,
-                            f.physics.pos.y,
-                            f.traits,
-                            f.brain,
-                            f.is_cleaner,
-                            f.is_predator,
-                            f.mate.brain if f.mate else None,
-                        )
+                        if f.mate:
+                            child_traits = FishTraits.blend(f.traits, f.mate.traits)
+                            child_brain = NeuralNet.blend(f.brain, f.mate.brain).mutate()
+                        else:
+                            # Fallback if no mate available
+                            child_traits = f.traits.clone()
+                            child_brain = f.brain.clone().mutate()
+
+                        # Create egg with named arguments for clarity
+                        egg_x = f.physics.pos.x
+                        egg_y = f.physics.pos.y
+                        egg_parent1 = f
+                        egg_parent2 = f.mate
+                        egg_is_cleaner = False
+                        egg_is_predator = True
+                        egg_brain = child_brain
+
                         self.eggs.append(
                             FishEgg(
-                                egg_data[1],
-                                egg_data[2],
-                                egg_data[3],
-                                egg_data[4],
-                                egg_data[5],
-                                egg_data[6],
-                                egg_data[7],
-                                egg_data[8] if len(egg_data) > 8 else None,
+                                egg_x,
+                                egg_y,
+                                child_traits,
+                                egg_parent1,
+                                egg_parent2,
+                                is_cleaner=egg_is_cleaner,
+                                is_predator=egg_is_predator,
+                                brain=egg_brain,
                             )
                         )
                         f.mate = None  # Clear mate reference
@@ -233,13 +243,21 @@ class FishSystem:
                     # Temporarily increase mating threshold during prey scarcity
                     original_threshold = FISH_MATING_THRESHOLD
                     predator.mating_threshold_boost = original_threshold * 1.5
+        else:
+            # Clear the boost when prey/predator ratio is healthy
+            for predator in self.predators:
+                if hasattr(predator, 'mating_threshold_boost'):
+                    delattr(predator, 'mating_threshold_boost')
 
         # If prey population is getting too low, spawn new prey to maintain balance
+        # Use a timer to prevent spawning every frame
         if prey_count < FISH_POPULATION_FLOOR * 2 and pred_count > 0:
-            # Emergency prey spawning to prevent ecosystem collapse
-            emergency_prey = NeuralFish(self.world)
-            emergency_prey.energy = FISH_MAX_ENERGY * 0.9  # Start with good energy
-            self.fish.append(emergency_prey)
+            self._emergency_prey_spawn_timer += dt
+            if self._emergency_prey_spawn_timer >= 2.0:  # Spawn at most once every 2 seconds
+                emergency_prey = NeuralFish(self.world)
+                emergency_prey.energy = FISH_MAX_ENERGY * 0.9  # Start with good energy
+                self.fish.append(emergency_prey)
+                self._emergency_prey_spawn_timer = 0.0
 
         # 7. Update eat effects with real dt
         self.particle_system.eat_effects = [

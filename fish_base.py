@@ -215,6 +215,10 @@ class NeuralFish:
             NeuralFish._mating_font_cache = pygame.font.Font(None, 18)
         return NeuralFish._mating_font_cache
 
+    def on_food_consumed(self, food):
+        """Hook for subclasses to react when food is consumed."""
+        pass
+
     def get_current_size_mult(self):
         return get_life_stage_size_mult(self.age) * self.traits.physical_traits.get(
             "size_mult", 1.0
@@ -783,6 +787,9 @@ class NeuralFish:
                 energy_gain = 12.0 * getattr(t, "nutrition", 1.0)
                 self.energy = min(FISH_MAX_ENERGY, self.energy + energy_gain)
                 self.food_eaten += 1
+
+                # Call hook for subclasses to react to food consumption
+                self.on_food_consumed(t)
 
                 eat_color = (
                     (

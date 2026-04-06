@@ -40,6 +40,7 @@ from config import (
     FISH_MAX_ENERGY,
     FISH_MAX_AGE,
     FISH_MATING_THRESHOLD,
+    FISH_REPRODUCTION_COST,
     FishState,
     FISH_EXPLORATION_FORCE,
 )

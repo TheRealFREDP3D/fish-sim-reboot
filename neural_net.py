@@ -321,9 +321,9 @@ class NeuralNet:
                 for v in vector
             ]
 
-        # Use config defaults if not specified
-        base_rate = rate if rate is not None else 0.1
-        base_strength = strength if strength is not None else 0.2
+        # Use config defaults if not specified (treat 0 as None to avoid division by zero)
+        base_rate = rate if rate is not None and rate != 0.0 else 0.1
+        base_strength = strength if strength is not None and strength != 0.0 else 0.2
 
         # Layer 1: Higher mutation for sensory adaptation
         child.w1 = mutate_matrix(child.w1, NN_MUTATION_RATE_INPUT / base_rate, 
