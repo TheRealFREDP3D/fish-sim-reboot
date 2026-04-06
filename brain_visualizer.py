@@ -2,7 +2,7 @@
 Brain Visualizer — Updated for improved neural network architecture.
 
 Displays:
-- Input layer (26 neurons): sensors + temporal context
+- Input layer (27 neurons): sensors + temporal context
 - Hidden layer 1 (14 neurons): tanh activation
 - Hidden layer 2 (8 neurons): tanh + recurrent
 - Output layer (9 neurons): movement, behavior, states

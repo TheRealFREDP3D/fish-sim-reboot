@@ -1,4 +1,4 @@
-# Underwater Plant Ecosystem Simulation
+# Underwater Ecosystem Simulation
 
 > "Evolving neural fish in a living underwater ecosystem — built from scratch in pure Python + Pygame"
 
@@ -7,7 +7,7 @@
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![Activity](https://img.shields.io/github/commit-activity/m/TheRealFREDP3D/fish-sim-reboot)
 
-A sophisticated underwater ecosystem simulation featuring neural network-driven fish, dynamic plant growth, real-time brain visualization, and a full day/night + seasonal cycle system.
+An underwater ecosystem simulation featuring **improved neural network-driven fish** with temporal memory, dynamic plant growth, real-time brain visualization, and a full day/night + seasonal cycle system.
 
 ![Screenshot](doc/screenshot.png)
 
@@ -31,11 +31,15 @@ A sophisticated underwater ecosystem simulation featuring neural network-driven 
 
 ![Brain Visualizer](doc/Animation.gif)
 
-### **Neural Fish System**
+### **Neural Fish System - Improved Architecture**
 - **Multiple Fish Species**: Regular fish, cleaner fish (cyan-striped), and predators (red)
-- **Neural Network Brains**: Each fish has its own feed-forward neural network that controls all movement and behaviour
-- **Real-time Brain Visualization**: Click on any fish to see its neural activations, connection weights, and output gauges in real-time
-- **Evolutionary Inheritance**: Fish pass traits and mutated neural weights to offspring through natural selection
+- **Enhanced Neural Networks**: Each fish has a recurrent neural network with temporal memory for learning patterns
+  - **27 inputs**: Radar sensors + physiology + environment + temporal context (time, season, previous state, hunger memory)
+  - **14→8 hidden neurons** with tanh activation and recurrent connections
+  - **9 outputs**: Movement (steer, thrust), behavior drives (hide/clean/ambush, sprint/dash), and state probabilities
+- **Real-time Brain Visualization**: Click on any fish to see its neural activations, recurrent pulses, temporal context, and output gauges
+- **Temporal Memory**: Fish remember their previous state and hunger patterns, enabling learned behaviors
+- **Layer-specific Evolution**: Different mutation rates for input, hidden, output, and recurrent layers
 - **Life Stages**: Larva → Juvenile → Adult → Elder, each with distinct behaviours and display labels
 - **Seasonal Behaviour**: Mating drives surge in Spring, fish slow and conserve energy in Winter, predators peak in Summer
 
@@ -56,10 +60,12 @@ A sophisticated underwater ecosystem simulation featuring neural network-driven 
 - **Terrain Zones**: Procedurally generated beach slope, mid-water shelf, and deep-water floor
 
 ### **Ecological Interactions**
-- **Cleaner Fish**: Actively seek and consume waste particles, returning nutrients to the soil
-- **Predator-Prey Dynamics**: Predators dash at prey; prey detect threats via their neural radar and flee; predators hibernate slightly in Winter
+- **Cleaner Fish**: Mutualistic cleaning behavior - actively seek client fish, clean them for energy, and scavenge waste
+- **Predator-Prey Dynamics**: Aggressive predators with dash mechanics, ambush behavior, and seasonal activity patterns
+- **Blood Effects**: Visual feedback when predators bite prey, with damage-based hunting system
+- **Dead Fish Decomposition**: Fish corpses sink and decompose, returning nutrients to the soil
 - **Nutrient Cycling**: Waste decomposition enriches soil, feeding plants that shelter fish
-- **Population Balance**: Per-species population caps and energy-based reproduction prevent runaway growth
+- **Population Balance**: Per-species population caps with predator-prey ratio enforcement
 - **Family Units**: After hatching, parents temporarily stay near offspring until they mature
 
 ## 🎮 Controls
@@ -108,13 +114,13 @@ fish-sim-reboot/
 ├── world.py                 # World generation, terrain, sky, stars, season particles
 ├── camera.py                # Smooth camera system with world-space transforms
 │
-├── fish_system.py           # Fish population manager (spawning, mating, death)
-├── fish_base.py             # Base NeuralFish class — radar, neural forward pass, steering
-├── predator_fish.py         # Predator subclass with dash mechanics and seasonal activity
-├── cleaner_fish.py          # Cleaner subclass with poop-seeking and hiding behaviour
+├── fish_system.py           # Fish population manager (spawning, mating, death, balance)
+├── fish_base.py             # Base NeuralFish class — 27-input radar, temporal context, neural forward pass
+├── predator_fish.py         # Predator subclass with dash mechanics, ambush behavior, blood effects
+├── cleaner_fish.py          # Cleaner subclass with mutualistic cleaning and scavenging behavior
 ├── fish_physics.py          # Steering physics (seek, bounce bounds, Euler integration)
 ├── fish_traits.py           # Heritable genetic traits with blend/mutate helpers
-├── neural_net.py            # Feed-forward neural network (14 → 12 → 6 → 2)
+├── neural_net.py            # Recurrent neural network (27→14→8→9) with temporal memory
 │
 ├── plants.py                # Plant rendering and PlantManager (seeds, bubbles, updates)
 ├── plant_development.py     # Staged plant life cycle with photosynthesis rate support
@@ -131,32 +137,46 @@ fish-sim-reboot/
 
 ## 🧠 Neural Network Architecture
 
-Each fish runs a feed-forward neural network every frame to determine its movement:
+Each fish runs a recurrent neural network every frame with temporal memory:
 ```
-Inputs (14)  →  Hidden 1 (12)  →  Hidden 2 (6)  →  Outputs (2)
+Inputs (27)  →  Hidden 1 (14, tanh)  →  Hidden 2 (8, tanh + recurrent)  →  Outputs (9)
 ```
 
-### **Input Layer (14 neurons)**
+### **Input Layer (27 neurons)**
 
 | # | Input | Description |
 |---|---|---|
-| 0–2 | Food radar | Left / Centre / Right sector intensity |
-| 3–5 | Threat radar | Left / Centre / Right (hidden fish are invisible) |
-| 6–8 | Mate radar | Left / Centre / Right (same species, opposite sex) |
-| 9 | Energy | Normalised current energy |
-| 10 | Stamina | Normalised current stamina |
-| 11 | Depth | Normalised water depth position |
-| 12 | Speed | Normalised current velocity magnitude |
-| 13 | Safety | Proximity to nearest plant (hiding cover) |
+| 0–8 | **Radar Sensors** | Food/Threat/Mate detection in Left/Centre/Right sectors |
+| 9–12 | **Physiology** | Energy, Stamina, Depth, Speed (all normalized 0-1) |
+| 13–16 | **Environment** | Cover quality, Plant food availability, Plant distance, Ambush alert |
+| 17 | **Mate Distance** | Normalized distance to nearest viable mate |
+| 18–19 | **Temporal Context** | Time of day, Season (Spring=0.25, Summer=0.5, Autumn=0.75, Winter=1.0) |
+| 20–24 | **Previous State** | One-hot encoding of previous behavior state (5 values) |
+| 25 | **Hunger Memory** | Time since last meal (normalized) |
+| 26 | **Life Stage** | Age normalized by maximum lifespan |
 
-### **Output Layer (2 neurons)**
+### **Output Layer (9 neurons)**
 | # | Output | Range | Effect |
 |---|---|---|---|
 | 0 | Steer | –1 → +1 | Rotational heading offset |
-| 1 | Thrust | –1 → +1 | Forward force magnitude |
+| 1 | Thrust | 0 → 1 | Forward force magnitude |
+| 2 | Behavior Drive 1 | 0 → 1 | Hide (prey) / Clean (cleaners) / Ambush (predators) |
+| 3 | Behavior Drive 2 | 0 → 1 | Sprint (prey) / Dash (predators) |
+| 4–8 | State Probabilities | 0-1 (softmax) | RESTING, HUNTING, FLEEING, MATING, NESTING |
 
-### **Evolution**
-Fish do not train via gradient descent. Instead, when two fish mate, the offspring inherits a blend of both parents' weights with random Gaussian mutations applied at configurable rate and strength (`MUTATION_RATE`, `MUTATION_STRENGTH` in `config.py`).
+### **Recurrent Memory**
+The second hidden layer maintains a persistent hidden state that:
+- Remembers previous neural activations
+- Enables learning of temporal patterns
+- Decays over time ( configurable decay factor )
+- Has very low mutation rate for stability
+
+### **Evolution - Layer-Specific**
+Fish evolve through weighted blending of parent networks with structured mutations:
+- **Input layer**: Higher mutation rate (0.15) for sensory adaptation
+- **Hidden layers**: Standard mutation (0.10) 
+- **Output layer**: Lower mutation (0.05) to preserve learned behaviors
+- **Recurrent weights**: Very low mutation (0.03) for memory stability
 
 ## 🌞 Day/Night & Season System
 
@@ -209,15 +229,18 @@ All tuneable parameters live in `config.py`. Key areas:
 | Fish behaviour | `FISH_HUNGER_THRESHOLD`, `FISH_MATING_THRESHOLD`, `FISH_MAX_ENERGY` |
 | Life stages | `FISH_LARVA_DURATION`, `FISH_JUVENILE_DURATION`, `FISH_ADULT_DURATION`, `FISH_ELDER_DURATION` |
 | Populations | `FISH_MAX_POPULATION`, `CLEANER_FISH_MAX_POPULATION`, `PREDATOR_MAX_POPULATION` |
-| Evolution | `MUTATION_RATE`, `MUTATION_STRENGTH` |
-| Predator | `PREDATOR_DASH_DURATION`, `PREDATOR_DASH_COOLDOWN` |
+| **Neural Network** | `NN_INPUT_COUNT`, `NN_HIDDEN1_SIZE`, `NN_HIDDEN2_SIZE`, `NN_OUTPUT_COUNT` |
+| **Neural Evolution** | `NN_MUTATION_RATE_INPUT/HIDDEN/OUTPUT/RECURRENT`, `NN_MUTATION_STRENGTH_*` |
+| **Recurrent** | `NN_RECURRENT`, `NN_RECURRENT_DECAY`, `NN_RECURRENT_WEIGHT` |
+| Predator | `PREDATOR_DASH_DURATION`, `PREDATOR_DAMAGE_PER_BITE`, `PREDATOR_DASH_TRIGGER_RANGE` |
+| Cleaner | `CLEANER_CLEANING_RANGE`, `CLEANER_CLEANING_ENERGY_GAIN`, `CLIENT_STAMINA_GAIN` |
 | Visual FX | `STAR_COUNT`, `BIOLUM_COLORS`, `SEASONAL_PARTICLE_CHANCE` |
 
 ## 📊 Performance
 
 - **Target FPS**: 60
 - **World Size**: 4000 × 1200 pixels (camera scrolls)
-- **Max Populations**: 40 common fish · 15 cleaner fish · 4 predators
+- **Max Populations**: 60 common fish · 20 cleaner fish · 10 predators (configurable in config.py)
 - **Particle Count**: ~720 environmental particles (sediment + plankton)
 - **Rendering**: Particle batching, camera-based culling, and soil diffusion slicing keep frame time low
 
@@ -225,11 +248,13 @@ All tuneable parameters live in `config.py`. Key areas:
 
 Contributions are welcome! Some ideas for extension:
 
-- Statistics dashboard showing population curves and trait evolution over time
-- NEAT (NeuroEvolution of Augmenting Topologies) — fish brains that grow new connections
-- Save/load ecosystem state across sessions
-- Ocean currents that push particles and seeds
-- Coral reef structures providing permanent shelter
+- **Advanced Neural Features**: LSTM networks, attention mechanisms, or hierarchical brains
+- **Genetic Algorithms**: Multi-objective optimization for different environmental pressures
+- **Statistics Dashboard**: Real-time population curves, trait evolution, and neural network metrics
+- **Save/Load System**: Ecosystem state persistence across sessions
+- **Environmental Dynamics**: Ocean currents, temperature gradients, pH levels
+- **Complex Ecosystem**: Coral reef structures, kelp forests, anemone gardens
+- **Social Behaviors**: Schooling, territoriality, dominance hierarchies
 
 ## 📄 License
 

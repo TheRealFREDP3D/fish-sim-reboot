@@ -172,7 +172,7 @@ MUTATION_RATE, MUTATION_STRENGTH = 0.2, 0.15
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Input counts (expanded for temporal context)
-NN_INPUT_COUNT = 27  # Was 18, now includes time, season, prev_state, hunger_memory, age
+NN_INPUT_COUNT = 27  # 9 radar + 18 stats (2 phys + 2 spatial + 3 env + 2 threats + 2 temporal + 5 state + 1 hunger + 1 age)
 NN_HIDDEN1_SIZE = 14  # Increased from 12
 NN_HIDDEN2_SIZE = 8   # Same
 NN_OUTPUT_COUNT = 9
@@ -180,6 +180,7 @@ NN_OUTPUT_COUNT = 9
 # Recurrent network settings
 NN_RECURRENT = True
 NN_RECURRENT_DECAY = 0.7  # How much of previous hidden state to retain
+NN_RECURRENT_WEIGHT = 0.5  # Weight of recurrent connections in hidden layer
 
 # Layer-specific mutation rates (allows structured exploration)
 NN_MUTATION_RATE_INPUT = 0.15      # Higher for sensory adaptation
@@ -248,6 +249,13 @@ PREDATOR_DAMAGE_PER_BITE = 45.0  # More lethal predators
 PREDATOR_BACKSTAB_MULTIPLIER = 1.5
 PREDATOR_BITE_COOLDOWN = 1.2  # Fast bite rate for aggressive hunting
 PREDATOR_CANNIBAL_SIZE_RATIO = 1.5  # More frequent cannibalism
+
+# Predator dash mechanics constants
+PREDATOR_DASH_TRIGGER_RANGE = 350  # Distance at which dash can be triggered
+PREDATOR_DASH_MIN_STAMINA_RATIO = 0.4  # Minimum stamina ratio to dash
+PREDATOR_DASH_MIN_ACTIVITY = 0.2  # Minimum activity modifier for dash
+PREDATOR_DASH_DRIVE_THRESHOLD = 0.1  # Minimum dash_drive to initiate dash
+PREDATOR_DASH_CLOSE_RANGE = 180  # Always dash if closer than this
 
 # Predator ecosystem balance - improved scavenging
 PREDATOR_SCAVENGE_THRESHOLD = 20.0

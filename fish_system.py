@@ -235,6 +235,11 @@ class FishSystem:
         prey_count = len(self.fish)
         pred_count = len(self.predators)
 
+        # Clear any existing boost first to ensure consistency
+        for predator in self.predators:
+            if hasattr(predator, 'mating_threshold_boost'):
+                delattr(predator, 'mating_threshold_boost')
+
         # If predator population is too high relative to prey, reduce predator reproduction
         if pred_count > 0 and prey_count / pred_count < PREDATOR_PREY_RATIO_MIN:
             # Make it harder for predators to reproduce by increasing their energy requirements
@@ -243,11 +248,6 @@ class FishSystem:
                     # Temporarily increase mating threshold during prey scarcity
                     original_threshold = FISH_MATING_THRESHOLD
                     predator.mating_threshold_boost = original_threshold * 1.5
-        else:
-            # Clear the boost when prey/predator ratio is healthy
-            for predator in self.predators:
-                if hasattr(predator, 'mating_threshold_boost'):
-                    delattr(predator, 'mating_threshold_boost')
 
         # If prey population is getting too low, spawn new prey to maintain balance
         # Use a timer to prevent spawning every frame

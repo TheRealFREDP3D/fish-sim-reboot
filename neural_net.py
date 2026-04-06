@@ -17,6 +17,7 @@ from config import (
     NN_OUTPUT_COUNT,
     NN_RECURRENT,
     NN_RECURRENT_DECAY,
+    NN_RECURRENT_WEIGHT,
     NN_MUTATION_RATE_INPUT,
     NN_MUTATION_RATE_HIDDEN,
     NN_MUTATION_RATE_OUTPUT,
@@ -164,7 +165,7 @@ class NeuralNet:
                     for j in range(self.hidden2_size)
                 )
                 # Blend with decay factor
-                combined = h2_pre[i] + recurrent_sum * 0.5
+                combined = h2_pre[i] + recurrent_sum * NN_RECURRENT_WEIGHT
                 h2.append(self.tanh(combined))
 
             # Update hidden state for next frame (with decay)
@@ -321,9 +322,9 @@ class NeuralNet:
                 for v in vector
             ]
 
-        # Use config defaults if not specified (treat 0 as None to avoid division by zero)
-        base_rate = rate if rate is not None and rate != 0.0 else 0.1
-        base_strength = strength if strength is not None and strength != 0.0 else 0.2
+        # Use config defaults if not specified (allow rate=0.0 to disable mutation)
+        base_rate = rate if rate is not None else 0.1
+        base_strength = strength if strength is not None else 0.2
 
         # Layer 1: Higher mutation for sensory adaptation
         child.w1 = mutate_matrix(child.w1, NN_MUTATION_RATE_INPUT / base_rate, 

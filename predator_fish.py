@@ -34,6 +34,11 @@ from config import (
     PREDATOR_SCAVENGE_ENERGY_GAIN,
     PREDATOR_MAX_POPULATION,
     PREDATOR_PREY_RATIO_MIN,
+    PREDATOR_DASH_TRIGGER_RANGE,
+    PREDATOR_DASH_MIN_STAMINA_RATIO,
+    PREDATOR_DASH_MIN_ACTIVITY,
+    PREDATOR_DASH_DRIVE_THRESHOLD,
+    PREDATOR_DASH_CLOSE_RANGE,
     CLEANER_IMMUNITY_CHANCE,
     PREY_PREDATOR_MIN_DISTANCE,
     FISH_HUNGER_THRESHOLD,
@@ -164,12 +169,12 @@ class PredatorFish(NeuralFish):
 
             # Initiate dash when close and ready — highly aggressive
             if (
-                min_dist < 350  # Large dash trigger range
+                min_dist < PREDATOR_DASH_TRIGGER_RANGE
                 and self.dash_cooldown <= 0
                 and not self.is_dashing
-                and self.stamina > PREDATOR_DASH_STAMINA_THRESHOLD * 0.4  # Low threshold
-                and activity_mod > 0.2
-                and (dash_drive > 0.1 or min_dist < 180)  # Very permissive
+                and self.stamina > PREDATOR_DASH_STAMINA_THRESHOLD * PREDATOR_DASH_MIN_STAMINA_RATIO
+                and activity_mod > PREDATOR_DASH_MIN_ACTIVITY
+                and (dash_drive > PREDATOR_DASH_DRIVE_THRESHOLD or min_dist < PREDATOR_DASH_CLOSE_RANGE)
             ):
                 self.is_dashing = True
                 self.dash_timer = PREDATOR_DASH_DURATION
@@ -278,10 +283,11 @@ class PredatorFish(NeuralFish):
                             self.energy + PREDATOR_SCAVENGE_ENERGY_GAIN,
                         )
                         fish_system.eggs.remove(egg)
-                        # Small blood effect for egg
-                        blood = self._create_blood_effect(egg.x, egg.y, self.physics.heading)
-                        if blood:
-                            fish_system.blood_effects.append(blood)
+                        # Small blood effect for egg (only if brain exists)
+                        if hasattr(egg, 'brain') and egg.brain is not None:
+                            blood = self._create_blood_effect(egg.x, egg.y, self.physics.heading)
+                            if blood:
+                                fish_system.blood_effects.append(blood)
                         break
 
         return res
