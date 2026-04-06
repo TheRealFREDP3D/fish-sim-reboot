@@ -184,6 +184,12 @@ class Particle:
             self.nutrition = 1.0
 
         self.variant = random.randint(0, 2) if self.is_plankton else 0
+        
+        # Cache alpha value to prevent flickering
+        if not self.is_plankton:
+            self.cached_alpha = max(0, min(255, PARTICLE_ALPHA + random.randint(-20, 20)))
+        else:
+            self.cached_alpha = None
 
     def update(self, time, depth_bias=0.0):
         drift_x = math.sin(time * 0.5 + self.phase) * 0.4
@@ -416,10 +422,9 @@ class ParticleSystem:
                 )
 
             else:
-                alpha = PARTICLE_ALPHA + random.randint(-20, 20)
                 pygame.draw.circle(
                     self.particle_surface,
-                    (*particle.color, max(0, min(255, alpha))),
+                    (*particle.color, particle.cached_alpha),
                     (sx, sy),
                     particle.size,
                 )

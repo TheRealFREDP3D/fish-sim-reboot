@@ -420,7 +420,7 @@ class SoilGrid:
         self._neighbours = {}
         for (cx, cy), cell in self.cells.items():
             neighbours = []
-            for dx, dy in [(0, 1), (-1, 0), (1, 0), (0, -1)]:
+            for dx, dy in [(0, 1), (-1, 1), (1, 1), (-1, 0), (1, 0), (0, -1), (-1, -1), (1, -1)]:
                 nb = self.get_cell(cx + dx, cy + dy)
                 if nb:
                     neighbours.append((nb, (dx, dy)))

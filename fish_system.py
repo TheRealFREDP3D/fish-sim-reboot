@@ -7,6 +7,7 @@ from config import (
     FISH_MAX_ENERGY,
     FISH_POPULATION_FLOOR,
     CLEANER_POPULATION_FLOOR,
+    PREDATOR_POPULATION_FLOOR,
     FISH_CARRYING_CAPACITY,
     FISH_CARRYING_CAPACITY_STRENGTH,
     WATER_LINE_Y,
@@ -16,6 +17,7 @@ from config import (
     SCREEN_HEIGHT,
     SOIL_MAX_NUTRIENT,
     FISH_REPRODUCTION_COST,
+    FISH_MATING_THRESHOLD,
     PREDATOR_PREY_RATIO_MIN,
 )
 from fish_base import NeuralFish, FishState
@@ -51,6 +53,9 @@ class FishSystem:
         self.blood_effects: list[BloodEffect] = []
 
         self.brain_visualizer = BrainVisualizer(SCREEN_WIDTH, SCREEN_HEIGHT)
+
+        # Emergency prey spawn timer to prevent rapid population explosion
+        self._emergency_prey_spawn_timer = 0.0
 
     def handle_click(self, pos, camera):
         world_x = pos[0] + camera.x
@@ -178,15 +183,81 @@ class FishSystem:
                     self._kill_fish(f, f_list)
                     continue
 
+                # Handle predator reproduction separately since they can't enter MATING state
+                if f.is_predator and hasattr(f, 'try_reproduce'):
+                    if f.try_reproduce():
+                        # Predator successfully reproduced, create egg
+                        if f.mate:
+                            child_traits = FishTraits.blend(f.traits, f.mate.traits)
+                            child_brain = NeuralNet.blend(f.brain, f.mate.brain).mutate()
+                        else:
+                            # Fallback if no mate available
+                            child_traits = f.traits.clone()
+                            child_brain = f.brain.clone().mutate()
+
+                        # Create egg with named arguments for clarity
+                        egg_x = f.physics.pos.x
+                        egg_y = f.physics.pos.y
+                        egg_parent1 = f
+                        egg_parent2 = f.mate
+                        egg_is_cleaner = False
+                        egg_is_predator = True
+                        egg_brain = child_brain
+
+                        self.eggs.append(
+                            FishEgg(
+                                egg_x,
+                                egg_y,
+                                child_traits,
+                                egg_parent1,
+                                egg_parent2,
+                                is_cleaner=egg_is_cleaner,
+                                is_predator=egg_is_predator,
+                                brain=egg_brain,
+                            )
+                        )
+                        f.mate = None  # Clear mate reference
+
                 if can_mate and f.state == FishState.MATING:
                     self.try_mate(f, f_list)
 
-        # 6. Population floors — ensure minimum viable populations
+        # 7. Population floors — ensure minimum viable populations
         if len(self.fish) < FISH_POPULATION_FLOOR:
             self.fish.append(NeuralFish(self.world))
 
         if len(self.cleaner_fish) < CLEANER_POPULATION_FLOOR:
             self.cleaner_fish.append(CleanerFish(self.world))
+
+        if len(self.predators) < PREDATOR_POPULATION_FLOOR:
+            self.predators.append(PredatorFish(self.world))
+
+        # 8. Ecosystem balancing - predator population control
+        prey_count = len(self.fish)
+        pred_count = len(self.predators)
+
+        # Clear any existing boost first to ensure consistency
+        for predator in self.predators:
+            if hasattr(predator, 'mating_threshold_boost'):
+                delattr(predator, 'mating_threshold_boost')
+
+        # If predator population is too high relative to prey, reduce predator reproduction
+        if pred_count > 0 and prey_count / pred_count < PREDATOR_PREY_RATIO_MIN:
+            # Make it harder for predators to reproduce by increasing their energy requirements
+            for predator in self.predators:
+                if hasattr(predator, 'try_reproduce'):
+                    # Temporarily increase mating threshold during prey scarcity
+                    original_threshold = FISH_MATING_THRESHOLD
+                    predator.mating_threshold_boost = original_threshold * 1.5
+
+        # If prey population is getting too low, spawn new prey to maintain balance
+        # Use a timer to prevent spawning every frame
+        if prey_count < FISH_POPULATION_FLOOR * 2 and pred_count > 0:
+            self._emergency_prey_spawn_timer += dt
+            if self._emergency_prey_spawn_timer >= 2.0:  # Spawn at most once every 2 seconds
+                emergency_prey = NeuralFish(self.world)
+                emergency_prey.energy = FISH_MAX_ENERGY * 0.9  # Start with good energy
+                self.fish.append(emergency_prey)
+                self._emergency_prey_spawn_timer = 0.0
 
         # 7. Update eat effects with real dt
         self.particle_system.eat_effects = [
@@ -194,7 +265,7 @@ class FishSystem:
         ]
 
     def try_mate(self, f, f_list):
-        if f.is_pregnant:
+        if f.is_pregnant or f.mating_cooldown > 0:
             return
 
         # ── Carrying capacity pressure on common fish ────────────────────
@@ -220,10 +291,10 @@ class FishSystem:
                 and partner.state == FishState.MATING
                 and partner.sex != f.sex
             ):
-                if f.physics.pos.distance_to(partner.physics.pos) < 45:
+                if f.physics.pos.distance_to(partner.physics.pos) < 70:
                     f.energy -= FISH_REPRODUCTION_COST
                     partner.energy -= FISH_REPRODUCTION_COST
-                    f.mating_cooldown, partner.mating_cooldown = 40.0, 40.0
+                    f.mating_cooldown, partner.mating_cooldown = 120.0, 120.0
                     child_traits = FishTraits.blend(f.traits, partner.traits)
                     blended_brain = NeuralNet.blend(f.brain, partner.brain)
                     child_brain = blended_brain.mutate()

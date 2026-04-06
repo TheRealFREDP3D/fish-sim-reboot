@@ -3,7 +3,18 @@
 import pygame
 import random
 import math
-from config import *
+from config import (
+    ROOT_BASE_THICKNESS,
+    ROOT_BASE_GROWTH_RATE,
+    ROOT_MAX_NODES,
+    ROOT_MAX_DEPTH,
+    ROOT_BRANCH_CHANCE,
+    ROOT_UPTAKE_CAPACITY,
+    ROOT_TRANSPORT_LOSS,
+    ROOT_BASE_COLOR,
+    ROOT_ACTIVE_COLOR,
+    ROOT_TIP_COLOR,
+)
 from collections import deque
 
 
@@ -119,7 +130,7 @@ class RootSystem:
 
     def _get_growth_candidates(self, tip):
         candidates = []
-        for dx, dy in [(0, 1), (-1, 1), (1, 1), (-1, 0), (1, 0), (0, -1)]:
+        for dx, dy in [(0, 1), (-1, 1), (1, 1), (-1, 0), (1, 0), (0, -1), (-1, -1), (1, -1)]:
             nx, ny = tip.cell_x + dx, tip.cell_y + dy
             cell = self.soil_grid.get_cell(nx, ny)
             if (

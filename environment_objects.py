@@ -1,7 +1,18 @@
 import pygame
 import math
 import random
-from config import *
+from config import (
+    SOIL_MAX_NUTRIENT,
+    CLEANER_CLEANING_FLASH_DURATION,
+    DEAD_FISH_SINK_SPEED,
+    DEAD_FISH_DECOMPOSITION_TIME,
+    DEAD_FISH_NUTRIENT_RETURN,
+    FISH_EGG_HATCH_TIME,
+    WORLD_WIDTH,
+    BLOOD_DROP_DURATION,
+    BLOOD_DROP_COUNT,
+    BLOOD_DROP_COLORS,
+)
 
 
 class PoopParticle:

@@ -1,4 +1,11 @@
-"""Configuration settings for the Underwater Plant Ecosystem Simulation"""
+"""Configuration settings for the Underwater Plant Ecosystem Simulation
+
+Improved neural network settings with:
+- Proper input normalization bounds
+- Reduced state override biases (allows NN to learn)
+- Layer-specific mutation rates
+- Temporal context inputs
+"""
 
 from enum import Enum, auto
 
@@ -8,7 +15,7 @@ SCREEN_HEIGHT = 800
 WORLD_WIDTH = 4000
 WORLD_HEIGHT = 1200
 FPS = 60
-TITLE = "Fish Simulation - Reboot"
+TITLE = "Fish Simulation - Neural Network Improved"
 
 # Camera settings
 CAMERA_SMOOTHING = 0.1
@@ -141,18 +148,15 @@ ROOT_BASE_COLOR, ROOT_ACTIVE_COLOR, ROOT_TIP_COLOR = (
     (255, 220, 150),
 )
 
-# Plant lifecycle — FIXED: lifespans now match season durations
-# With SEASON_DURATION = 840s, plants need to live 2-4 seasons to reproduce.
-# PLANT_MAX_AGE = 800 age-seconds. At rate 0.25/s in spring, that's ~3040s real
-# time ≈ 3.6 seasons — enough to flower, seed, and sustain the ecosystem.
+# Plant lifecycle
 SEED_GROWTH_ENERGY = 0.8
-MATURE_ENERGY_THRESHOLD = 1.2  # Lowered from 1.8 for faster maturity
-PLANT_BASE_MAINTENANCE = 0.05  # Lowered from 0.10 - reduced energy drain
-PLANT_SIZE_MAINTENANCE_FACTOR = 0.12  # Lowered from 0.30 - less size penalty
-PLANT_MAX_AGE = 800.0  # FIX: was 90 — plants now live multiple seasons
+MATURE_ENERGY_THRESHOLD = 1.2
+PLANT_BASE_MAINTENANCE = 0.05
+PLANT_SIZE_MAINTENANCE_FACTOR = 0.12
+PLANT_MAX_AGE = 800.0
 SEED_PRODUCTION_ENERGY, SEED_PRODUCTION_COST = 4.0, 1.2
-FLOWERING_ENERGY_THRESHOLD = 1.5  # FIX: was 2.5 — easier to start flowering
-FLOWERING_DURATION = 35.0  # Increased from 18.0 - more time to produce seeds
+FLOWERING_ENERGY_THRESHOLD = 1.5
+FLOWERING_DURATION = 35.0
 DECOMPOSITION_NUTRIENT_RETURN, DECOMPOSITION_DURATION = 0.9, 8.0
 PLANT_HARD_CAP, SEED_HARD_CAP = 80, 100
 
@@ -162,6 +166,56 @@ PLANKTON_HARD_CAP = 250
 
 # Evolution settings
 MUTATION_RATE, MUTATION_STRENGTH = 0.2, 0.15
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NEURAL NETWORK IMPROVEMENTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Input counts (expanded for temporal context)
+NN_INPUT_COUNT = 27  # 9 radar + 18 stats (2 phys + 2 spatial + 3 env + 2 threats + 2 temporal + 5 state + 1 hunger + 1 age)
+NN_HIDDEN1_SIZE = 14  # Increased from 12
+NN_HIDDEN2_SIZE = 8   # Same
+NN_OUTPUT_COUNT = 9
+
+# Recurrent network settings
+NN_RECURRENT = True
+NN_RECURRENT_DECAY = 0.7  # How much of previous hidden state to retain
+NN_RECURRENT_WEIGHT = 0.5  # Weight of recurrent connections in hidden layer
+
+# Layer-specific mutation rates (allows structured exploration)
+NN_MUTATION_RATE_INPUT = 0.15      # Higher for sensory adaptation
+NN_MUTATION_RATE_HIDDEN = 0.10     # Standard for hidden layers
+NN_MUTATION_RATE_OUTPUT = 0.05     # Lower to preserve learned behaviors
+NN_MUTATION_RATE_RECURRENT = 0.03  # Very low for memory stability
+
+# Layer-specific mutation strengths
+NN_MUTATION_STRENGTH_INPUT = 0.25
+NN_MUTATION_STRENGTH_HIDDEN = 0.20
+NN_MUTATION_STRENGTH_OUTPUT = 0.12
+NN_MUTATION_STRENGTH_RECURRENT = 0.08
+
+# Weight clamping (prevent explosion)
+NN_WEIGHT_MAX = 3.0
+NN_BIAS_MAX = 2.0
+
+# ═══════════════════════════════════════════════════════════════════════════
+# REDUCED STATE BIAS MULTIPLIERS (allows NN to learn behaviors)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Old values were: FLEE=3.5, HUNT=2.5, MATE=2.0, REST=1.5
+# New values allow the NN's learned probabilities to matter
+STATE_BIAS_FLEE_THREAT = 0.6      # Reduced from 3.5
+STATE_BIAS_HUNT_HUNGER = 0.4      # Reduced from 2.5
+STATE_BIAS_MATE_DRIVE = 0.3       # Reduced from 2.0
+STATE_BIAS_REST_NIGHT = 0.3       # Reduced from 1.5
+
+# Soft blocks instead of hard blocks (-1e9)
+STATE_BLOCK_IMMATURE = 1.5        # Discourage immature fish from hunting/mating
+
+# Input normalization bounds (for clamping)
+INPUT_MAX_ABS_VALUE = 2.0
+
+# ═══════════════════════════════════════════════════════════════════════════
 
 # Fish Physics
 FISH_MAX_FORCE, FISH_MAX_SPEED = 4.5, 140.0
@@ -182,46 +236,53 @@ FISH_MAX_AGE = (
 # Predator & Cleaner Specialties
 CLEANER_FISH_SPEED_MULT = 0.85
 CLEANER_FISH_CLEANING_ENERGY_THRESHOLD = 45.0
-PREDATOR_SPEED_MULT = 0.95
-PREDATOR_DASH_SPEED_MULT, PREDATOR_DASH_DURATION = 2.4, 0.8
-PREDATOR_DASH_COOLDOWN, PREDATOR_DASH_STAMINA_THRESHOLD = 3.5, 20.0
-PREDATOR_DASH_STAMINA_DRAIN, PREDATOR_DASH_FORCE_MULT = 30.0, 3.5
-PREDATOR_SIZE_ADVANTAGE_MULTIPLIER = 1.2
-PREY_PREDATOR_MIN_DISTANCE = 400
-PREDATOR_PREY_RATIO_MIN = 5.0  # Minimum prey per predator for reproduction
+PREDATOR_SPEED_MULT = 1.15  # Predators are faster than prey
+PREDATOR_DASH_DURATION = 1.2  # Longer dash burst
+PREDATOR_DASH_COOLDOWN, PREDATOR_DASH_STAMINA_THRESHOLD = 2.0, 12.0  # Faster dash recovery, lower stamina gate
+PREDATOR_DASH_STAMINA_DRAIN, PREDATOR_DASH_FORCE_MULT = 25.0, 3.5  # Less stamina drain per dash
+PREDATOR_SIZE_ADVANTAGE_MULTIPLIER = 1.0  # Can hunt same-sized prey
+PREY_PREDATOR_MIN_DISTANCE = 500  # Larger detection range
+PREDATOR_PREY_RATIO_MIN = 5.0
 
-# ── Predator hunt mechanics ──────────────────────────────────────────────
-PREDATOR_DAMAGE_PER_BITE = 28.0
+# Predator hunt mechanics — highly lethal
+PREDATOR_DAMAGE_PER_BITE = 45.0  # More lethal predators
 PREDATOR_BACKSTAB_MULTIPLIER = 1.5
-PREDATOR_BITE_COOLDOWN = 3.0
-PREDATOR_CANNIBAL_SIZE_RATIO = 2.0
+PREDATOR_BITE_COOLDOWN = 1.2  # Fast bite rate for aggressive hunting
+PREDATOR_CANNIBAL_SIZE_RATIO = 1.5  # More frequent cannibalism
 
-# ── Predator ecosystem balance ───────────────────────────────────────────
-PREDATOR_SCAVENGE_THRESHOLD = 15.0
-PREDATOR_SCAVENGE_ENERGY_GAIN = 5.0
+# Predator dash mechanics constants
+PREDATOR_DASH_TRIGGER_RANGE = 350  # Distance at which dash can be triggered
+PREDATOR_DASH_MIN_STAMINA_RATIO = 0.4  # Minimum stamina ratio to dash
+PREDATOR_DASH_MIN_ACTIVITY = 0.2  # Minimum activity modifier for dash
+PREDATOR_DASH_DRIVE_THRESHOLD = 0.1  # Minimum dash_drive to initiate dash
+PREDATOR_DASH_CLOSE_RANGE = 180  # Always dash if closer than this
 
-# ── Cleaner Fish – Mutualism & Scavenging ────────────────────────────────
-CLEANER_CLEANING_RANGE = 60.0             # Distance to initiate cleaning on a client fish
-CLEANER_CLEANING_DURATION = 1.8           # Seconds a cleaning event lasts
-CLEANER_CLEANING_COOLDOWN = 4.0           # Seconds between cleaning attempts
-CLEANER_CLEANING_ENERGY_GAIN = 10.0       # Energy the cleaner gains per cleaning event
-CLIENT_STAMINA_GAIN = 12.0               # Stamina the client fish gains from being cleaned
-CLIENT_ENERGY_GAIN = 3.0                  # Small energy boost for the client fish
-CLEANER_IMMUNITY_CHANCE = 0.90            # 90% chance predators ignore cleaner fish
+# Predator ecosystem balance - improved scavenging
+PREDATOR_SCAVENGE_THRESHOLD = 20.0
+PREDATOR_SCAVENGE_ENERGY_GAIN = 8.0
+
+# Cleaner Fish – Mutualism & Scavenging
+CLEANER_CLEANING_RANGE = 60.0
+CLEANER_CLEANING_DURATION = 1.8
+CLEANER_CLEANING_COOLDOWN = 4.0
+CLEANER_CLEANING_ENERGY_GAIN = 10.0
+CLIENT_STAMINA_GAIN = 12.0
+CLIENT_ENERGY_GAIN = 3.0
+CLEANER_IMMUNITY_CHANCE = 0.90
 CLEANER_STATION_PLANT_TYPES = ("fan_coral", "anemone", "tube_sponge")
-CLEANER_STATION_RADIUS = 100.0            # Affinity radius around cleaning stations
-CLEANER_STATION_SEEK_WEIGHT = 0.35        # How strongly cleaners are drawn to stations
-CLEANER_PLANKTON_EAT_CHANCE = 0.6         # Probability to seek plankton alongside poop
-CLEANER_POOP_SEEK_WEIGHT = 0.7            # Seek weight for poop (no hunger gate)
-CLEANER_CLIENT_SEEK_WEIGHT = 0.8          # Seek weight toward nearby client fish
-CLEANER_CLEANING_FLASH_DURATION = 0.5     # Duration of the sparkle effect per tick
-CLEANER_NEED_CLEANING_DECAY = 0.05        # How fast the "needs_cleaning" score decays per second
+CLEANER_STATION_RADIUS = 100.0
+CLEANER_STATION_SEEK_WEIGHT = 0.35
+CLEANER_PLANKTON_EAT_CHANCE = 0.6
+CLEANER_POOP_SEEK_WEIGHT = 0.7
+CLEANER_CLIENT_SEEK_WEIGHT = 0.8
+CLEANER_CLEANING_FLASH_DURATION = 0.5
+CLEANER_NEED_CLEANING_DECAY = 0.05
 
 # Fish Logic
 FISH_MAX_ENERGY, FISH_HUNGER_THRESHOLD = 50.0, 30.0
 FISH_MATING_THRESHOLD, FISH_REPRODUCTION_COST = 35.0, 12.0
 FISH_EGG_HATCH_TIME = 10.0
-FISH_MAX_POPULATION, CLEANER_FISH_MAX_POPULATION, PREDATOR_MAX_POPULATION = 40, 15, 4
+FISH_MAX_POPULATION, CLEANER_FISH_MAX_POPULATION, PREDATOR_MAX_POPULATION = 60, 20, 10
 
 
 class FishState(Enum):
@@ -251,21 +312,14 @@ SEEDLING_DEATH_TIME, DORMANT_ENERGY_MINIMUM, DORMANT_DEATH_TIME = 25.0, 0.05, 30
 SPRING_GERMINATION_BASE_CHANCE, SUMMER_GERMINATION_BASE_CHANCE = 0.015, 0.006
 SEED_ENERGY_THRESHOLD, FLOWERING_BASE_CHANCE = 0.4, 0.025
 
-AUTUMN_SEED_BASE_PROBABILITY = 0.05  # FIX: was 0.028 — higher seed output in autumn
-SUMMER_SEED_BASE_PROBABILITY = 0.035  # FIX: was 0.014 — higher seed output in summer
-SPRING_SEED_BASE_PROBABILITY = 0.018  # FIX: new — allow seed production in spring
+AUTUMN_SEED_BASE_PROBABILITY = 0.05
+SUMMER_SEED_BASE_PROBABILITY = 0.035
+SPRING_SEED_BASE_PROBABILITY = 0.018
 SEED_ENERGY_COST = 0.5
 
-# Soft state-machine biases
-STATE_BIAS_FLEE_THREAT = 3.5
-STATE_BIAS_HUNT_HUNGER = 2.5
-STATE_BIAS_MATE_DRIVE = 2.0
-STATE_BIAS_NEST_PREGNANT = 999.0
-STATE_BIAS_REST_NIGHT = 1.5
-
 MATING_HEART_SPAWN_INTERVAL, MATING_HEART_RANDOM_RANGE, MATING_GLOW_DECAY_RATE = (
-    1.2,
-    0.6,
+    3.0,
+    0.8,
     3.0,
 )
 DAWN_START, DAWN_END, DUSK_START, DUSK_END = 0.18, 0.27, 0.73, 0.82
@@ -295,14 +349,11 @@ WINTER_SURVIVAL_CHANCE = {
     "anemone": 0.85,
 }
 SPRING_GERMINATION_BOOST, WINTER_PHOTOSYNTHESIS_BASE = 4.0, 0.08
-FLOWERING_SEASON_PREFERENCE = {0: 0.8, 1: 1.4, 2: 1.0, 3: 0.0}  # FIX: spring 0.3→0.8
+FLOWERING_SEASON_PREFERENCE = {0: 0.8, 1: 1.4, 2: 1.0, 3: 0.0}
 
-# FIX: Age rates scaled down ~5× so plants live multiple seasons instead of <2 days
 _SEASON_AGE_RATE = {0: 0.25, 1: 0.35, 2: 0.20, 3: 0.05}
 _SEASON_PHOTO_MOD = {0: 0.8, 1: 1.2, 2: 0.9, 3: 0.2}
-# FIX: Spring now allowed to produce seeds
 _SEASON_CAN_SEED = {0: True, 1: True, 2: True, 3: False}
-# FIX: Reduced cooldowns for more frequent seed production
 _SEASON_SEED_COOLDOWN = {0: 15.0, 1: 10.0, 2: 8.0, 3: 40.0}
 
 # Fish-Plant Interaction Mechanics
@@ -322,15 +373,15 @@ GRAZING_COOLDOWN, GRAZING_VISUAL_DURATION = 3.8, 2.5
 
 WINTER_MAINTENANCE_MULT = 1.15
 
-# ── Dead Fish & Decomposition ────────────────────────────────────────────
-DEAD_FISH_SINK_SPEED = 40.0        # pixels per second sinking speed
-DEAD_FISH_DECOMPOSITION_TIME = 12.0 # seconds for full decomposition at bottom
-DEAD_FISH_NUTRIENT_RETURN = 1.8    # nutrients deposited into soil per dead fish
-DEAD_FISH_COLOR_FADE_SPEED = 0.06  # how fast the corpse colour fades to grey
+# Dead Fish & Decomposition
+DEAD_FISH_SINK_SPEED = 40.0
+DEAD_FISH_DECOMPOSITION_TIME = 12.0
+DEAD_FISH_NUTRIENT_RETURN = 1.8
+DEAD_FISH_COLOR_FADE_SPEED = 0.06
 
-# ── Blood Effect (predator bite) ─────────────────────────────────────────
-BLOOD_DROP_COUNT = 10              # number of blood droplets per bite
-BLOOD_DROP_DURATION = 1.2          # seconds blood drops are visible
+# Blood Effect (predator bite)
+BLOOD_DROP_COUNT = 10
+BLOOD_DROP_DURATION = 1.2
 BLOOD_DROP_BASE_COLOR = (200, 30, 30)
 BLOOD_DROP_COLORS = [
     (200, 30, 30),
@@ -340,19 +391,34 @@ BLOOD_DROP_COLORS = [
     (170, 15, 20),
 ]
 
-# ── Fish Anti-Clustering & Exploration ─────────────────────────────────
-FISH_HIDE_THREAT_THRESHOLD = 0.25  # minimum threat_level to trigger plant-seeking
-FISH_HIDE_WEIGHT = 0.7             # hide_drive force weight (was 1.6 — too strong)
-FISH_EXPLORATION_FORCE = 1.2       # random wander strength when safe & well-fed
-FISH_SEPARATION_RADIUS = 50.0      # distance below which fish push apart
-FISH_SEPARATION_FORCE = 1.8         # repulsion strength between nearby fish
-FISH_PLANT_RESTLESSNESS = 0.4      # force pushing fish AWAY from plants when safe
-FISH_PLANT_LINGER_MAX = 8.0        # seconds near a plant before restlessness kicks in
-FISH_COVER_STAMINA_BONUS = 10.0    # stamina/sec from cover (was 18 — too strong)
-FISH_COVER_STAMINA_PREDATOR = 4.0  # predators get less cover stamina
+# Fish Anti-Clustering & Exploration
+FISH_HIDE_THREAT_THRESHOLD = 0.25
+FISH_HIDE_WEIGHT = 0.7
+FISH_EXPLORATION_FORCE = 1.2
+FISH_SEPARATION_RADIUS = 50.0
+FISH_SEPARATION_FORCE = 1.8
+FISH_PLANT_RESTLESSNESS = 0.4
+FISH_PLANT_LINGER_MAX = 8.0
+FISH_COVER_STAMINA_BONUS = 10.0
+FISH_COVER_STAMINA_PREDATOR = 4.0
 
-# ── Population Control ───────────────────────────────────────────────────
-FISH_POPULATION_FLOOR = 4          # minimum common fish (was 6)
-CLEANER_POPULATION_FLOOR = 2       # minimum cleaner fish (was 3)
-FISH_CARRYING_CAPACITY = 50        # soft cap — mating urge suppressed above this
-FISH_CARRYING_CAPACITY_STRENGTH = 3.0  # how strongly suppressed
+# Population Control
+FISH_POPULATION_FLOOR = 4
+CLEANER_POPULATION_FLOOR = 2
+PREDATOR_POPULATION_FLOOR = 2
+FISH_CARRYING_CAPACITY = 50
+FISH_CARRYING_CAPACITY_STRENGTH = 3.0
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SPECIALIZED OUTPUT HEADS (for different fish types)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Output indices for common fish
+OUTPUT_STEER = 0
+OUTPUT_THRUST = 1
+OUTPUT_HIDE_DRIVE = 2
+OUTPUT_SPRINT_DRIVE = 3
+OUTPUT_STATE_START = 4  # States are indices 4-8
+
+# For cleaner fish, output 2 becomes "clean_drive"
+# For predator fish, output 2 becomes "ambush_drive", output 3 becomes "dash_drive"
