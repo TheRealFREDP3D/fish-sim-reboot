@@ -7,3 +7,10 @@
 project_review_report.md
 
 /.sourcetrail
+/src/fish_sim_reboot.egg-info
+/.codeviz
+src/fish_sim/fish/__pycache__/fish_base.cpython-314.pyc
+src/fish_sim/fish/__pycache__/fish_base.cpython-314.pyc
+/src/fish_sim/fish/__pycache__
+src/fish_sim/fish/__pycache__/fish_base.cpython-314.pyc
+src/fish_sim/__pycache__/__init__.cpython-314.pyc

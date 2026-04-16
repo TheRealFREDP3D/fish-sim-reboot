@@ -1,4 +1,4 @@
-# Underwater Ecosystem Simulation
+# Underwater Ecosystem Simulation v0.2.0
 
 > "Evolving neural fish in a living underwater ecosystem — built from scratch in pure Python + Pygame"
 
@@ -102,37 +102,60 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## 📁 Project Structure
+*Optional: For development with editable install:*
+```bash
+pip install -e .
 ```
+
+## 📁 Project Structure
+
+The project now uses a clean `src/` layout for better organization and packaging:
+
+```bash
 fish-sim-reboot/
-├── main.py                  # Main simulation entry point, game loop, and HUD
-├── config.py                # All configuration constants (including time/season)
-├── requirements.txt         # Python dependencies (pygame)
-│
-├── time_system.py           # ★ NEW: Day/night cycle, seasons, light level, bioluminescence
-│
-├── world.py                 # World generation, terrain, sky, stars, season particles
-├── camera.py                # Smooth camera system with world-space transforms
-│
-├── fish_system.py           # Fish population manager (spawning, mating, death, balance)
-├── fish_base.py             # Base NeuralFish class — 27-input radar, temporal context, neural forward pass
-├── predator_fish.py         # Predator subclass with dash mechanics, ambush behavior, blood effects
-├── cleaner_fish.py          # Cleaner subclass with mutualistic cleaning and scavenging behavior
-├── fish_physics.py          # Steering physics (seek, bounce bounds, Euler integration)
-├── fish_traits.py           # Heritable genetic traits with blend/mutate helpers
-├── neural_net.py            # Recurrent neural network (27→14→8→9) with temporal memory
-│
-├── plants.py                # Plant rendering and PlantManager (seeds, bubbles, updates)
-├── plant_development.py     # Staged plant life cycle with photosynthesis rate support
-├── roots.py                 # Root network — directed graph seeking nutrient cells
-├── seeds.py                 # Seed dispersal physics and trait inheritance
-├── soil.py                  # Soil grid with nutrient diffusion and organic rendering
-│
-├── particles.py             # Sediment and plankton with diel vertical migration
-├── family.py                # Temporary family units that dissolve on offspring maturity
-├── environment_objects.py   # PoopParticle and FishEgg objects
-│
-└── brain_visualizer.py      # Sliding brain panel: network graph, gauges, sparklines
+|-- main.py                  # Thin launcher for easy execution
+|-- setup.py                 # Package configuration for pip install
+|-- requirements.txt         # Python dependencies (pygame)
+|
+|-- src/                     # Main package directory
+|   `-- fish_sim/           # Importable package (fish_sim)
+|       |-- __init__.py      # Package version and metadata
+|       |-- main.py          # Core simulation logic
+|       |-- config.py        # All configuration constants
+|       |-- time_system.py   # Day/night cycle, seasons, bioluminescence
+|       |
+|       |-- core/           # Core simulation engine
+|       |   |-- world.py     # World generation, terrain, sky, stars
+|       |   |-- camera.py    # Smooth camera system
+|       |   |-- particles.py # Sediment and plankton systems
+|       |   `-- environment_objects.py # Environmental objects
+|       |
+|       |-- fish/           # All fish-related logic
+|       |   |-- fish_base.py     # Base NeuralFish class
+|       |   |-- fish_system.py    # Population manager
+|       |   |-- fish_traits.py    # Heritable genetic traits
+|       |   |-- fish_physics.py   # Steering physics
+|       |   |-- neural_net.py     # Recurrent neural networks
+|       |   |-- cleaner_fish.py   # Cleaner fish subclass
+|       |   |-- predator_fish.py  # Predator subclass
+|       |   `-- family.py         # Family bonding system
+|       |
+|       |-- plants/         # Plant & ecology systems
+|       |   |-- plants.py           # Plant rendering and management
+|       |   |-- plant_development.py # Plant lifecycle
+|       |   |-- plant_rules.py      # Plant validation logic
+|       |   |-- roots.py            # Root network systems
+|       |   `-- seeds.py            # Seed dispersal
+|       |
+|       |-- environment/    # Environment systems
+|       |   `-- soil.py     # Soil grid with nutrients
+|       |
+|       `-- ui/            # User interface
+|           `-- brain_visualizer.py # Neural network visualization
+|
+|-- doc/                     # Documentation and screenshots
+|-- music/                   # Game music files
+`-- README.md               # This file
 ```
 
 ## 🧠 Neural Network Architecture
