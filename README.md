@@ -1,4 +1,4 @@
-# Underwater Ecosystem Simulation
+# Underwater Ecosystem Simulation v0.2.0
 
 > "Evolving neural fish in a living underwater ecosystem — built from scratch in pure Python + Pygame"
 

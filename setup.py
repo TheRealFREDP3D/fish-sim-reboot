@@ -13,7 +13,7 @@ def read_requirements():
 
 setup(
     name="fish-sim-reboot",
-    version="0.5.0",
+    version="0.2.0",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     install_requires=read_requirements(),

@@ -70,6 +70,7 @@ from ..config import (
     MATING_GLOW_DECAY_RATE,
     BIOLUM_COLORS,
     INPUT_MAX_ABS_VALUE,
+    PREDATOR_MAX_POPULATION,
 )
 from ..core.environment_objects import PoopParticle
 
@@ -456,7 +457,6 @@ class NeuralFish:
             pred_count = len(self.world.fish_system.predators)
             if pred_count > 0 and (prey_count / pred_count) < 5.0:
                 logits[3] -= 3.0  # Discourage MATING when prey scarce
-            from ..config import PREDATOR_MAX_POPULATION
             if pred_count >= PREDATOR_MAX_POPULATION:
                 logits[3] = -1e9  # Hard block at population cap
 
@@ -954,7 +954,6 @@ class NeuralFish:
 
     def _draw_tail(self, screen, pos, angle, size, color, sec_color, tail_config, time):
         """Draw the fish tail based on tail_shape trait."""
-        from .fish_traits import TAIL_POINTED, TAIL_FORKED, TAIL_ROUNDED, TAIL_LYRE
         
         tail_angle = angle + math.pi + math.sin(time * 10) * 0.4
         tail_size = size * tail_config["size"] * 2.5
@@ -1027,7 +1026,6 @@ class NeuralFish:
 
     def _draw_fins(self, screen, pos, angle, size, color, sec_color, fin_config, app, time):
         """Draw dorsal, pectoral, and anal fins."""
-        from .fish_traits import FIN_STYLE_ELEGANT, FIN_STYLE_DRAMATIC
         
         fin_anim = math.sin(self._fin_phase) * 0.3
         
@@ -1094,7 +1092,6 @@ class NeuralFish:
     def _draw_body(self, screen, pos, angle, body_len, body_wid, color, sec_color, 
                    pattern_config, app, time):
         """Draw the fish body with proper proportions."""
-        from .fish_traits import BODY_SHAPE_STREAMLINED, BODY_SHAPE_ROUNDED
         
         surf_w = int(body_len * 6) + 4
         surf_h = int(body_wid * 4) + 4
@@ -1154,7 +1151,6 @@ class NeuralFish:
     def _draw_pattern(self, screen, pos, angle, body_len, body_wid, sec_color, 
                       pattern_config, app, time):
         """Draw pattern overlay based on pattern_type."""
-        from .fish_traits import PATTERN_STRIPES, PATTERN_SPOTS, PATTERN_GRADIENT, PATTERN_BANDS, PATTERN_MARBLED
         
         pattern_type = pattern_config["type"]
         intensity = pattern_config["intensity"]
