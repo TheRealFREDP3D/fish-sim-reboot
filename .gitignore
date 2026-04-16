@@ -7,3 +7,5 @@
 project_review_report.md
 
 /.sourcetrail
+/src/fish_sim_reboot.egg-info
+/.codeviz
