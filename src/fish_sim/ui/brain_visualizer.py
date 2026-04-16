@@ -1,481 +1,346 @@
-"""
-Brain Visualizer — Updated for improved neural network architecture.
-
-Displays:
-- Input layer (27 neurons): sensors + temporal context
-- Hidden layer 1 (14 neurons): tanh activation
-- Hidden layer 2 (8 neurons): tanh + recurrent
-- Output layer (9 neurons): movement, behavior, states
-"""
+"""Professional Brain Visualizer - Organic & Portfolio-Ready"""
 
 import pygame
 import math
-import random
 from ..config import (
-    BRAIN_PANEL_WIDTH,
-    BRAIN_PANEL_HEIGHT,
-    FishState,
-    FISH_MAX_ENERGY,
-    NN_INPUT_COUNT,
-    NN_HIDDEN1_SIZE,
-    NN_HIDDEN2_SIZE,
-    NN_OUTPUT_COUNT,
+    BRAIN_PANEL_WIDTH, FISH_MAX_AGE, FISH_MAX_ENERGY,
+    FISH_LARVA_DURATION, FISH_JUVENILE_DURATION, FISH_ELDER_DURATION,
+    FishState
 )
-
-# ── Palette ────────────────────────────────────────────────────────────────────
-BG = (6, 12, 20)
-BG_SECTION = (12, 22, 35)
-DIVIDER = (20, 38, 55)
-
-TEXT_PRIMARY = (220, 240, 255)
-TEXT_SECONDARY = (130, 165, 195)
-TEXT_LABEL = (70, 110, 145)
-
-# Bioluminescent accent colours
-TEAL = (0, 210, 190)
-TEAL_DIM = (0, 100, 90)
-AMBER = (255, 185, 55)
-AMBER_DIM = (140, 95, 20)
-RED_ACC = (255, 100, 110)
-RED_DIM = (130, 45, 50)
-PURPLE = (180, 100, 255)
-PURPLE_DIM = (90, 50, 130)
-
-# Neural activation colours
-COL_POS_HI = (80, 255, 220)
-COL_POS_MID = (0, 180, 160)
-COL_NEU = (30, 55, 80)
-COL_NEG_MID = (200, 120, 40)
-COL_NEG_HI = (255, 180, 60)
-
-_COL_DIM_WIRE = (18, 35, 52)
-
-SPECIES_ACCENT = {
-    (False, False): AMBER,
-    (True, False): TEAL,
-    (False, True): RED_ACC,
-}
-SPECIES_ACCENT_DIM = {
-    (False, False): AMBER_DIM,
-    (True, False): TEAL_DIM,
-    (False, True): RED_DIM,
-}
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-
-def lerp_color(c1, c2, t):
-    t = max(0.0, min(1.0, t))
-    return tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
-
-
-def activation_color(v):
-    if v >= 0:
-        t = min(1.0, v)
-        mid = lerp_color(COL_NEU, COL_POS_MID, t)
-        return lerp_color(mid, COL_POS_HI, t * t)
-    else:
-        t = min(1.0, -v)
-        mid = lerp_color(COL_NEU, COL_NEG_MID, t)
-        return lerp_color(mid, COL_NEG_HI, t * t)
-
-
-def _cubic_bezier(p0, p1, p2, p3, t):
-    mt = 1 - t
-    x = mt**3 * p0[0] + 3 * mt**2 * t * p1[0] + 3 * mt * t**2 * p2[0] + t**3 * p3[0]
-    y = mt**3 * p0[1] + 3 * mt**2 * t * p1[1] + 3 * mt * t**2 * p2[1] + t**3 * p3[1]
-    return (x, y)
-
-
-def _bezier_points(p0, p3, steps=18):
-    dx = (p3[0] - p0[0]) * 0.45
-    p1 = (p0[0] + dx, p0[1])
-    p2 = (p3[0] - dx, p3[1])
-    return [_cubic_bezier(p0, p1, p2, p3, i / steps) for i in range(steps + 1)]
-
-
-def draw_capsule(surface, color, x, y, w, h, radius=None):
-    if radius is None:
-        radius = h // 2
-    pygame.draw.rect(surface, color, pygame.Rect(x, y, w, h), border_radius=radius)
-
-
-# ── Input Labels for New Architecture ───────────────────────────────────────────
-
-INPUT_LABELS = [
-    # Radar inputs (0-8)
-    "Food L", "Food C", "Food R",
-    "Pred L", "Pred C", "Pred R",
-    "Mate L", "Mate C", "Mate R",
-    # Core stats (9-12)
-    "Energy", "Stamina", "Depth", "Speed",
-    # Environment (13-16)
-    "Cover", "PlantFood", "PlantDist", "Ambush",
-    # Mate distance (17)
-    "MateDist",
-    # Temporal context (18-25) - NEW
-    "Time", "Season",
-    "WasRest", "WasHunt", "WasFlee", "WasMate", "WasNest",
-    "Hunger", "Age",
-]
-
-OUTPUT_LABELS = ["Str", "Thr", "Hide", "Spr", "Rest", "Hunt", "Flee", "Mate", "Nest"]
-
-# Temporal input indices for maintainability
-TEMPORAL_TIME_IDX = 18
-TEMPORAL_SEASON_IDX = 19
-TEMPORAL_WAS_REST_IDX = 20
-TEMPORAL_WAS_HUNT_IDX = 21
-TEMPORAL_WAS_FLEE_IDX = 22
-TEMPORAL_WAS_MATE_IDX = 23
-TEMPORAL_WAS_NEST_IDX = 24
-TEMPORAL_HUNGER_IDX = 25
 
 
 class BrainVisualizer:
-    PANEL_W = BRAIN_PANEL_WIDTH
-    PANEL_H = BRAIN_PANEL_HEIGHT
-
-    _GLOW = 48
-    _glow_surf = None
-
     def __init__(self, screen_width, screen_height):
-        self.screen_w = screen_width
-        self.screen_h = screen_height
-        self.panel_h = min(self.PANEL_H, screen_height)
-        self.slide_x = float(self.PANEL_W)
-        self.anim_t = 0.0
+        self.screen_width = screen_width
+        self.screen_height = screen_height
 
-        self.prev_state = None
-        self.state_flash = 0.0
+        # Panel settings - wider and more spacious
+        self.panel_width = 460
+        self.panel_height = screen_height
+        self.panel_offset_x = self.panel_width  # start off-screen
+
+        # Fonts - larger and hierarchical
+        self.font_title = pygame.font.Font(None, 34)
+        self.font_heading = pygame.font.Font(None, 26)
+        self.font_body = pygame.font.Font(None, 20)
+        self.font_small = pygame.font.Font(None, 16)
+        self.font_tiny = pygame.font.Font(None, 13)
+
+        # Organic color palette (deep ocean + bioluminescence)
+        self.bg_color = (6, 10, 26, 245)
+        self.accent_common = (255, 185, 65)      # warm amber
+        self.accent_cleaner = (80, 225, 255)     # cyan
+        self.accent_predator = (255, 85, 95)     # red
+        self.neutral_glow = (180, 220, 255, 30)
+
+        # Animation
         self.anim_intensity = 0.5
-
-        self._INTENSITY = {
-            FishState.RESTING: 0.25,
-            FishState.HUNTING: 0.70,
-            FishState.FLEEING: 1.00,
-            FishState.MATING: 0.55,
-            FishState.NESTING: 0.45,
-        }
-
-        self.f_title = pygame.font.Font(None, 26)
-        self.f_body = pygame.font.Font(None, 21)
-        self.f_small = pygame.font.Font(None, 18)
-        self.f_tiny = pygame.font.Font(None, 15)
-
-        self._panel_surf = pygame.Surface((self.PANEL_W, self.panel_h), pygame.SRCALPHA)
-        BrainVisualizer._glow_surf = pygame.Surface(
-            (self._GLOW * 2, self._GLOW * 2), pygame.SRCALPHA
-        )
-
-        self._node_positions_built = False
-        self._pos_in = []
-        self._pos_h1 = []
-        self._pos_h2 = []
-        self._pos_out = []
-        self._ripples = []
-        self._recurrent_pulse = 0.0
+        self.state_flash_timer = 0.0
+        self.prev_state = None
 
     def update(self, dt, selected_fish):
-        self.anim_t += dt
-        self._recurrent_pulse = (self._recurrent_pulse + dt * 3) % (math.pi * 2)
-
         if selected_fish is not None:
-            self.slide_x = max(0.0, self.slide_x - 14 * dt * 60)
-            target_i = self._INTENSITY.get(selected_fish.state, 0.5)
-            self.anim_intensity += (target_i - self.anim_intensity) * 2.5 * dt
+            self.panel_offset_x = max(0, self.panel_offset_x - 14 * dt * 60)
+            target_intensity = {
+                FishState.RESTING: 0.35,
+                FishState.HUNTING: 0.75,
+                FishState.FLEEING: 1.0,
+                FishState.MATING: 0.65,
+                FishState.NESTING: 0.55,
+            }.get(selected_fish.state, 0.5)
+            self.anim_intensity += (target_intensity - self.anim_intensity) * 3.0 * dt
+
             if selected_fish.state != self.prev_state:
-                self.state_flash = 0.6
+                self.state_flash_timer = 0.6
             self.prev_state = selected_fish.state
         else:
-            self.slide_x = min(float(self.PANEL_W), self.slide_x + 14 * dt * 60)
-            self._ripples.clear()
-            self._node_positions_built = False
+            self.panel_offset_x = min(self.panel_width, self.panel_offset_x + 14 * dt * 60)
 
-        if self.state_flash > 0:
-            self.state_flash = max(0.0, self.state_flash - dt)
+        if self.state_flash_timer > 0:
+            self.state_flash_timer = max(0, self.state_flash_timer - dt)
 
-        self._ripples = [
-            (a + dt, m, pos, col) for a, m, pos, col in self._ripples if a < m
-        ]
-
-        # Trigger ripples on active inputs
-        if self._pos_in and selected_fish is not None:
-            inp = selected_fish.last_inputs
-            if len(inp) >= NN_INPUT_COUNT:
-                for i, node_pos in enumerate(self._pos_in):
-                    act = inp[i] if i < len(inp) else 0.0
-                    if abs(act) > 0.3 and random.random() < abs(act) * dt * 3:
-                        self._ripples.append(
-                            (0.0, 0.6, node_pos, activation_color(act))
-                        )
-
-    def draw(self, screen, selected_fish, time):
-        if self.slide_x >= self.PANEL_W:
+    def draw(self, screen, fish, time):
+        if self.panel_offset_x >= self.panel_width:
             return
 
-        surf = self._panel_surf
-        surf.fill((0, 0, 0, 0))
-        surf.fill((*BG, 245))
+        accent = self._get_accent_color(fish)
 
-        accent = SPECIES_ACCENT.get(
-            (selected_fish.is_cleaner, selected_fish.is_predator), AMBER
-        )
-        accent_dim = SPECIES_ACCENT_DIM.get(
-            (selected_fish.is_cleaner, selected_fish.is_predator), AMBER_DIM
-        )
+        # Create panel surface
+        surf = pygame.Surface((self.panel_width, self.panel_height), pygame.SRCALPHA)
+        surf.fill(self.bg_color)
 
-        # Side glow
-        for gx in range(4):
-            a = int(80 * (1 - gx / 4) * (0.8 + 0.2 * math.sin(self.anim_t * 2.5)))
-            pygame.draw.line(surf, (*accent, a), (gx, 0), (gx, self.panel_h))
+        # Soft inner glow border
+        pygame.draw.rect(surf, (*accent, 40), (0, 0, self.panel_width, self.panel_height), border_radius=12)
+        pygame.draw.rect(surf, accent, (0, 0, self.panel_width, self.panel_height), width=4, border_radius=12)
 
-        y = 18
-        y = self._draw_header(surf, selected_fish, accent, y)
-        y = self._draw_divider(surf, y)
-        y = self._draw_status_bars(surf, selected_fish, accent, y)
-        y = self._draw_divider(surf, y)
-        y = self._draw_network(surf, selected_fish, accent, accent_dim, y)
-        y = self._draw_divider(surf, y)
-        y = self._draw_outputs(surf, selected_fish, accent, y)
-        y = self._draw_divider(surf, y)
-        y = self._draw_temporal_context(surf, selected_fish, accent, y)
-        y = self._draw_divider(surf, y)
-        self._draw_traits(surf, selected_fish, accent, y)
+        y = 24
+        y = self._draw_header(surf, fish, accent, y)
+        y = self._draw_status_bars(surf, fish, y)
+        y = self._draw_neural_network(surf, fish, time, accent, y)
+        y = self._draw_output_section(surf, fish, time, y)
+        y = self._draw_traits(surf, fish, y)
+        y = self._draw_lifetime_stats(surf, fish, y)
 
-        dest_x = self.screen_w - self.PANEL_W + int(self.slide_x)
-        screen.blit(surf, (dest_x, 0))
+        # Blit to main screen
+        screen.blit(surf, (self.screen_width - self.panel_width + int(self.panel_offset_x), 0))
+
+    def _get_accent_color(self, fish):
+        if fish.is_predator:
+            return self.accent_predator
+        return self.accent_cleaner if fish.is_cleaner else self.accent_common
+
+    # ===================================================================
+    # SECTION DRAWERS
+    # ===================================================================
 
     def _draw_header(self, surf, fish, accent, y):
-        PAD = 16
-        pill_w = 80
-        species = (
-            "PREDATOR"
-            if fish.is_predator
-            else "CLEANER" if fish.is_cleaner else "COMMON"
-        )
-        draw_capsule(surf, (*accent, 200), PAD, y, pill_w, 22, radius=11)
-        t = self.f_tiny.render(species, True, BG)
-        surf.blit(t, (PAD + (pill_w - t.get_width()) // 2, y + 4))
-        y += 32
-        base_c = (
-            RED_ACC
-            if fish.state == FishState.FLEEING
-            else AMBER if fish.state == FishState.HUNTING else TEXT_SECONDARY
-        )
-        state_c = (
-            lerp_color(base_c, TEXT_PRIMARY, self.state_flash / 0.6)
-            if self.state_flash > 0
-            else base_c
-        )
-        t = self.f_body.render(f"  {fish.state.name}", True, state_c)
-        surf.blit(t, (PAD + 4, y))
-        y += 26
-        return y
+        species = "PREDATOR" if fish.is_predator else ("CLEANER" if fish.is_cleaner else "COMMON")
+        pill_rect = pygame.Rect(24, y, 138, 34)
+        pygame.draw.rect(surf, accent, pill_rect, border_radius=17)
+        txt = self.font_heading.render(species, True, (255, 255, 255))
+        surf.blit(txt, (pill_rect.x + 12, pill_rect.y + 5))
 
-    def _draw_divider(self, surf, y, margin=16):
-        pygame.draw.line(surf, DIVIDER, (margin, y), (self.PANEL_W - margin, y))
-        return y + 10
+        # Life stage
+        if fish.age < FISH_LARVA_DURATION:
+            stage = "LARVA"
+        elif fish.age < FISH_LARVA_DURATION + FISH_JUVENILE_DURATION:
+            stage = "JUVENILE"
+        elif fish.age > FISH_MAX_AGE * 0.85:
+            stage = "ELDER"
+        else:
+            stage = "ADULT"
 
-    def _draw_status_bars(self, surf, fish, accent, y):
-        PAD = 16
-        LW, BAR_H = 62, 10
-        BAR_W = self.PANEL_W - PAD * 2 - LW - 32
-        bars = [
-            ("ENERGY", max(0.0, min(1.0, fish.energy / FISH_MAX_ENERGY)), accent),
-            ("STAMINA", fish.stamina / 100.0, (80, 220, 140)),
-        ]
-        for label, ratio, color in bars:
-            surf.blit(self.f_tiny.render(label, True, TEXT_LABEL), (PAD, y + 1))
-            bx = PAD + LW
-            pygame.draw.rect(surf, BG_SECTION, (bx, y, BAR_W, BAR_H), border_radius=5)
-            pygame.draw.rect(
-                surf, color, (bx, y, int(BAR_W * ratio), BAR_H), border_radius=5
-            )
-            y += 20
-        return y + 6
+        sex_icon = "♂" if fish.sex == "M" else "♀"
+        pregnant = " • PREGNANT" if fish.is_pregnant else ""
+        identity = f"{sex_icon} {stage} • { 'MATURE' if fish.is_mature else 'IMMATURE' }{pregnant}"
+        txt = self.font_small.render(identity, True, (220, 220, 240))
+        surf.blit(txt, (24, y + 42))
 
-    def _draw_network(self, surf, fish, accent, accent_dim, y):
-        PAD = 16
-        surf.blit(self.f_small.render("NEURAL NETWORK (Improved)", True, TEXT_LABEL), (PAD, y))
-        y += 20
-        NET_H = 200
+        # State with flash
+        state_color = (255, 100, 100) if fish.state == FishState.FLEEING else \
+                      (255, 170, 60) if fish.state == FishState.HUNTING else \
+                      (120, 255, 160) if fish.state == FishState.RESTING else \
+                      (200, 140, 255)
+
+        if self.state_flash_timer > 0:
+            flash = int(255 * (self.state_flash_timer / 0.6))
+            state_color = (min(255, state_color[0] + flash), min(255, state_color[1] + flash), min(255, state_color[2] + flash))
+
+        txt = self.font_body.render(fish.state.name.upper(), True, state_color)
+        surf.blit(txt, (24, y + 68))
+
+        return y + 110
+
+    def _draw_status_bars(self, surf, fish, y):
+        bar_w, bar_h = 310, 22
+        label_x = 24
+
+        for label, ratio, color in [
+            ("LIFE", max(0, 1 - fish.age / (FISH_MAX_AGE * fish.traits.physical_traits.get("lifespan_mult", 1.0))), (100, 180, 255)),
+            ("ENERGY", max(0, min(1, fish.energy / FISH_MAX_ENERGY)), (255, 200, 80)),
+            ("STAMINA", fish.stamina / 100.0, (100, 255, 160)),
+        ]:
+            # Label
+            txt = self.font_body.render(label, True, (200, 210, 230))
+            surf.blit(txt, (label_x, y))
+
+            # Bar background
+            bar_x = label_x + 78
+            pygame.draw.rect(surf, (28, 32, 48), (bar_x, y + 4, bar_w, bar_h), border_radius=8)
+
+            # Fill
+            fill_w = int(bar_w * ratio)
+            pygame.draw.rect(surf, color, (bar_x, y + 4, fill_w, bar_h), border_radius=8)
+
+            # Percentage
+            pct = self.font_small.render(f"{int(ratio * 100)}%", True, (230, 230, 240))
+            surf.blit(pct, (bar_x + bar_w + 12, y + 5))
+
+            y += 42
+
+        return y + 12
+
+    def _draw_neural_network(self, surf, fish, time, accent, y):
+        title = self.font_heading.render("NEURAL NETWORK", True, (255, 255, 255))
+        surf.blit(title, (24, y))
+        y += 38
+
+        net_h = 260
         net_top = y
-        W = self.PANEL_W
-        xs = {
-            "in": int(W * 0.12),
-            "h1": int(W * 0.35),
-            "h2": int(W * 0.60),
-            "out": int(W * 0.88),
+
+        # Node positions
+        cols = {
+            "input": 68,
+            "hidden1": 168,
+            "hidden2": 268,
+            "output": 368
         }
 
-        def col_nodes(x, n):
-            return [(x, net_top + int((i + 0.5) * NET_H / n)) for i in range(n)]
+        # Input nodes (grouped)
+        input_labels = ["FOOD", "THREAT", "MATE", "ENERGY", "STAMINA", "DEPTH", "SPEED", "SAFETY"]
+        input_pos = []
+        for i in range(8):
+            py = net_top + 18 + i * 28
+            input_pos.append((cols["input"], py))
+            # Draw node
+            self._draw_node(surf, input_pos[-1], fish.last_inputs[i] if i < len(fish.last_inputs) else 0, time, 7)
 
-        # Build node positions for current architecture
-        pos_in = col_nodes(xs["in"], NN_INPUT_COUNT)
-        pos_h1 = col_nodes(xs["h1"], NN_HIDDEN1_SIZE)
-        pos_h2 = col_nodes(xs["h2"], NN_HIDDEN2_SIZE)
-        pos_out = col_nodes(xs["out"], NN_OUTPUT_COUNT)
+        # Hidden 1 & 2
+        h1_pos = [(cols["hidden1"], net_top + 30 + i * 26) for i in range(8)]
+        h2_pos = [(cols["hidden2"], net_top + 38 + i * 30) for i in range(6)]
 
-        if not self._node_positions_built:
-            self._pos_in, self._pos_h1, self._pos_h2, self._pos_out = (
-                pos_in,
-                pos_h1,
-                pos_h2,
-                pos_out,
-            )
-            self._node_positions_built = True
-
-        inp = list(fish.last_inputs)
-        h1 = list(fish.last_hidden1)
-        h2 = list(fish.last_hidden)
-        out = list(fish.last_outputs)
-
-        # Draw connections
-        def draw_connections(src_pos, dst_pos, src_acts):
-            for i, sp in enumerate(src_pos):
-                act = src_acts[i] if i < len(src_acts) else 0.0
-                for dp in dst_pos:
-                    pts = _bezier_points(sp, dp, steps=12)
-                    pygame.draw.lines(surf, _COL_DIM_WIRE, False, pts, 1)
-                    if abs(act) > 0.25:
-                        pygame.draw.lines(surf, activation_color(act), False, pts, 1)
-
-        draw_connections(pos_in, pos_h1, inp)
-        draw_connections(pos_h1, pos_h2, h1)
-        draw_connections(pos_h2, pos_out, h2)
-
-        # Draw recurrent loop indicator on h2
-        if fish.brain.recurrent if hasattr(fish, 'brain') else False:
-            pulse_alpha = int(100 + 50 * math.sin(self._recurrent_pulse))
-            rec_color = (*PURPLE, pulse_alpha)
-            for pos in pos_h2:
-                # Small loop arc
-                pygame.draw.circle(surf, PURPLE_DIM, (int(pos[0]) - 8, int(pos[1])), 5, 1)
-
-        # Draw nodes
-        def draw_node(pos, act, r=5, label=None):
-            col = activation_color(act)
-            pygame.draw.circle(surf, col, pos, r)
-            if label:
-                tl = self.f_tiny.render(label, True, TEXT_LABEL)
-                surf.blit(tl, (pos[0] + r + 3, pos[1] - 6))
-
-        # Input nodes (smaller, more of them)
-        for i, pos in enumerate(pos_in):
-            draw_node(pos, inp[i] if i < len(inp) else 0.0, r=3)
-
-        # Hidden 1 nodes
-        for i, pos in enumerate(pos_h1):
-            draw_node(pos, h1[i] if i < len(h1) else 0.0, r=4)
-
-        # Hidden 2 nodes (with recurrent indicator)
-        for i, pos in enumerate(pos_h2):
-            draw_node(pos, h2[i] if i < len(h2) else 0.0, r=5)
-            # Recurrent pulse
-            if fish.brain.recurrent if hasattr(fish, 'brain') else False:
-                pulse = int(4 + 2 * math.sin(self._recurrent_pulse + i))
-                pygame.draw.circle(surf, (*PURPLE, 100), pos, pulse + 3, 1)
+        for pos in h1_pos + h2_pos:
+            act = fish.last_hidden1[i] if pos in h1_pos and i < len(fish.last_hidden1) else fish.last_hidden[i % 6]
+            self._draw_node(surf, pos, act, time, 8)
 
         # Output nodes
-        for i, pos in enumerate(pos_out):
-            draw_node(pos, out[i] if i < len(out) else 0.0, r=6, label=OUTPUT_LABELS[i] if i < len(OUTPUT_LABELS) else None)
+        out_pos = [(cols["output"], net_top + 70 + i * 60) for i in range(2)]
+        for pos, label in zip(out_pos, ["STEER", "THRUST"]):
+            act = fish.last_outputs[0] if label == "STEER" else fish.last_outputs[1]
+            self._draw_node(surf, pos, act, time, 10)
+            txt = self.font_tiny.render(label, True, (200, 220, 255))
+            surf.blit(txt, (pos[0] + 18, pos[1] - 8))
 
-        y += NET_H + 8
+        # Connections (background faint + active glowing)
+        self._draw_connections(surf, input_pos, h1_pos, fish.last_inputs, time)
+        self._draw_connections(surf, h1_pos, h2_pos, fish.last_hidden1, time)
+        self._draw_connections(surf, h2_pos, out_pos, fish.last_hidden, time)
+
+        return net_top + net_h + 24
+
+    def _draw_node(self, surf, pos, activation, time, radius):
+        color = self._activation_color(activation)
+        # Glow
+        glow_r = radius + math.sin(time * 3.5 * self.anim_intensity) * 2.5
+        glow_surf = pygame.Surface((int(glow_r * 3), int(glow_r * 3)), pygame.SRCALPHA)
+        pygame.draw.circle(glow_surf, (*color, 35), (int(glow_r * 1.5), int(glow_r * 1.5)), int(glow_r + 3))
+        surf.blit(glow_surf, (pos[0] - glow_r * 1.5, pos[1] - glow_r * 1.5))
+        # Core node
+        pygame.draw.circle(surf, color, pos, radius)
+        pygame.draw.circle(surf, (255, 255, 255), pos, radius, 2)
+
+    def _activation_color(self, value):
+        t = min(1.0, abs(value))
+        if value > 0:
+            return (80 + int(175 * t), 255, 140 + int(115 * t))
+        return (255, 80 + int(175 * t), 220 + int(35 * t))
+
+    def _draw_connections(self, surf, from_nodes, to_nodes, activations, time):
+        for i, p1 in enumerate(from_nodes):
+            act = activations[i] if i < len(activations) else 0
+            if abs(act) < 0.15:
+                continue
+            color = self._activation_color(act)
+            alpha = int(40 + abs(act) * 200)
+            for p2 in to_nodes:
+                self._draw_bezier(surf, p1, p2, (*color, alpha), thickness=2.5)
+                # Ripple
+                self._draw_ripple(surf, p1, p2, color, time, act)
+
+    def _draw_bezier(self, surf, p0, p1, color, thickness):
+        # Simple quadratic bezier
+        ctrl_x = (p0[0] + p1[0]) // 2 + 28
+        ctrl_y = (p0[1] + p1[1]) // 2
+        points = []
+        for t in range(21):
+            t = t / 20
+            x = (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * ctrl_x + t ** 2 * p1[0]
+            y = (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * ctrl_y + t ** 2 * p1[1]
+            points.append((int(x), int(y)))
+        for i in range(len(points) - 1):
+            pygame.draw.line(surf, color, points[i], points[i + 1], thickness)
+
+    def _draw_ripple(self, surf, p0, p1, color, time, activation):
+        t = (time * 2.2 * self.anim_intensity + abs(activation) * 2) % 1.0
+        ctrl_x = (p0[0] + p1[0]) // 2 + 28
+        ctrl_y = (p0[1] + p1[1]) // 2
+        x = (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * ctrl_x + t ** 2 * p1[0]
+        y = (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * ctrl_y + t ** 2 * p1[1]
+        pygame.draw.circle(surf, color, (int(x), int(y)), 4)
+
+    def _draw_output_section(self, surf, fish, time, y):
+        title = self.font_heading.render("OUTPUT INTERPRETATION", True, (200, 210, 230))
+        surf.blit(title, (24, y))
+        y += 36
+
+        # STEER (left-right gauge)
+        self._draw_steer_gauge(surf, fish.last_outputs[0] if fish.last_outputs else 0, y)
+        y += 68
+
+        # THRUST
+        self._draw_thrust_gauge(surf, fish.last_outputs[1] if len(fish.last_outputs) > 1 else 0, y)
+        y += 72
+
         return y
 
-    def _draw_outputs(self, surf, fish, accent, y):
-        PAD = 16
-        surf.blit(self.f_small.render("BEHAVIOR DRIVES", True, TEXT_LABEL), (PAD, y))
-        y += 18
-        out = fish.last_outputs
-        gx, gw, gh = PAD + 52, self.PANEL_W - PAD * 2 - 80, 10
+    def _draw_steer_gauge(self, surf, value, y):
+        x = 24
+        pygame.draw.rect(surf, (28, 32, 48), (x + 72, y, 280, 24), border_radius=12)
+        center = x + 72 + 140
+        pygame.draw.line(surf, (100, 120, 160), (center, y), (center, y + 24), 2)
 
-        drives = [
-            ("STEER", out[0], True),
-            ("THRUST", max(0.0, min(1.0, out[1] if len(out) > 1 else 0.5)), False),
-            ("HIDE/AMBUSH", out[2] if len(out) > 2 else 0.5, False),
-            ("SPRINT/DASH", out[3] if len(out) > 3 else 0.5, False),
+        needle_x = center + int(value * 135)
+        pygame.draw.rect(surf, (80, 255, 220), (needle_x - 3, y - 4, 6, 32))
+
+        txt = self.font_small.render("← LEFT          RIGHT →", True, (160, 170, 200))
+        surf.blit(txt, (x + 82, y + 30))
+
+    def _draw_thrust_gauge(self, surf, value, y):
+        norm = (value + 1) / 2
+        x = 24
+        pygame.draw.rect(surf, (28, 32, 48), (x + 72, y, 280, 24), border_radius=12)
+        fill = int(280 * norm)
+        col = (255, int(255 * norm * 2), 80) if norm < 0.5 else (int(255 * (1 - (norm - 0.5) * 2)), 255, 100)
+        pygame.draw.rect(surf, col, (x + 72, y, fill, 24), border_radius=12)
+
+    def _draw_traits(self, surf, fish, y):
+        title = self.font_heading.render("HERITABLE TRAITS", True, (200, 210, 230))
+        surf.blit(title, (24, y))
+        y += 34
+
+        traits = fish.traits.physical_traits
+        data = [
+            ("SPEED", traits.get("max_speed_mult", 1.0)),
+            ("STAMINA", traits.get("stamina_mult", 1.0)),
+            ("AGILITY", traits.get("turn_rate_mult", 1.0)),
+            ("METABOLISM", traits.get("metabolism_mult", 1.0)),
+            ("SIZE", traits.get("size_mult", 1.0)),
+            ("LIFESPAN", traits.get("lifespan_mult", 1.0)),
         ]
 
-        for label, val, dual in drives:
-            surf.blit(self.f_tiny.render(label, True, TEXT_SECONDARY), (PAD, y + 1))
-            pygame.draw.rect(surf, BG_SECTION, (gx, y, gw, gh), border_radius=5)
-            if dual:
-                fw = int(abs(val) * gw / 2)
-                fx = gx + gw // 2 if val >= 0 else gx + gw // 2 - fw
-                pygame.draw.rect(
-                    surf, activation_color(val), (fx, y, fw, gh), border_radius=5
-                )
-            else:
-                pygame.draw.rect(
-                    surf, accent, (gx, y, int(gw * max(0, min(1, val))), gh), border_radius=5
-                )
-            y += 16
-        return y + 4
+        for label, val in data:
+            txt = self.font_body.render(label, True, (200, 210, 230))
+            surf.blit(txt, (24, y))
+            bar_x = 130
+            pygame.draw.rect(surf, (28, 32, 48), (bar_x, y + 6, 220, 10), border_radius=5)
+            offset = (val - 1.0) * 110
+            col = (120, 255, 160) if val > 1 else (255, 170, 80)
+            pygame.draw.rect(surf, col, (bar_x + 110, y + 6, offset, 10), border_radius=5)
+            val_txt = self.font_small.render(f"{val:.2f}", True, (220, 230, 255))
+            surf.blit(val_txt, (bar_x + 240, y + 3))
+            y += 28
 
-    def _draw_temporal_context(self, surf, fish, accent, y):
-        """Display the new temporal context inputs."""
-        PAD = 16
-        surf.blit(self.f_small.render("TEMPORAL CONTEXT (NEW)", True, PURPLE), (PAD, y))
-        y += 18
-        gx, gw, gh = PAD + 52, self.PANEL_W - PAD * 2 - 80, 8
+        return y + 12
 
-        inp = fish.last_inputs
-        
-        # Temporal inputs are at indices 18-25
-        temporal_labels = [
-            ("TIME", TEMPORAL_TIME_IDX),
-            ("SEASON", TEMPORAL_SEASON_IDX),
-            ("WAS_REST", TEMPORAL_WAS_REST_IDX),
-            ("WAS_HUNT", TEMPORAL_WAS_HUNT_IDX),
-            ("WAS_FLEE", TEMPORAL_WAS_FLEE_IDX),
-            ("WAS_MATE", TEMPORAL_WAS_MATE_IDX),
-            ("WAS_NEST", TEMPORAL_WAS_NEST_IDX),
-            ("HUNGER", TEMPORAL_HUNGER_IDX),
-        ]
-        
-        for label, idx in temporal_labels:
-            val = inp[idx] if idx < len(inp) else 0.0
-            surf.blit(self.f_tiny.render(label, True, TEXT_SECONDARY), (PAD, y + 1))
-            pygame.draw.rect(surf, BG_SECTION, (gx, y, gw, gh), border_radius=4)
-            pygame.draw.rect(
-                surf, PURPLE_DIM, (gx, y, int(gw * max(0, min(1, val))), gh), border_radius=4
-            )
-            y += 12
-        return y + 4
+    def _draw_lifetime_stats(self, surf, fish, y):
+        title = self.font_heading.render("LIFETIME STATS", True, (200, 210, 230))
+        surf.blit(title, (24, y))
+        y += 32
 
-    def _draw_traits(self, surf, fish, accent, y):
-        PAD = 16
-        surf.blit(self.f_small.render("HERITABLE TRAITS", True, TEXT_LABEL), (PAD, y))
-        y += 18
-        LW, TW, TH = 70, self.PANEL_W - PAD * 2 - 100, 8
-
-        trait_rows = [
-            ("max_speed_mult", "Speed"),
-            ("stamina_mult", "Stamina"),
-            ("turn_rate_mult", "Turn"),
-            ("metabolism_mult", "Metab"),
-            ("size_mult", "Size"),
+        stats = [
+            ("FOOD EATEN", str(fish.food_eaten), (80, 255, 220)),
+            ("DISTANCE", f"{int(fish.distance_traveled)}", (255, 200, 100)),
+            ("OFFSPRING", str(fish.offspring_count), (255, 140, 200)),
         ]
 
-        for trait_key, display_label in trait_rows:
-            if trait_key not in fish.traits.physical_traits:
-                continue
+        for i, (label, value, col) in enumerate(stats):
+            x = 24 + i * 148
+            pygame.draw.rect(surf, (20, 24, 38), (x, y, 130, 72), border_radius=12)
+            pygame.draw.rect(surf, col, (x, y, 130, 72), width=3, border_radius=12)
 
-            val = fish.traits.physical_traits[trait_key]
-            surf.blit(self.f_tiny.render(display_label, True, TEXT_SECONDARY), (PAD, y + 1))
-            pygame.draw.rect(surf, BG_SECTION, (PAD + LW, y, TW, TH), border_radius=4)
-            dev = (val - 1.0) / 0.8
-            bar_width = max(0, int(abs(dev) * TW / 2))
-            bar_x = PAD + LW + TW // 2 if dev >= 0 else PAD + LW + TW // 2 - bar_width
-            pygame.draw.rect(
-                surf,
-                TEAL if dev > 0 else AMBER,
-                (bar_x, y, bar_width, TH),
-                border_radius=4,
-            )
-            y += 14
-        return y + 4
+            val_txt = self.font_title.render(value, True, col)
+            surf.blit(val_txt, (x + 18, y + 12))
+            label_txt = self.font_tiny.render(label, True, (160, 170, 200))
+            surf.blit(label_txt, (x + 18, y + 48))
+
+        return y + 88
