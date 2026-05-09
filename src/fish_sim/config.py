@@ -261,6 +261,10 @@ PREDATOR_DASH_CLOSE_RANGE = 180  # Always dash if closer than this
 PREDATOR_SCAVENGE_THRESHOLD = 20.0
 PREDATOR_SCAVENGE_ENERGY_GAIN = 8.0
 
+# Predator collision and interaction ranges
+PREDATOR_COLLISION_RADIUS_MULT = 20  # Multiplied by size for bite collision
+PREDATOR_EGG_EATING_RANGE = 40  # Distance to eat eggs when scavenging
+
 # Cleaner Fish – Mutualism & Scavenging
 CLEANER_CLEANING_RANGE = 60.0
 CLEANER_CLEANING_DURATION = 1.8
