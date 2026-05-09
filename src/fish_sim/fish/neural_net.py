@@ -234,6 +234,10 @@ class NeuralNet:
             
         return child
 
+    def clone(self) -> 'NeuralNet':
+        """Alias for copy() - create an identical copy of this network."""
+        return self.copy()
+
     # ── Reproduction ─────────────────────────────────────────────────────────
 
     @staticmethod

@@ -226,6 +226,14 @@ class FishTraits:
         """Returns a mutated version of these traits (for asexual or single-parent legacy logic)"""
         return FishTraits.blend(self, self)
 
+    def clone(self):
+        """Create an exact copy of these traits without mutation."""
+        return FishTraits(
+            color_offset=self.color_offset,
+            physical_traits=dict(self.physical_traits),
+            appearance_traits=dict(self.appearance_traits)
+        )
+
     # ── Appearance accessor methods ─────────────────────────────────────────
 
     def get_body_proportions(self):
