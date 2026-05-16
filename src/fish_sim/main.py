@@ -78,13 +78,14 @@ class Simulation:
         self.camera.update()
 
     def draw(self):
+        dt = self.clock.get_time() / 1000.0
         self.screen.fill((0, 0, 0))
 
         # Draw world with time-of-day lighting
         self.world.draw(self.screen, self.camera, self.time_system)
         self.particle_system.draw(self.screen, self.camera, self.time_system)
         self.plant_manager.draw(self.screen, self.camera, self.time_system.time_of_day)
-        self.fish_system.draw(self.screen, self.camera, self.time_system.time_of_day)
+        self.fish_system.draw(self.screen, self.camera, self.time_system.time_of_day, dt, self.time_system)
 
         # Instructions (bottom left)
         instructions = [

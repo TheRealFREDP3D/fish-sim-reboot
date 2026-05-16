@@ -177,7 +177,7 @@ class CleanerFish(NeuralFish):
     def _update_scavenging(self, dt, poops):
         """Pillar 2: Scavenging behavior using NN's clean_drive output."""
         if not self._is_actively_cleaning:
-            clean_drive = self.last_outputs[2] if len(self.last_outputs) > 2 else 0.5
+            clean_drive = self.last_outputs[4] if len(self.last_outputs) > 4 else 0.5
             nearest_poop = self._find_nearest_poop(poops)
             if nearest_poop and clean_drive > 0.3:
                 seek = self.physics.seek(

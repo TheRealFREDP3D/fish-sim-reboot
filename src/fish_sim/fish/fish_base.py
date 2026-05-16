@@ -394,6 +394,72 @@ class NeuralFish:
             min(1.0, max(0.0, self.age / FISH_MAX_AGE)),
         ]
         
+        # Add specialized inputs
+        prey_dist_input = 0.0
+        client_dist_input = 0.0
+        poop_dist_input = 0.0
+
+        if self.is_predator:
+            # Find closest viable prey
+            closest_prey_dist = float('inf')
+            for f in all_fish:
+                if f is self:
+                    continue
+                # Only consider non-predator, non-hidden fish that are smaller
+                if not f.is_predator and not f.is_hidden and self.get_current_size_mult() >= f.get_current_size_mult() * 1.0:
+                    dist = self.physics.pos.distance_to(f.physics.pos)
+                    if dist < closest_prey_dist:
+                        closest_prey_dist = dist
+            if closest_prey_dist != float('inf'):
+                # Normalize to 0-1, closer is higher
+                prey_dist_input = 1.0 - (closest_prey_dist / FISH_SENSOR_RANGE)
+
+        if self.is_cleaner:
+            # Find closest client needing cleaning
+            best_client = None
+            best_score = -1.0
+            my_pos = self.physics.pos
+            for fish in all_fish:
+                if fish is self:
+                    continue
+                if fish.is_predator or not fish.is_mature:
+                    continue
+                if fish.is_cleaner:
+                    continue
+                dist = my_pos.distance_to(fish.physics.pos)
+                if dist > 60.0:
+                    continue
+                need = getattr(fish, "needs_cleaning", 0.0)
+                if need < 0.15:
+                    continue
+                proximity_bonus = 1.0 - (dist / 60.0)
+                score = need * 2.0 + proximity_bonus
+                if score > best_score:
+                    best_score = score
+                    best_client = fish
+            if best_client:
+                dist = self.physics.pos.distance_to(best_client.physics.pos)
+                # Normalize to 0-1, closer is higher
+                client_dist_input = 1.0 - (dist / 60.0)
+
+            # Find closest poop
+            poops = [t for t in targets if hasattr(t, "nutrition") and not getattr(t, "is_plankton", False)]
+            nearest_poop = None
+            best_dist = 200.0
+            for poop in poops:
+                dist = self.physics.pos.distance_to((poop.x, poop.y))
+                if dist < best_dist:
+                    best_dist = dist
+                    nearest_poop = poop
+            if nearest_poop:
+                dist = self.physics.pos.distance_to((nearest_poop.x, nearest_poop.y))
+                # Normalize to 0-1, closer is higher
+                poop_dist_input = 1.0 - (dist / FISH_SENSOR_RANGE)
+
+        stats.append(max(0.0, min(1.0, prey_dist_input)))
+        stats.append(max(0.0, min(1.0, client_dist_input)))
+        stats.append(max(0.0, min(1.0, poop_dist_input)))
+
         return radar + stats
 
     # ═════════════════════════════════════════════════════════════════════════
@@ -571,12 +637,15 @@ class NeuralFish:
         self.last_outputs = outputs
         self.output_history.append(list(outputs[:4]))
 
-        # Parse outputs
+        # Parse outputs (new expanded architecture)
         steer_out = outputs[0]
         thrust_out = outputs[1]
         hide_drive = outputs[2]
         sprint_drive = outputs[3]
-        raw_state_probs = outputs[4:9]
+        clean_drive = outputs[4]
+        ambush_drive = outputs[5]
+        dash_drive = outputs[6]
+        raw_state_probs = outputs[7:12]
         self.last_state_probs = raw_state_probs
 
         # ── State selection (with predator hunting bias) ────────────────

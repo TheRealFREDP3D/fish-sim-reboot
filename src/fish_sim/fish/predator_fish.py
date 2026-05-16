@@ -141,12 +141,12 @@ class PredatorFish(NeuralFish):
 
         # ═══════════════════════════════════════════════════════════════════
         # IMPROVED: Use NN outputs for hunting behavior
-        # ambush_drive = output[2], dash_drive = output[3]
+        # ambush_drive = output[5], dash_drive = output[6]
         # ═══════════════════════════════════════════════════════════════════
-        
+
         # Get behavior drives from NN
-        ambush_drive = self.last_outputs[2] if len(self.last_outputs) > 2 else 0.5
-        dash_drive = self.last_outputs[3] if len(self.last_outputs) > 3 else 0.5
+        ambush_drive = self.last_outputs[5] if len(self.last_outputs) > 5 else 0.5
+        dash_drive = self.last_outputs[6] if len(self.last_outputs) > 6 else 0.5
 
         # ── Hunting seek — predators ALWAYS pursue detected prey ───────────
         if closest_prey:

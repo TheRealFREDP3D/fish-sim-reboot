@@ -172,10 +172,10 @@ MUTATION_RATE, MUTATION_STRENGTH = 0.2, 0.15
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Input counts (expanded for temporal context)
-NN_INPUT_COUNT = 27  # 9 radar + 18 stats (2 phys + 2 spatial + 3 env + 2 threats + 2 temporal + 5 state + 1 hunger + 1 age)
+NN_INPUT_COUNT = 30  # 9 radar + 18 stats (2 phys + 2 spatial + 3 env + 2 threats + 2 temporal + 5 state + 1 hunger + 1 age) + 3 specialized (Prey_Distance, Client_Distance, Poop_Distance)
 NN_HIDDEN1_SIZE = 14  # Increased from 12
 NN_HIDDEN2_SIZE = 8   # Same
-NN_OUTPUT_COUNT = 9
+NN_OUTPUT_COUNT = 12
 
 # Recurrent network settings
 NN_RECURRENT = True

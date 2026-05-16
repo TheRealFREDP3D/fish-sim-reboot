@@ -44,9 +44,12 @@ class NeuralNet:
     Outputs:
         0: steer (tanh, -1 to 1)
         1: thrust (sigmoid, 0 to 1)
-        2: behavior_drive_1 (sigmoid, 0 to 1) - hide/clean/ambush
-        3: behavior_drive_2 (sigmoid, 0 to 1) - sprint/dash
-        4-8: state probabilities (softmax)
+        2: hide_drive (sigmoid, 0 to 1)
+        3: sprint_drive (sigmoid, 0 to 1)
+        4: clean_drive (sigmoid, 0 to 1)
+        5: ambush_drive (sigmoid, 0 to 1)
+        6: dash_drive (sigmoid, 0 to 1)
+        7-11: state probabilities (softmax)
     """
 
     def __init__(self, input_size=None, hidden_size=None, output_size=None, recurrent=None):
@@ -136,7 +139,7 @@ class NeuralNet:
             
         Returns:
             Tuple of (outputs, hidden1_activations, hidden2_activations)
-            outputs: [steer, thrust, behavior1, behavior2, state_probs...]
+            outputs: [steer, thrust, hide_drive, sprint_drive, clean_drive, ambush_drive, dash_drive, state_probs...]
         """
         # Normalize inputs to prevent extreme activations
         normalized = [max(-INPUT_MAX_ABS_VALUE, min(INPUT_MAX_ABS_VALUE, x)) for x in inputs]
@@ -191,16 +194,27 @@ class NeuralNet:
         # Output 1: thrust (sigmoid, 0 to 1)
         thrust = self.sigmoid(raw_outputs[1])
         
-        # Outputs 2-3: behavior drives (sigmoid, 0 to 1)
-        behavior1 = self.sigmoid(raw_outputs[2]) if len(raw_outputs) > 2 else 0.5
-        behavior2 = self.sigmoid(raw_outputs[3]) if len(raw_outputs) > 3 else 0.5
+        # Output 2: hide_drive (sigmoid, 0 to 1)
+        hide_drive = self.sigmoid(raw_outputs[2]) if len(raw_outputs) > 2 else 0.5
         
-        # Outputs 4-8: state probabilities (softmax)
-        state_logits = raw_outputs[4:9] if len(raw_outputs) >= 9 else [0.0] * 5
+        # Output 3: sprint_drive (sigmoid, 0 to 1)
+        sprint_drive = self.sigmoid(raw_outputs[3]) if len(raw_outputs) > 3 else 0.5
+        
+        # Output 4: clean_drive (sigmoid, 0 to 1)
+        clean_drive = self.sigmoid(raw_outputs[4]) if len(raw_outputs) > 4 else 0.5
+        
+        # Output 5: ambush_drive (sigmoid, 0 to 1)
+        ambush_drive = self.sigmoid(raw_outputs[5]) if len(raw_outputs) > 5 else 0.5
+        
+        # Output 6: dash_drive (sigmoid, 0 to 1)
+        dash_drive = self.sigmoid(raw_outputs[6]) if len(raw_outputs) > 6 else 0.5
+        
+        # Outputs 7-11: state probabilities (softmax)
+        state_logits = raw_outputs[7:12] if len(raw_outputs) >= 12 else [0.0] * 5
         state_probs = self.softmax(state_logits)
 
         # Combine all outputs
-        outputs = [steer, thrust, behavior1, behavior2] + state_probs
+        outputs = [steer, thrust, hide_drive, sprint_drive, clean_drive, ambush_drive, dash_drive] + state_probs
 
         return outputs, h1, h2
 
@@ -285,7 +299,7 @@ class NeuralNet:
 
         return child
 
-    def mutate(self, rate: float = None, strength: float = None) -> 'NeuralNet':
+    def mutate(self, rate: float | None = None, strength: float | None = None) -> 'NeuralNet':
         """Create a mutated copy with layer-specific mutation rates.
         
         Args:

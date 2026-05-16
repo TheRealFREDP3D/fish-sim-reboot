@@ -24,7 +24,7 @@ from .fish_base import NeuralFish, FishState
 from ..core.environment_objects import PoopParticle, FishEgg, DeadFish, BloodEffect
 from .fish_traits import FishTraits
 from .family import Family
-from ..ui.brain_visualizer import BrainVisualizer
+from ..ui.brain_visualizer_enhanced import EnhancedBrainVisualizer as BrainVisualizer
 from .neural_net import NeuralNet
 from .cleaner_fish import CleanerFish
 from .predator_fish import PredatorFish
