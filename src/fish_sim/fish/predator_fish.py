@@ -39,6 +39,8 @@ from ..config import (
     PREDATOR_DASH_MIN_ACTIVITY,
     PREDATOR_DASH_DRIVE_THRESHOLD,
     PREDATOR_DASH_CLOSE_RANGE,
+    PREDATOR_COLLISION_RADIUS_MULT,
+    PREDATOR_EGG_EATING_RANGE,
     CLEANER_IMMUNITY_CHANCE,
     PREY_PREDATOR_MIN_DISTANCE,
     FISH_HUNGER_THRESHOLD,
@@ -206,7 +208,7 @@ class PredatorFish(NeuralFish):
         # Damage-based hunting — always attempt to bite nearby prey
         # ═══════════════════════════════════════════════════════════════════
         for prey in prey_targets:
-            collision_radius = 20 * self.get_current_size_mult()
+            collision_radius = PREDATOR_COLLISION_RADIUS_MULT * self.get_current_size_mult()
             dist = math.hypot(
                 self.physics.pos.x - prey.physics.pos.x,
                 self.physics.pos.y - prey.physics.pos.y,
@@ -277,7 +279,7 @@ class PredatorFish(NeuralFish):
             if fish_system:
                 for egg in fish_system.eggs[:]:
                     dist = self.physics.pos.distance_to((egg.x, egg.y))
-                    if dist < 40:
+                    if dist < PREDATOR_EGG_EATING_RANGE:
                         self.energy = min(
                             FISH_MAX_ENERGY,
                             self.energy + PREDATOR_SCAVENGE_ENERGY_GAIN,
@@ -294,11 +296,8 @@ class PredatorFish(NeuralFish):
 
     def _create_blood_effect(self, x, y, heading):
         """Create a blood effect at the given position."""
-        try:
-            from environment_objects import BloodEffect
-            return BloodEffect(x, y, heading)
-        except ImportError:
-            return None
+        from ..core.environment_objects import BloodEffect
+        return BloodEffect(x, y, heading)
 
     def try_reproduce(self):
         """Check if predator can reproduce (population control)."""
