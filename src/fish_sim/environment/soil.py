@@ -339,7 +339,7 @@ class SoilGrid:
                     rect = pygame.Rect(
                         px - 1, py - 1, self.cell_size + 2, self.cell_size + 2
                     )
-                    pygame.draw.rect(screen, color, rect, border_radius=2)
+                    pygame.draw.rect(screen, color, rect)
 
                     # Soil-type specific detail rendering
                     if cell.soil_type == "rocky":

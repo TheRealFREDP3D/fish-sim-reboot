@@ -22,3 +22,11 @@ src/fish_sim/ui/__pycache__/brain_visualizer.cpython-314.pyc
 src/fish_sim/__pycache__/main.cpython-314.pyc
 /Improving Fish-Sim Brain Visualizer and Neural Network Design
 /src/fish_sim/__pycache__
+src/fish_sim/ui/__pycache__/brain_visualizer_enhanced.cpython-314.pyc
+.vscode/fish-sim-reboot.code-workspace
+src/fish_sim/ui/brain_visualizer_enhanced.py.bak
+src/fish_sim/environment/__pycache__/soil.cpython-314.pyc
+/src/fish_sim/plants/__pycache__
+/src/fish_sim/core/__pycache__
+/src/fish_sim/environment/__pycache__
+/src/fish_sim/ui/__pycache__

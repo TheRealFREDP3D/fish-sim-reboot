@@ -368,5 +368,7 @@ class FishSystem:
             p.draw(screen, camera)
         for f in self.fish + self.cleaner_fish + self.predators:
             f.draw(screen, camera, time, f == self.selected_fish, biolum_alpha=biolum)
+        
+        # Draw the visualizer overlay last
         if self.selected_fish:
             self.brain_visualizer.draw(screen, self.selected_fish, time)

@@ -1,4 +1,4 @@
-"""Base fish class with improved neural network integration.
+﻿"""Base fish class with improved neural network integration.
 
 Key improvements:
 - Normalized inputs (all clamped to [0, 1] or [-1, 1])
@@ -193,7 +193,7 @@ class NeuralFish:
         self._fin_phase = random.uniform(0, math.pi * 2)
         self._pattern_seed = random.randint(0, 10000)
 
-        # ── NEW: Temporal context for neural network ───────────────────────
+        # ΓöÇΓöÇ NEW: Temporal context for neural network ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         self._prev_state = FishState.RESTING
         self._frames_since_meal = 0
         self._last_food_count = 0
@@ -225,9 +225,9 @@ class NeuralFish:
             "size_mult", 1.0
         )
 
-    # ═════════════════════════════════════════════════════════════════════════
+    # ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     # IMPROVED: Normalized Sensory Inputs with Temporal Context
-    # ═════════════════════════════════════════════════════════════════════════
+    # ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
 
     def get_radar_inputs(self, all_fish, targets, plant_manager, time_system=None):
         """Collect and NORMALIZE all sensory inputs for the neural network.
@@ -279,7 +279,7 @@ class NeuralFish:
             if dist < 60:
                 self.is_hidden = True
 
-        # ── NORMALIZE cover and plant_food ─────────────────────────────────
+        # ΓöÇΓöÇ NORMALIZE cover and plant_food ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         cover_quality = min(1.0, max(0.0, cover_quality / 2.0))
         plant_food_total = min(1.0, max(0.0, sum(plant_food) / 3.0))
 
@@ -331,7 +331,7 @@ class NeuralFish:
             6,
         )
 
-        # ── Ambush Alert ──────────────────────────────────────────────────
+        # ΓöÇΓöÇ Ambush Alert ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         ambush_alert = 0.0
         if self.closest_plant:
             for f in all_fish:
@@ -343,15 +343,15 @@ class NeuralFish:
                         ambush_alert = 1.0
                         break
 
-        # ── NEW: One-hot encode previous state ─────────────────────────────
+        # ΓöÇΓöÇ NEW: One-hot encode previous state ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         state_onehot = [0.0] * len(FISH_STATE_ORDER)
         state_onehot[FISH_STATE_ORDER.index(self._prev_state)] = 1.0
 
-        # ── NEW: Time and season inputs ───────────────────────────────────
+        # ΓöÇΓöÇ NEW: Time and season inputs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         time_of_day = time_system.time_of_day if time_system else 0.5
         season_norm = time_system.season_index / 3.0 if time_system else 0.0
 
-        # ── NEW: Hunger memory ────────────────────────────────────────────
+        # ΓöÇΓöÇ NEW: Hunger memory ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         if self.food_eaten > self._last_food_count:
             self._frames_since_meal = 0
             self._last_food_count = self.food_eaten
@@ -359,7 +359,7 @@ class NeuralFish:
             self._frames_since_meal += 1
         hunger_memory = max(0.0, min(1.0, self._frames_since_meal / 600.0))
 
-        # ── Assemble NORMALIZED inputs ────────────────────────────────────
+        # ΓöÇΓöÇ Assemble NORMALIZED inputs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         stats = [
             # Core physiology (0-1)
             max(0.0, min(1.0, self.energy / FISH_MAX_ENERGY)),
@@ -378,9 +378,9 @@ class NeuralFish:
             min(1.0, max(0.0, ambush_alert)),
             min(1.0, max(0.0, min_mate_dist / FISH_SENSOR_RANGE)),
             
-            # ════════════════════════════════════════════════════════════
+            # ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
             # NEW: Temporal context inputs
-            # ════════════════════════════════════════════════════════════
+            # ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
             time_of_day,           # 0-1: fraction of day
             season_norm,           # 0-1: 0=spring, 1=winter
             
@@ -462,9 +462,9 @@ class NeuralFish:
 
         return radar + stats
 
-    # ═════════════════════════════════════════════════════════════════════════
+    # ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     # IMPROVED: State biases with strong predator hunting drive
-    # ═════════════════════════════════════════════════════════════════════════
+    # ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
 
     def _pick_state(
         self,
@@ -485,22 +485,22 @@ class NeuralFish:
         # Convert probabilities back to log-space for bias addition
         logits = [math.log(max(p, 1e-9)) for p in raw_state_probs]
 
-        # ── Predator: strong baseline hunting drive ──────────────────────
-        # Predators are apex hunters — always strongly biased toward HUNTING
+        # ΓöÇΓöÇ Predator: strong baseline hunting drive ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        # Predators are apex hunters ΓÇö always strongly biased toward HUNTING
         if self.is_predator:
             logits[1] += 1.0  # Strong constant hunting drive
             logits[0] -= 0.4  # Suppress resting
             logits[2] -= 0.3  # Reduce fleeing tendency
 
-        # ── General biases (gentle nudges) ───────────────────────────────
-        # Threat → nudge FLEE
+        # ΓöÇΓöÇ General biases (gentle nudges) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        # Threat ΓåÆ nudge FLEE
         logits[2] += threat_level * STATE_BIAS_FLEE_THREAT
 
-        # Hunger → nudge HUNT
+        # Hunger ΓåÆ nudge HUNT
         hunger_signal = max(0.0, 1.0 - self.energy / FISH_MAX_ENERGY)
         logits[1] += hunger_signal * STATE_BIAS_HUNT_HUNGER
 
-        # Mating readiness → nudge MATE
+        # Mating readiness ΓåÆ nudge MATE
         if (
             self.is_mature
             and not self.is_pregnant
@@ -509,15 +509,15 @@ class NeuralFish:
         ):
             logits[3] += STATE_BIAS_MATE_DRIVE * mating_drive
 
-        # Night → nudge REST
+        # Night ΓåÆ nudge REST
         logits[0] += (1.0 - night_rest_factor) * STATE_BIAS_REST_NIGHT
 
-        # ── Predator seasonal suppression (mild) ─────────────────────────
+        # ΓöÇΓöÇ Predator seasonal suppression (mild) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         if self.is_predator and activity_mod < 0.8:
             logits[1] -= (1.0 - activity_mod) * 1.0  # Mild HUNTING suppression
             logits[0] += (1.0 - activity_mod) * 0.8  # Mild REST encouragement
 
-        # ── Predator population control ──────────────────────────────────
+        # ΓöÇΓöÇ Predator population control ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         if self.is_predator and hasattr(self.world, "fish_system"):
             prey_count = len(self.world.fish_system.fish)
             pred_count = len(self.world.fish_system.predators)
@@ -526,7 +526,7 @@ class NeuralFish:
             if pred_count >= PREDATOR_MAX_POPULATION:
                 logits[3] = -1e9  # Hard block at population cap
 
-        # ── SOFT blocks for immature fish ────────────────────────────────
+        # ΓöÇΓöÇ SOFT blocks for immature fish ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         if not self.is_mature:
             logits[1] -= STATE_BLOCK_IMMATURE
             logits[3] -= STATE_BLOCK_IMMATURE
@@ -538,9 +538,9 @@ class NeuralFish:
         best_idx = logits.index(max(logits))
         return FISH_STATE_ORDER[best_idx]
 
-    # ═════════════════════════════════════════════════════════════════════════
+    # ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     # Main Update Loop
-    # ═════════════════════════════════════════════════════════════════════════
+    # ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
 
     def update(
         self, dt, all_fish, targets, particle_system, plant_manager, time_system=None
@@ -551,7 +551,7 @@ class NeuralFish:
         # Update fin animation
         self._fin_phase += dt * 8.0
 
-        # ── needs_cleaning accumulation ───────────────────────────────────
+        # ΓöÇΓöÇ needs_cleaning accumulation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         if self.last_cleaned_time > 5.0:
             age_pressure = min(1.0, self.age / FISH_MAX_AGE)
             energy_pressure = max(0.0, 1.0 - self.energy / FISH_MAX_ENERGY)
@@ -561,7 +561,7 @@ class NeuralFish:
                 + (0.02 * age_pressure + 0.03 * energy_pressure) * dt,
             )
 
-        # ── Metabolism ────────────────────────────────────────────────────
+        # ΓöÇΓöÇ Metabolism ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         metabolism_mod = time_system.metabolism_modifier if time_system else 1.0
         metabolism_rate = (
             0.1
@@ -574,7 +574,7 @@ class NeuralFish:
 
         night_rest_factor = 0.5 if (time_system and time_system.is_night) else 1.0
 
-        # ── Stamina management ────────────────────────────────────────────
+        # ΓöÇΓöÇ Stamina management ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         speed_ratio = self.physics.vel.length() / max(1.0, self.physics.max_speed)
         if speed_ratio > 0.8 and not getattr(self, "is_dashing", False):
             self.stamina = max(0.0, self.stamina - 15.0 * speed_ratio * dt)
@@ -582,7 +582,7 @@ class NeuralFish:
             recovery = 8.0 * self.traits.physical_traits.get("stamina_mult", 1.0) * dt
             self.stamina = min(100.0, self.stamina + recovery)
 
-        # ── Get NORMALIZED inputs with temporal context ───────────────────
+        # ΓöÇΓöÇ Get NORMALIZED inputs with temporal context ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         full_inputs = self.get_radar_inputs(all_fish, targets, plant_manager, time_system)
         threat_level = min(1.0, sum(full_inputs[3:6]))
         cover_quality = full_inputs[13]
@@ -590,7 +590,7 @@ class NeuralFish:
 
         self.grazing_cooldown = max(0.0, self.grazing_cooldown - dt)
 
-        # ── Plant grazing (when hungry) ───────────────────────────────────
+        # ΓöÇΓöÇ Plant grazing (when hungry) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         if (
             not self.is_predator
             and self.energy < FISH_HUNGER_THRESHOLD * 0.7
@@ -613,12 +613,12 @@ class NeuralFish:
                             )
                         break
 
-        # ── Cover stamina bonus ───────────────────────────────────────────
+        # ΓöÇΓöÇ Cover stamina bonus ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         if cover_quality > 0.3:
             bonus = FISH_COVER_STAMINA_PREDATOR if self.is_predator else FISH_COVER_STAMINA_BONUS
             self.stamina = min(100.0, self.stamina + bonus * cover_quality * dt)
 
-        # ── Neural network forward pass ──────────────────────────────────
+        # ΓöÇΓöÇ Neural network forward pass ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         mating_drive = time_system.mating_drive_modifier if time_system else 1.0
         activity_mod = (
             time_system.predator_activity_modifier
@@ -648,17 +648,17 @@ class NeuralFish:
         raw_state_probs = outputs[7:12]
         self.last_state_probs = raw_state_probs
 
-        # ── State selection (with predator hunting bias) ────────────────
+        # ΓöÇΓöÇ State selection (with predator hunting bias) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         self.state = self._pick_state(
             raw_state_probs, threat_level, night_rest_factor, mating_drive, activity_mod
         )
 
-        # ═════════════════════════════════════════════════════════════════
+        # ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
         # IMPROVED: Consolidated Movement Control
         # The NN now has primary control; parallel systems are reduced
-        # ═════════════════════════════════════════════════════════════════
+        # ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
 
-        # ── Hide Drive (gated by actual threats) ────────────────────────
+        # ΓöÇΓöÇ Hide Drive (gated by actual threats) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         if self.closest_plant:
             should_hide = (
                 threat_level > FISH_HIDE_THREAT_THRESHOLD
@@ -686,7 +686,7 @@ class NeuralFish:
                     self.physics.apply_force(hide_force)
                     self._plant_linger_timer = 0.0
 
-            # ── Plant restlessness (anti-clustering) ────────────────────
+            # ΓöÇΓöÇ Plant restlessness (anti-clustering) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             elif self.closest_plant and not self.is_predator:
                 dist_to_plant = self.physics.pos.distance_to(
                     (self.closest_plant.x, self.closest_plant.base_y)
@@ -701,7 +701,7 @@ class NeuralFish:
                         )
                         self.physics.apply_force(away_force)
 
-        # ── Exploration / Wanderlust (when safe and fed) ────────────────
+        # ΓöÇΓöÇ Exploration / Wanderlust (when safe and fed) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         is_safe = threat_level < FISH_HIDE_THREAT_THRESHOLD
         is_well_fed = self.energy > FISH_MAX_ENERGY * 0.5
         if is_safe and is_well_fed and not self.is_hidden:
@@ -714,7 +714,7 @@ class NeuralFish:
             wander_fy = math.sin(self._wander_angle) * FISH_EXPLORATION_FORCE
             self.physics.apply_force((wander_fx, wander_fy))
 
-        # ── Fish Separation (anti-clustering) ───────────────────────────
+        # ΓöÇΓöÇ Fish Separation (anti-clustering) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         for other in all_fish:
             if other is self or other.is_predator != self.is_predator:
                 continue
@@ -728,7 +728,7 @@ class NeuralFish:
                         (dx / sep_dist * strength, dy / sep_dist * strength)
                     )
 
-        # ── Mating display timers ───────────────────────────────────────
+        # ΓöÇΓöÇ Mating display timers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         if self.state == FishState.MATING:
             self._mating_glow_timer += dt
             self._heart_timer = max(0.0, self._heart_timer - dt)
@@ -742,7 +742,7 @@ class NeuralFish:
                 0.0, self._mating_glow_timer - dt * MATING_GLOW_DECAY_RATE
             )
 
-        # ── Speed ceiling by state ──────────────────────────────────────
+        # ΓöÇΓöÇ Speed ceiling by state ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         stamina_factor = max(0.3, self.stamina / 100.0)
         if self.state == FishState.FLEEING:
             speed_ceiling = self.physics.max_speed * 1.3 * stamina_factor * night_rest_factor
@@ -759,7 +759,7 @@ class NeuralFish:
         speed_ceiling *= 1.0 + sprint_drive * 0.5
         speed_ceiling = min(speed_ceiling, self.physics.max_speed * 1.8)
 
-        # ── Steering from NN outputs ────────────────────────────────────
+        # ΓöÇΓöÇ Steering from NN outputs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         turn_rate = FISH_TURN_RATE_SCALAR * self.traits.physical_traits.get(
             "turn_rate_mult", 1.0
         )
@@ -782,7 +782,7 @@ class NeuralFish:
 
         self.physics.apply_force((steer_force_x, steer_force_y))
 
-        # ── Egg laying ──────────────────────────────────────────────────
+        # ΓöÇΓöÇ Egg laying ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         if self.is_pregnant and self.closest_plant:
             dist_to_plant = self.physics.pos.distance_to(
                 (self.closest_plant.x, self.closest_plant.base_y)
@@ -806,7 +806,7 @@ class NeuralFish:
                     getattr(self, "pregnancy_brain", None),
                 )
 
-        # ── Family cohesion ─────────────────────────────────────────────
+        # ΓöÇΓöÇ Family cohesion ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         if self.family and self.family.active:
             if self.is_mature and not self.is_pregnant:
                 child_positions = [
@@ -835,7 +835,7 @@ class NeuralFish:
                         self.physics.seek(avg_x, avg_y, weight=child_weight)
                     )
 
-        # ── Physics update ──────────────────────────────────────────────
+        # ΓöÇΓöÇ Physics update ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         self.physics.bounce_bounds(
             0,
             WATER_LINE_Y + 20,
@@ -845,7 +845,7 @@ class NeuralFish:
         self.physics.update(dt, FISH_DRAG, speed_ceiling)
         self.distance_traveled += self.physics.vel.length() * dt
 
-        # ── Food collision ──────────────────────────────────────────────
+        # ΓöÇΓöÇ Food collision ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         for t in targets[:]:
             if self.is_predator:
                 break
@@ -881,9 +881,9 @@ class NeuralFish:
             return PoopParticle(self.physics.pos.x, self.physics.pos.y)
         return None
 
-    # ═════════════════════════════════════════════════════════════════════════
+    # ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
     # Drawing Methods (unchanged from original)
-    # ═════════════════════════════════════════════════════════════════════════
+    # ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
 
     def draw(self, screen, camera, time, selected, biolum_alpha=0):
         pos = self.physics.pos
@@ -1018,7 +1018,7 @@ class NeuralFish:
         # Mating state heart
         if self.state == FishState.MATING and self._mating_glow_timer > 0.3:
             heart_y = int(screen_pos[1]) - int(size * 4) - 8
-            sym = self._mating_font.render("♥", True, (255, 100, 150))
+            sym = self._mating_font.render("ΓÖÑ", True, (255, 100, 150))
             screen.blit(sym, (int(screen_pos[0]) - sym.get_width() // 2, heart_y))
 
     def _draw_tail(self, screen, pos, angle, size, color, sec_color, tail_config, time):
