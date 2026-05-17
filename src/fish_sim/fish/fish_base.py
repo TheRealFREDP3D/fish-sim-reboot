@@ -766,7 +766,7 @@ class NeuralFish:
         heading_delta = steer_out * turn_rate * dt
         new_heading = self.physics.heading + heading_delta
 
-        normalised_thrust = (thrust_out + 1.0) / 2.0
+        normalised_thrust = thrust_out
         target_speed = normalised_thrust * speed_ceiling
 
         desired_vx = math.cos(new_heading) * target_speed
