@@ -137,11 +137,22 @@ class SynapticParticle:
         if self.t >= 1.0:
             self.alive = False
 
-    def draw(self, surf):
+    def draw(self, surf, global_t):
         if not self.alive:
             return
-        px = lerp(self.x1, self.x2, self.t)
-        py = lerp(self.y1, self.y2, self.t)
+        # Calculate current position with curve
+        x1, y1 = self.x1, self.y1
+        x2, y2 = self.x2, self.y2
+
+        mid_x = (x1 + x2) / 2
+        mid_y = (y1 + y2) / 2
+        wave = math.sin(global_t * 2 + (x1 + y1) * 0.01) * 10
+        cx, cy = mid_x, mid_y + wave
+
+        # Quadratic Bezier
+        t = self.t
+        px = (1-t)**2 * x1 + 2*(1-t)*t * cx + t**2 * x2
+        py = (1-t)**2 * y1 + 2*(1-t)*t * cy + t**2 * y2
         fade = math.sin(self.t * math.pi)
         r = int(2 + self.strength * 3)
         alpha = int(200 * fade)
@@ -155,11 +166,12 @@ class SynapticParticle:
 
 class NeuronNode:
     """A single visualized neuron with animated activation state."""
-    __slots__ = ('x','y','activation','smooth_act','phase','base_color','hi_color',
+    __slots__ = ('x','y','drift_x','drift_y','activation','smooth_act','phase','base_color','hi_color',
                  'radius','pulse_t','fire_t','label')
 
     def __init__(self, x, y, base_color, hi_color, radius=7, label=''):
         self.x, self.y = x, y
+        self.drift_x, self.drift_y = x, y
         self.activation = 0.0
         self.smooth_act = 0.0
         self.phase = random.uniform(0, math.pi * 2)
@@ -182,9 +194,15 @@ class NeuronNode:
         if self.fire_t > 0:
             self.fire_t = max(0.0, self.fire_t - dt * 3)
 
+        # Organic drift
+        drift_speed = 0.5 + abs(self.smooth_act) * 1.5
+        self.drift_x = self.x + math.sin(global_t * drift_speed + self.phase) * 4
+        self.drift_y = self.y + math.cos(global_t * drift_speed * 0.7 + self.phase) * 4
+
     def draw(self, surf, global_t):
         act = self.smooth_act
         abs_act = abs(act)
+        curr_x, curr_y = int(self.drift_x), int(self.drift_y)
 
         # Base idle breath
         breath = 0.15 * math.sin(self.pulse_t + self.phase)
@@ -209,17 +227,17 @@ class NeuronNode:
             glow_r = int(display_r * 2.5)
             outer = pygame.Surface((glow_r * 2 + 2, glow_r * 2 + 2), pygame.SRCALPHA)
             pygame.draw.circle(outer, (*col, glow_alpha // 2), (glow_r + 1, glow_r + 1), glow_r)
-            surf.blit(outer, (int(self.x) - glow_r - 1, int(self.y) - glow_r - 1))
+            surf.blit(outer, (curr_x - glow_r - 1, curr_y - glow_r - 1))
 
         # Inactive ring
-        pygame.draw.circle(surf, (20, 40, 60), (int(self.x), int(self.y)), int(self.radius), 1)
+        pygame.draw.circle(surf, (20, 40, 60), (curr_x, curr_y), int(self.radius), 1)
         # Core
-        pygame.draw.circle(surf, col, (int(self.x), int(self.y)), max(1, int(display_r)))
+        pygame.draw.circle(surf, col, (curr_x, curr_y), max(1, int(display_r)))
 
         # Highlight spec
         if abs_act > 0.3:
-            spec_x = int(self.x - display_r * 0.3)
-            spec_y = int(self.y - display_r * 0.3)
+            spec_x = int(curr_x - display_r * 0.3)
+            spec_y = int(curr_y - display_r * 0.3)
             pygame.draw.circle(surf, (255, 255, 255), (spec_x, spec_y), max(1, int(display_r * 0.25)))
 
 
@@ -445,11 +463,13 @@ class EnhancedBrainVisualizer:
             self._stamina_smooth = lerp(self._stamina_smooth,
                                          selected_fish.stamina / 100.0, dt * 5)
 
-            # Synaptic particle emission (reduced frequency for performance)
+            # Synaptic particle emission
             self._particle_timer -= dt
             if self._particle_timer <= 0:
+                # Emit more particles if fish is active
+                freq = 0.05 if abs(selected_fish.last_outputs[1]) > 0.5 else 0.15
                 self._emit_particle(selected_fish)
-                self._particle_timer = random.uniform(0.15, 0.35)
+                self._particle_timer = random.uniform(freq, freq * 2)
 
             # Update existing particles
             for p in self._particles[:]:
@@ -483,7 +503,7 @@ class EnhancedBrainVisualizer:
             if strength > 0.1:
                 col = lerp_color(COL_INPUT_HI, COL_H1_HI, 0.5)
                 self._particles.append(SynapticParticle(
-                    src.x, src.y, dst.x, dst.y, col, strength))
+                    src.drift_x, src.drift_y, dst.drift_x, dst.drift_y, col, strength))
 
         elif roll < 0.65 and self._nodes_h1 and self._nodes_h2:
             # H1 → H2
@@ -493,7 +513,7 @@ class EnhancedBrainVisualizer:
             if strength > 0.1:
                 col = lerp_color(COL_H1_HI, COL_H2_HI, 0.5)
                 self._particles.append(SynapticParticle(
-                    src.x, src.y, dst.x, dst.y, col, strength))
+                    src.drift_x, src.drift_y, dst.drift_x, dst.drift_y, col, strength))
 
         elif self._nodes_h2 and self._nodes_output:
             # H2 → Output
@@ -556,6 +576,9 @@ class EnhancedBrainVisualizer:
 
         # ── State distribution arc ────────────────────────────────────────
         y = self._draw_state_arcs(surf, selected_fish, accent, y + 8)
+
+        # ── Behavioral Insights ──────────────────────────────────────────
+        y = self._draw_insights(surf, selected_fish, accent, y + 10)
 
         # ── Stats footer ─────────────────────────────────────────────────
         self._draw_footer(surf, selected_fish, accent, y + 8)
@@ -659,7 +682,7 @@ class EnhancedBrainVisualizer:
 
         # Draw particles
         for p in self._particles:
-            p.draw(surf)
+            p.draw(surf, self.anim_t)
 
         # Draw nodes
         for node in (self._nodes_input + self._nodes_h1 +
@@ -681,6 +704,13 @@ class EnhancedBrainVisualizer:
         # Recurrent loop indicator on h2
         if self._nodes_h2 and fish.brain.recurrent:
             self._draw_recurrent_arc(surf)
+
+        # Input node labels on the left
+        for node in self._nodes_input:
+            lt = self.f_tiny.render(node.label, True,
+                                     lerp_color(TEXT_DIM, COL_INPUT_HI,
+                                                abs(node.smooth_act)))
+            surf.blit(lt, (int(node.x) - lt.get_width() - 12, int(node.y) - 5))
 
         # Output node labels on the right
         for node in self._nodes_output:
@@ -723,10 +753,26 @@ class EnhancedBrainVisualizer:
 
                 alpha = int(20 + 160 * intensity * max(0.15, activity))
                 width = max(1, int(1 + intensity * 2))
-                # Draw directly on surf instead of creating new surface per line
-                pygame.draw.line(surf, (*col, alpha),
-                                 (int(src.x), int(src.y)),
-                                 (int(dst.x), int(dst.y)), width)
+                # Draw organic curved connections
+                x1, y1 = int(src.drift_x), int(src.drift_y)
+                x2, y2 = int(dst.drift_x), int(dst.drift_y)
+
+                # Control point for quadratic bezier
+                mid_x = (x1 + x2) / 2
+                mid_y = (y1 + y2) / 2
+                # Offset mid point based on global_t for subtle waving
+                wave = math.sin(self.anim_t * 2 + (x1 + y1) * 0.01) * 10
+                cx = mid_x
+                cy = mid_y + wave
+
+                # Draw as 3 segments for a "curved" look without heavy math
+                p1 = (x1, y1)
+                p2 = (int((x1 + cx) / 2), int((y1 + cy) / 2))
+                p3 = (int(cx), int(cy))
+                p4 = (int((cx + x2) / 2), int((cy + y2) / 2))
+                p5 = (x2, y2)
+
+                pygame.draw.lines(surf, (*col, alpha), False, [p1, p2, p3, p4, p5], width)
 
         if self._conn_w1:
             draw_layer_connections(self._nodes_input, self._nodes_h1, self._conn_w1, 25)
@@ -897,6 +943,44 @@ class EnhancedBrainVisualizer:
             lx += lt.get_width() + 22
 
         return legend_y + 18
+
+    def _draw_insights(self, surf, fish, accent, y):
+        """Explain the current state based on dominant inputs."""
+        PAD = 16
+        t = self.f_small.render("NEURAL INSIGHTS", True, TEXT_DIM)
+        surf.blit(t, (PAD, y))
+        y += 18
+
+        # Determine why fish is in current state
+        insight = "Maintaining baseline metabolism."
+        if fish.state == FishState.HUNTING:
+            if fish.energy < 25:
+                insight = "Critical hunger driving foraging."
+            else:
+                insight = "Seeking prey/food sources."
+        elif fish.state == FishState.FLEEING:
+            insight = "Threat detected! Evasive action."
+        elif fish.state == FishState.MATING:
+            insight = "Energy surplus: seeking mate."
+        elif fish.state == FishState.NESTING:
+            insight = "Protecting offspring/eggs."
+        elif fish.state == FishState.RESTING:
+            insight = "Conserving energy."
+
+        words = insight.split()
+        line = ""
+        for word in words:
+            if self.f_tiny.size(line + word)[0] < self.PANEL_W - PAD*2:
+                line += word + " "
+            else:
+                it = self.f_tiny.render(line, True, TEXT_MID)
+                surf.blit(it, (PAD, y))
+                y += 12
+                line = word + " "
+        it = self.f_tiny.render(line, True, TEXT_MID)
+        surf.blit(it, (PAD, y))
+
+        return y + 15
 
     def _draw_footer(self, surf, fish, accent, y):
         """Small stats row at the bottom."""
