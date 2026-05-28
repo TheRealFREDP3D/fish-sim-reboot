@@ -80,6 +80,19 @@ STATE_COLS = [
 
 STATE_NAMES = ["REST", "HUNT", "FLEE", "MATE", "NEST"]
 
+# ── Visualizer Configuration Constants ───────────────────────────────────────
+DRIFT_SPEED_BASE = 0.5
+DRIFT_SPEED_MULT = 1.5
+DRIFT_MAGNITUDE = 4.0
+DRIFT_Y_FREQ_MULT = 0.7
+
+WAVE_AMP = 10.0
+WAVE_FREQ = 2.0
+WAVE_PHASE_SCALE = 0.01
+
+PARTICLE_SPEED_MIN = 0.6
+PARTICLE_SPEED_MAX = 1.4
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def lerp(a, b, t):
@@ -116,6 +129,40 @@ def draw_rounded_rect(surf, color, rect, radius=8, alpha=255):
     pygame.draw.rect(s, (*color, alpha), (0, 0, rect[2], rect[3]), border_radius=radius)
     surf.blit(s, (rect[0], rect[1]))
 
+def quad_bezier(p0, p1, p2, t: float):
+    """Quadratic Bezier interpolation for 2D points."""
+    (x0, y0), (cx, cy), (x2, y2) = p0, p1, p2
+    u = 1 - t
+    x = u*u * x0 + 2*u*t * cx + t*t * x2
+    y = u*u * y0 + 2*u*t * cy + t*t * y2
+    return x, y
+
+def make_wavy_control_point(p0, p2, phase: float, amp: float = WAVE_AMP):
+    x1, y1 = p0
+    x2, y2 = p2
+    mid_x = (x1 + x2) / 2
+    mid_y = (y1 + y2) / 2
+    wave = math.sin(phase + (x1 + y1) * WAVE_PHASE_SCALE) * amp
+    return mid_x, mid_y + wave
+
+def draw_wrapped_text(surf, font, text, rect, color, line_height):
+    x, y, max_w, _ = rect
+    words = text.split()
+    line = ""
+    for word in words:
+        test = line + word + " "
+        if font.size(test)[0] <= max_w:
+            line = test
+        else:
+            it = font.render(line, True, color)
+            surf.blit(it, (x, y))
+            y += line_height
+            line = word + " "
+    if line:
+        it = font.render(line, True, color)
+        surf.blit(it, (x, y))
+    return y + line_height
+
 
 # ── Synaptic Signal Particle ──────────────────────────────────────────────────
 
@@ -127,7 +174,7 @@ class SynapticParticle:
         self.x1, self.y1 = x1, y1
         self.x2, self.y2 = x2, y2
         self.t = 0.0
-        self.speed = random.uniform(0.6, 1.4)
+        self.speed = random.uniform(PARTICLE_SPEED_MIN, PARTICLE_SPEED_MAX)
         self.color = color
         self.strength = strength
         self.alive = True
@@ -140,19 +187,12 @@ class SynapticParticle:
     def draw(self, surf, global_t):
         if not self.alive:
             return
-        # Calculate current position with curve
-        x1, y1 = self.x1, self.y1
-        x2, y2 = self.x2, self.y2
 
-        mid_x = (x1 + x2) / 2
-        mid_y = (y1 + y2) / 2
-        wave = math.sin(global_t * 2 + (x1 + y1) * 0.01) * 10
-        cx, cy = mid_x, mid_y + wave
+        p0 = (self.x1, self.y1)
+        p2 = (self.x2, self.y2)
+        c = make_wavy_control_point(p0, p2, phase=global_t * WAVE_FREQ, amp=WAVE_AMP)
 
-        # Quadratic Bezier
-        t = self.t
-        px = (1-t)**2 * x1 + 2*(1-t)*t * cx + t**2 * x2
-        py = (1-t)**2 * y1 + 2*(1-t)*t * cy + t**2 * y2
+        px, py = quad_bezier(p0, c, p2, self.t)
         fade = math.sin(self.t * math.pi)
         r = int(2 + self.strength * 3)
         alpha = int(200 * fade)
@@ -166,12 +206,12 @@ class SynapticParticle:
 
 class NeuronNode:
     """A single visualized neuron with animated activation state."""
-    __slots__ = ('x','y','drift_x','drift_y','activation','smooth_act','phase','base_color','hi_color',
-                 'radius','pulse_t','fire_t','label')
+    __slots__ = ('x', 'y', '_drift_x', '_drift_y', 'activation', 'smooth_act', 'phase', 'base_color', 'hi_color',
+                 'radius', 'pulse_t', 'fire_t', 'label')
 
     def __init__(self, x, y, base_color, hi_color, radius=7, label=''):
         self.x, self.y = x, y
-        self.drift_x, self.drift_y = x, y
+        self._drift_x, self._drift_y = x, y
         self.activation = 0.0
         self.smooth_act = 0.0
         self.phase = random.uniform(0, math.pi * 2)
@@ -195,14 +235,17 @@ class NeuronNode:
             self.fire_t = max(0.0, self.fire_t - dt * 3)
 
         # Organic drift
-        drift_speed = 0.5 + abs(self.smooth_act) * 1.5
-        self.drift_x = self.x + math.sin(global_t * drift_speed + self.phase) * 4
-        self.drift_y = self.y + math.cos(global_t * drift_speed * 0.7 + self.phase) * 4
+        drift_speed = DRIFT_SPEED_BASE + abs(self.smooth_act) * DRIFT_SPEED_MULT
+        self._drift_x = self.x + math.sin(global_t * drift_speed + self.phase) * DRIFT_MAGNITUDE
+        self._drift_y = self.y + math.cos(global_t * drift_speed * DRIFT_Y_FREQ_MULT + self.phase) * DRIFT_MAGNITUDE
+
+    def get_draw_pos(self):
+        return int(self._drift_x), int(self._drift_y)
 
     def draw(self, surf, global_t):
         act = self.smooth_act
         abs_act = abs(act)
-        curr_x, curr_y = int(self.drift_x), int(self.drift_y)
+        curr_x, curr_y = self.get_draw_pos()
 
         # Base idle breath
         breath = 0.15 * math.sin(self.pulse_t + self.phase)
@@ -502,8 +545,10 @@ class EnhancedBrainVisualizer:
             strength = abs(src.smooth_act) * 0.5 + abs(dst.smooth_act) * 0.5
             if strength > 0.1:
                 col = lerp_color(COL_INPUT_HI, COL_H1_HI, 0.5)
+                src_x, src_y = src.get_draw_pos()
+                dst_x, dst_y = dst.get_draw_pos()
                 self._particles.append(SynapticParticle(
-                    src.drift_x, src.drift_y, dst.drift_x, dst.drift_y, col, strength))
+                    src_x, src_y, dst_x, dst_y, col, strength))
 
         elif roll < 0.65 and self._nodes_h1 and self._nodes_h2:
             # H1 → H2
@@ -512,8 +557,10 @@ class EnhancedBrainVisualizer:
             strength = abs(src.smooth_act) * 0.5 + abs(dst.smooth_act) * 0.5
             if strength > 0.1:
                 col = lerp_color(COL_H1_HI, COL_H2_HI, 0.5)
+                src_x, src_y = src.get_draw_pos()
+                dst_x, dst_y = dst.get_draw_pos()
                 self._particles.append(SynapticParticle(
-                    src.drift_x, src.drift_y, dst.drift_x, dst.drift_y, col, strength))
+                    src_x, src_y, dst_x, dst_y, col, strength))
 
         elif self._nodes_h2 and self._nodes_output:
             # H2 → Output
@@ -526,8 +573,10 @@ class EnhancedBrainVisualizer:
                 accent = self._get_accent_from_fish_flags(
                     getattr(fish, 'is_cleaner', False),
                     getattr(fish, 'is_predator', False))
+                src_x, src_y = src.get_draw_pos()
+                dst_x, dst_y = dst.get_draw_pos()
                 self._particles.append(SynapticParticle(
-                    src.x, src.y, dst.x, dst.y, accent, strength))
+                    src_x, src_y, dst_x, dst_y, accent, strength))
 
     # ── Drawing ───────────────────────────────────────────────────────────────
 
@@ -710,14 +759,16 @@ class EnhancedBrainVisualizer:
             lt = self.f_tiny.render(node.label, True,
                                      lerp_color(TEXT_DIM, COL_INPUT_HI,
                                                 abs(node.smooth_act)))
-            surf.blit(lt, (int(node.x) - lt.get_width() - 12, int(node.y) - 5))
+            curr_x, curr_y = node.get_draw_pos()
+            surf.blit(lt, (curr_x - lt.get_width() - 12, curr_y - 5))
 
         # Output node labels on the right
         for node in self._nodes_output:
             lt = self.f_tiny.render(node.label, True,
                                      lerp_color(TEXT_DIM, COL_OUT_HI,
                                                 abs(node.smooth_act)))
-            surf.blit(lt, (int(node.x) + 12, int(node.y) - 5))
+            curr_x, curr_y = node.get_draw_pos()
+            surf.blit(lt, (curr_x + 12, curr_y - 5))
 
         # Find the bottom of the lowest node
         all_nodes = (self._nodes_input + self._nodes_h1 +
@@ -754,25 +805,15 @@ class EnhancedBrainVisualizer:
                 alpha = int(20 + 160 * intensity * max(0.15, activity))
                 width = max(1, int(1 + intensity * 2))
                 # Draw organic curved connections
-                x1, y1 = int(src.drift_x), int(src.drift_y)
-                x2, y2 = int(dst.drift_x), int(dst.drift_y)
+                x1, y1 = src.get_draw_pos()
+                x2, y2 = dst.get_draw_pos()
+                p0, p2 = (x1, y1), (x2, y2)
+                c = make_wavy_control_point(p0, p2, phase=self.anim_t * WAVE_FREQ, amp=WAVE_AMP)
 
-                # Control point for quadratic bezier
-                mid_x = (x1 + x2) / 2
-                mid_y = (y1 + y2) / 2
-                # Offset mid point based on global_t for subtle waving
-                wave = math.sin(self.anim_t * 2 + (x1 + y1) * 0.01) * 10
-                cx = mid_x
-                cy = mid_y + wave
-
-                # Draw as 3 segments for a "curved" look without heavy math
-                p1 = (x1, y1)
-                p2 = (int((x1 + cx) / 2), int((y1 + cy) / 2))
-                p3 = (int(cx), int(cy))
-                p4 = (int((cx + x2) / 2), int((cy + y2) / 2))
-                p5 = (x2, y2)
-
-                pygame.draw.lines(surf, (*col, alpha), False, [p1, p2, p3, p4, p5], width)
+                # sample the curve instead of manual midpoints
+                points = [quad_bezier(p0, c, p2, t) for t in (0.0, 0.25, 0.5, 0.75, 1.0)]
+                points = [(int(px), int(py)) for px, py in points]
+                pygame.draw.lines(surf, (*col, alpha), False, points, width)
 
         if self._conn_w1:
             draw_layer_connections(self._nodes_input, self._nodes_h1, self._conn_w1, 25)
@@ -787,9 +828,11 @@ class EnhancedBrainVisualizer:
             return
         top_node = self._nodes_h2[0]
         bot_node = self._nodes_h2[-1]
-        cx = int(top_node.x) + 35
-        cy = int((top_node.y + bot_node.y) / 2)
-        rx, ry = 20, int((bot_node.y - top_node.y) / 2)
+        tx, ty = top_node.get_draw_pos()
+        bx, by = bot_node.get_draw_pos()
+        cx = tx + 35
+        cy = int((ty + by) / 2)
+        rx, ry = 20, int((by - ty) / 2)
 
         # Animated arc
         angle_rad = math.radians(self._recurrent_angle)
@@ -945,7 +988,7 @@ class EnhancedBrainVisualizer:
         return legend_y + 18
 
     def _draw_insights(self, surf, fish, accent, y):
-        """Explain the current state based on dominant inputs."""
+        """Explain the current state based on behavioral state and energy level."""
         PAD = 16
         t = self.f_small.render("NEURAL INSIGHTS", True, TEXT_DIM)
         surf.blit(t, (PAD, y))
@@ -967,20 +1010,15 @@ class EnhancedBrainVisualizer:
         elif fish.state == FishState.RESTING:
             insight = "Conserving energy."
 
-        words = insight.split()
-        line = ""
-        for word in words:
-            if self.f_tiny.size(line + word)[0] < self.PANEL_W - PAD*2:
-                line += word + " "
-            else:
-                it = self.f_tiny.render(line, True, TEXT_MID)
-                surf.blit(it, (PAD, y))
-                y += 12
-                line = word + " "
-        it = self.f_tiny.render(line, True, TEXT_MID)
-        surf.blit(it, (PAD, y))
-
-        return y + 15
+        y = draw_wrapped_text(
+            surf,
+            self.f_tiny,
+            insight,
+            pygame.Rect(PAD, y, self.PANEL_W - PAD * 2, 0),
+            TEXT_MID,
+            line_height=12,
+        )
+        return y + 3
 
     def _draw_footer(self, surf, fish, accent, y):
         """Small stats row at the bottom."""
