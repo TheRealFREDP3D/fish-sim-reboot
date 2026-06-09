@@ -23,6 +23,7 @@ build/
 .pytest_cache/
 .codeviz/
 .sourcetrail/
+.kilo/
 
 # Generated / review artifacts (not source code)
 *.pdf
