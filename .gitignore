@@ -1,35 +1,38 @@
-/__pycache__
-/_DEV_
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
 
-#Ignore vscode AI rules
-.github/instructions/codacy.instructions.md
-/.codacy
+# Virtual environment
+.venv/
+env/
+venv/
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Cache / temp directories
+.mypy_cache/
+.pytest_cache/
+.codeviz/
+.sourcetrail/
+
+# Generated / review artifacts (not source code)
+*.pdf
 project_review_report.md
 
-/.sourcetrail
-/src/fish_sim_reboot.egg-info
-/.codeviz
-src/fish_sim/fish/__pycache__/fish_base.cpython-314.pyc
-src/fish_sim/fish/__pycache__/fish_base.cpython-314.pyc
-/src/fish_sim/fish/__pycache__
-src/fish_sim/fish/__pycache__/fish_base.cpython-314.pyc
-src/fish_sim/__pycache__/__init__.cpython-314.pyc
-src/fish_sim/ui/__pycache__/brain_visualizer.cpython-314.pyc
-src/fish_sim/ui/__pycache__/brain_visualizer.cpython-314.pyc
-src/fish_sim/ui/__pycache__/brain_visualizer.cpython-314.pyc
-src/fish_sim/__pycache__/main.cpython-314.pyc
-src/fish_sim/ui/__pycache__/brain_visualizer.cpython-314.pyc
-src/fish_sim/__pycache__/main.cpython-314.pyc
-/Improving Fish-Sim Brain Visualizer and Neural Network Design
-/src/fish_sim/__pycache__
-src/fish_sim/ui/__pycache__/brain_visualizer_enhanced.cpython-314.pyc
-.vscode/fish-sim-reboot.code-workspace
-src/fish_sim/ui/brain_visualizer_enhanced.py.bak
-src/fish_sim/environment/__pycache__/soil.cpython-314.pyc
-/src/fish_sim/plants/__pycache__
-/src/fish_sim/core/__pycache__
-/src/fish_sim/environment/__pycache__
-/src/fish_sim/ui/__pycache__
-src/fish_sim/environment/__pycache__/soil.cpython-314.pyc
-src/fish_sim/environment/__pycache__/soil.cpython-314.pyc
-src/fish_sim/environment/__pycache__/soil.cpython-314.pyc
+# Backup files
+*.bak
+
+# Protected development workspace
+_DEV_/
+
+# AI/Assistant rules
+.github/instructions/codacy.instructions.md
