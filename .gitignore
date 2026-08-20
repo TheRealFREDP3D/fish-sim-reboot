@@ -43,6 +43,4 @@ package-lock.json
 /.ruff_cache
 .kanban/
 /.opencode
-src/fish_sim/core/__pycache__/environment_objects.cpython-314.pyc
-src/fish_sim/core/__pycache__/environment_objects.cpython-314.pyc
-src/fish_sim/core/__pycache__/particles.cpython-314.pyc
+
