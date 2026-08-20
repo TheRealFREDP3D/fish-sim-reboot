@@ -1,14 +1,16 @@
 """Seed system - floating seeds that settle and grow into plants"""
 
-import pygame
-import random
 import math
+import random
+
+import pygame
+
 from ..config import (
-    WORLD_WIDTH,
-    WORLD_HEIGHT,
-    WATER_LINE_Y,
     MUTATION_RATE,
     MUTATION_STRENGTH,
+    WATER_LINE_Y,
+    WORLD_HEIGHT,
+    WORLD_WIDTH,
 )
 from .plant_rules import is_valid_depth
 

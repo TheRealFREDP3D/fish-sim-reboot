@@ -1,10 +1,11 @@
 import pygame
+
 from ..config import (
-    SCREEN_WIDTH,
-    SCREEN_HEIGHT,
-    WORLD_WIDTH,
-    WORLD_HEIGHT,
     CAMERA_SMOOTHING,
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
+    WORLD_HEIGHT,
+    WORLD_WIDTH,
 )
 
 CAMERA_PAN_SPEED = 400  # pixels per second

@@ -1,20 +1,18 @@
 """Soil grid system with multiple distinct soil types and organic rendering"""
 
-import pygame
-import random
 import math
+import random
+
+import pygame
+
 from ..config import (
-    SOIL_CELL_SIZE,
-    SOIL_DEPLETED_COLOR,
-    SOIL_FERTILE_COLOR,
     SOIL_BASE_NUTRIENT,
-    SCREEN_WIDTH,
-    SCREEN_HEIGHT,
-    WATER_LINE_Y,
-    SOIL_SOLIDIFY_THRESHOLD,
+    SOIL_CELL_SIZE,
     SOIL_MAX_NUTRIENT,
-    WORLD_WIDTH,
+    SOIL_SOLIDIFY_THRESHOLD,
+    WATER_LINE_Y,
     WORLD_HEIGHT,
+    WORLD_WIDTH,
 )
 
 # ── Soil Type Definitions ─────────────────────────────────────────────────────
@@ -110,7 +108,7 @@ def _get_soil_type_for_depth(depth_ratio, noise_val):
             total = sum(wts)
             r = random.uniform(0, total)
             cumulative = 0
-            for k, w in zip(keys, wts):
+            for k, w in zip(keys, wts, strict=False):
                 cumulative += w
                 if r <= cumulative:
                     return k
@@ -418,7 +416,7 @@ class SoilGrid:
     def _rebuild_cell_list(self):
         self._cell_list = [(cx, cy, cell) for (cx, cy), cell in self.cells.items()]
         self._neighbours = {}
-        for (cx, cy), cell in self.cells.items():
+        for (cx, cy), _cell in self.cells.items():
             neighbours = []
             for dx, dy in [(0, 1), (-1, 1), (1, 1), (-1, 0), (1, 0), (0, -1), (-1, -1), (1, -1)]:
                 nb = self.get_cell(cx + dx, cy + dy)

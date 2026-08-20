@@ -1,86 +1,89 @@
-"""Plant system with organic visual rendering, tapered blades, and visible seed production"""
+﻿"""Plant system with organic visual rendering, tapered blades, and visible seed production"""
 
-import pygame
 import math
 import random
+
+import pygame
+
 from ..config import (
-    WATER_LINE_Y,
-    WORLD_HEIGHT,
-    WORLD_WIDTH,
-    KELP_HEIGHT_MIN,
-    KELP_HEIGHT_MAX,
-    KELP_SWAY_SPEED,
-    KELP_SWAY_AMPLITUDE,
-    KELP_COLOR,
-    KELP_HIGHLIGHT,
-    KELP_WIDTH,
-    SEAGRASS_HEIGHT_MIN,
-    SEAGRASS_HEIGHT_MAX,
-    SEAGRASS_SWAY_SPEED,
-    SEAGRASS_SWAY_AMPLITUDE,
-    SEAGRASS_COLOR,
-    SEAGRASS_HIGHLIGHT,
-    SEAGRASS_WIDTH,
-    ALGAE_HEIGHT_MIN,
-    ALGAE_HEIGHT_MAX,
-    ALGAE_SWAY_SPEED,
-    ALGAE_SWAY_AMPLITUDE,
     ALGAE_COLOR,
+    ALGAE_HEIGHT_MAX,
+    ALGAE_HEIGHT_MIN,
     ALGAE_HIGHLIGHT,
+    ALGAE_SWAY_AMPLITUDE,
+    ALGAE_SWAY_SPEED,
     ALGAE_WIDTH,
-    RED_SEAWEED_HEIGHT_MIN,
-    RED_SEAWEED_HEIGHT_MAX,
-    RED_SEAWEED_SWAY_SPEED,
-    RED_SEAWEED_SWAY_AMPLITUDE,
-    RED_SEAWEED_COLOR,
-    RED_SEAWEED_HIGHLIGHT,
-    RED_SEAWEED_WIDTH,
-    RED_SEAWEED_GLOW_INTENSITY,
-    LILY_PAD_COLOR,
-    LILY_PAD_HIGHLIGHT,
-    LILY_PAD_SIZE_MIN,
-    LILY_PAD_SIZE_MAX,
-    LILY_PAD_FLOWER_COLOR,
-    TUBE_SPONGE_HEIGHT_MIN,
-    TUBE_SPONGE_HEIGHT_MAX,
-    TUBE_SPONGE_SEGMENTS,
-    TUBE_SPONGE_FILTER_RATE,
-    TUBE_SPONGE_COLOR,
-    TUBE_SPONGE_HIGHLIGHT,
-    TUBE_SPONGE_WIDTH,
-    FAN_CORAL_HEIGHT_MIN,
-    FAN_CORAL_HEIGHT_MAX,
-    FAN_CORAL_SWAY_SPEED,
-    FAN_CORAL_SWAY_AMPLITUDE,
-    FAN_CORAL_BRANCH_FACTOR,
-    FAN_CORAL_COLOR,
-    FAN_CORAL_HIGHLIGHT,
-    FAN_CORAL_WIDTH,
-    ANEMONE_HEIGHT_MIN,
+    ANEMONE_COLOR,
+    ANEMONE_GLOW_COLOR,
     ANEMONE_HEIGHT_MAX,
+    ANEMONE_HEIGHT_MIN,
+    ANEMONE_HIGHLIGHT,
+    ANEMONE_PULSE_SPEED,
     ANEMONE_SWAY_SPEED,
     ANEMONE_TENTACLES,
-    ANEMONE_COLOR,
-    ANEMONE_HIGHLIGHT,
     ANEMONE_WIDTH,
-    ANEMONE_PULSE_SPEED,
-    ANEMONE_GLOW_COLOR,
-    PLANT_GRAZE_DAMAGE,
-    PLANT_GRAZE_ENERGY_GAIN,
-    GRAZING_VISUAL_DURATION,
-    PLANKTON_PER_PLANT_CHANCE,
-    ROOT_BASE_GROWTH_RATE,
-    PLANT_HARD_CAP,
-    SEED_HARD_CAP,
     BUBBLE_CHANCE,
     BUBBLE_COLOR,
+    CLEANER_STATION_BUFF_RATE,
+    CLEANER_STATION_PLANT_TYPES,
+    CLEANER_STATION_RADIUS,
+    FAN_CORAL_BRANCH_FACTOR,
+    FAN_CORAL_COLOR,
+    FAN_CORAL_HEIGHT_MAX,
+    FAN_CORAL_HEIGHT_MIN,
+    FAN_CORAL_HIGHLIGHT,
+    FAN_CORAL_SWAY_AMPLITUDE,
+    FAN_CORAL_SWAY_SPEED,
+    FAN_CORAL_WIDTH,
+    GRAZING_VISUAL_DURATION,
+    KELP_COLOR,
+    KELP_HEIGHT_MAX,
+    KELP_HEIGHT_MIN,
+    KELP_HIGHLIGHT,
+    KELP_SWAY_AMPLITUDE,
+    KELP_SWAY_SPEED,
+    KELP_WIDTH,
+    LILY_PAD_COLOR,
+    LILY_PAD_FLOWER_COLOR,
+    LILY_PAD_HIGHLIGHT,
+    LILY_PAD_SIZE_MAX,
+    LILY_PAD_SIZE_MIN,
+    PLANKTON_PER_PLANT_CHANCE,
+    PLANT_GRAZE_DAMAGE,
+    PLANT_GRAZE_ENERGY_GAIN,
+    PLANT_HARD_CAP,
+    RED_SEAWEED_COLOR,
+    RED_SEAWEED_GLOW_INTENSITY,
+    RED_SEAWEED_HEIGHT_MAX,
+    RED_SEAWEED_HEIGHT_MIN,
+    RED_SEAWEED_HIGHLIGHT,
+    RED_SEAWEED_SWAY_AMPLITUDE,
+    RED_SEAWEED_SWAY_SPEED,
+    RED_SEAWEED_WIDTH,
+    ROOT_BASE_GROWTH_RATE,
+    SEAGRASS_COLOR,
+    SEAGRASS_HEIGHT_MAX,
+    SEAGRASS_HEIGHT_MIN,
+    SEAGRASS_HIGHLIGHT,
+    SEAGRASS_SWAY_AMPLITUDE,
+    SEAGRASS_SWAY_SPEED,
+    SEAGRASS_WIDTH,
+    SEED_HARD_CAP,
     SOIL_MAX_NUTRIENT,
+    TUBE_SPONGE_COLOR,
+    TUBE_SPONGE_FILTER_RATE,
+    TUBE_SPONGE_HEIGHT_MAX,
+    TUBE_SPONGE_HEIGHT_MIN,
+    TUBE_SPONGE_HIGHLIGHT,
+    TUBE_SPONGE_SEGMENTS,
+    TUBE_SPONGE_WIDTH,
+    WATER_LINE_Y,
+    WORLD_HEIGHT,
 )
+from .plant_development import PlantDevelopment
 from .plant_rules import is_valid_depth
 from .roots import RootSystem
 from .seeds import Seed
-from .plant_development import PlantDevelopment
-
 
 _PLANT_PLANKTON_COLOR = {
     "kelp": (60, 160, 60),
@@ -227,10 +230,10 @@ class Plant:
         h = self.development.current_height
         self.branches = []
 
-        def add(x, y, a, l, w, lev):
-            if lev <= 0 or l < 5:
+        def add(x, y, a, length, w, lev):
+            if lev <= 0 or length < 5:
                 return
-            ex, ey = x + math.cos(a) * l, y + math.sin(a) * l
+            ex, ey = x + math.cos(a) * length, y + math.sin(a) * length
             self.branches.append(
                 {"start": (x, y), "end": (ex, ey), "width": w, "level": lev}
             )
@@ -240,8 +243,8 @@ class Plant:
                     * FAN_CORAL_BRANCH_FACTOR
                     * self.traits.get("branch_density", 1.0)
                 )
-                add(ex, ey, a - off, l * 0.7, w * 0.6, lev - 1)
-                add(ex, ey, a + off, l * 0.7, w * 0.6, lev - 1)
+                add(ex, ey, a - off, length * 0.7, w * 0.6, lev - 1)
+                add(ex, ey, a + off, length * 0.7, w * 0.6, lev - 1)
 
         add(self.x, self.base_y, -math.pi / 2, h * 0.3, self.width, 4)
         self._last_branch_height, self._branch_dirty = h, False
@@ -355,16 +358,16 @@ class Plant:
             )
         self.floating_leaves = [
             {
-                "x": l["x"] + l["vx"],
-                "y": l["y"] + l["vy"],
-                "vx": l["vx"],
-                "vy": l["vy"],
-                "life": l["life"] - dt,
-                "rot": l["rot"] + l["spin"] * dt,
-                "spin": l["spin"],
+                "x": lf["x"] + lf["vx"],
+                "y": lf["y"] + lf["vy"],
+                "vx": lf["vx"],
+                "vy": lf["vy"],
+                "life": lf["life"] - dt,
+                "rot": lf["rot"] + lf["spin"] * dt,
+                "spin": lf["spin"],
             }
-            for l in self.floating_leaves
-            if l["life"] > dt
+            for lf in self.floating_leaves
+            if lf["life"] > dt
         ]
 
         if self.development.stage == "decomposing" and random.random() < 0.1:
@@ -720,6 +723,16 @@ class Plant:
         )
         return (self.x + sw, self.base_y - self.development.current_height)
 
+    def apply_cleaner_buff(self, dt):
+        """Called when a cleaner fish is nearby. Boosts nutrient efficiency.
+
+        The cleaner's presence provides a small energy bonus, representing
+        the mutualistic benefit of cleaning station proximity (removal of
+        parasites, water circulation, etc.).
+        """
+        if self.development.stage not in ("seed", "dormant", "decomposing"):
+            self.development.energy += CLEANER_STATION_BUFF_RATE * dt
+
     def draw_roots(self, screen, camera, time=0):
         self.root_system.draw(screen, camera, time)
 
@@ -831,6 +844,18 @@ class PlantManager:
                     }
                 )
 
+        # Cleaner fish mutualism: station plants gain energy when cleaners are nearby
+        fish_sys = getattr(self.world, "fish_system", None)
+        if fish_sys:
+            for cleaner in fish_sys.cleaner_fish:
+                for p in self.plants:
+                    if p.plant_type in CLEANER_STATION_PLANT_TYPES:
+                        dist_sq = (cleaner.physics.pos.x - p.x) ** 2 + (
+                            cleaner.physics.pos.y - p.base_y
+                        ) ** 2
+                        if dist_sq < CLEANER_STATION_RADIUS ** 2:
+                            p.apply_cleaner_buff(dt)
+
         for b in self.bubbles[:]:
             b["y"] += b["vy"] * 60 * dt
             b["life"] -= dt
@@ -853,3 +878,6 @@ class PlantManager:
                 (int(pos[0]), int(pos[1])),
                 b["size"],
             )
+
+
+

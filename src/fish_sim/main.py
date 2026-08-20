@@ -1,14 +1,16 @@
-"""Main simulation entry point - imported by the root launcher"""
+﻿"""Main simulation entry point - imported by the root launcher"""
+
+import sys
 
 import pygame
-import sys
-from .config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, TITLE
-from .core.world import World
-from .plants.plants import PlantManager
-from .core.particles import ParticleSystem
-from .fish.fish_system import FishSystem
+
+from .config import FPS, SCREEN_HEIGHT, SCREEN_WIDTH, TITLE
 from .core.camera import Camera
-from .time_system import TimeSystem   # New seasonal/day-night system
+from .core.particles import ParticleSystem
+from .core.world import World
+from .fish.fish_system import FishSystem
+from .plants.plants import PlantManager
+from .time_system import TimeSystem  # New seasonal/day-night system
 
 
 class Simulation:
@@ -66,7 +68,7 @@ class Simulation:
         self.time_system.update(dt)                    # Update day/night & seasons
 
         self.world.soil_grid.update(dt)
-        self.particle_system.update_with_dt(dt, self.time_system)
+        self.particle_system.update_with_dt(dt, self.time_system, soil_grid=self.world.soil_grid)
         self.plant_manager.update(dt, self.time_system)   # Pass time_system for seasonal effects
         self.fish_system.update(dt, self.time_system)     # Pass time_system for behavior modulation
 
@@ -85,12 +87,16 @@ class Simulation:
         self.world.draw(self.screen, self.camera, self.time_system)
         self.particle_system.draw(self.screen, self.camera, self.time_system)
         self.plant_manager.draw(self.screen, self.camera, self.time_system.time_of_day)
-        self.fish_system.draw(self.screen, self.camera, self.time_system.time_of_day, dt, self.time_system)
+        self.fish_system.draw(
+            self.screen, self.camera,
+            self.time_system.time_of_day, dt,
+            self.time_system,
+        )
 
         # Instructions (bottom left)
         instructions = [
             "Click on any fish to view its neural activity!",
-            "Blue-striped = Cleaner fish (eat poop, fertilize soil)",
+            "Blue-striped = Cleaner fish (eat poop, clean fish, fertilize soil)",
             "R = Restart   T = Cycle time speed   P = Pause   ESC = Quit",
         ]
         y = SCREEN_HEIGHT - 110
@@ -125,3 +131,5 @@ def run_simulation():
 
 if __name__ == "__main__":
     run_simulation()
+
+

@@ -1,17 +1,19 @@
-import pygame
 import math
 import random
+
+import pygame
+
 from ..config import (
-    SOIL_MAX_NUTRIENT,
+    BLOOD_DROP_COLORS,
+    BLOOD_DROP_COUNT,
+    BLOOD_DROP_DURATION,
     CLEANER_CLEANING_FLASH_DURATION,
-    DEAD_FISH_SINK_SPEED,
     DEAD_FISH_DECOMPOSITION_TIME,
     DEAD_FISH_NUTRIENT_RETURN,
+    DEAD_FISH_SINK_SPEED,
     FISH_EGG_HATCH_TIME,
+    SOIL_MAX_NUTRIENT,
     WORLD_WIDTH,
-    BLOOD_DROP_DURATION,
-    BLOOD_DROP_COUNT,
-    BLOOD_DROP_COLORS,
 )
 
 
@@ -355,7 +357,8 @@ class DeadFish:
             return
 
         color = self.get_current_color()
-        alpha = int(255 * (1.0 - self.fade_progress * 0.6))  # fade out but don't go fully transparent
+        # fade out but don't go fully transparent
+        alpha = int(255 * (1.0 - self.fade_progress * 0.6))
         alpha = max(40, alpha)
 
         pos = camera.apply((self.x, self.y))
@@ -409,8 +412,16 @@ class DeadFish:
         eye_y = int(cy + eye_offset_y)
         eye_r = max(1, body_size // 4)
         # X marks the spot
-        pygame.draw.line(surf, (40, 30, 25, alpha), (eye_x - eye_r, eye_y - eye_r), (eye_x + eye_r, eye_y + eye_r), 1)
-        pygame.draw.line(surf, (40, 30, 25, alpha), (eye_x - eye_r, eye_y + eye_r), (eye_x + eye_r, eye_y - eye_r), 1)
+        pygame.draw.line(
+            surf, (40, 30, 25, alpha),
+            (eye_x - eye_r, eye_y - eye_r),
+            (eye_x + eye_r, eye_y + eye_r), 1,
+        )
+        pygame.draw.line(
+            surf, (40, 30, 25, alpha),
+            (eye_x - eye_r, eye_y + eye_r),
+            (eye_x + eye_r, eye_y - eye_r), 1,
+        )
 
         screen.blit(surf, (sx - surf_size // 2, sy - surf_size // 2))
 
@@ -419,7 +430,10 @@ class DeadFish:
             bpos = camera.apply((b["x"], b["y"]))
             b_alpha = int(180 * (b["life"] / 1.5))
             b_alpha = max(0, min(255, b_alpha))
-            bsurf = pygame.Surface((int(b["size"] * 2 + 4), int(b["size"] * 2 + 4)), pygame.SRCALPHA)
+            bsurf = pygame.Surface(
+                (int(b["size"] * 2 + 4), int(b["size"] * 2 + 4)),
+                pygame.SRCALPHA,
+            )
             pygame.draw.circle(
                 bsurf,
                 (180, 200, 220, b_alpha),
