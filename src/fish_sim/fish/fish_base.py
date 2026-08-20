@@ -888,6 +888,9 @@ class NeuralFish:
                 particle_system.spawn_eat_effect(tx, ty, eat_color)
 
                 if hasattr(t, "reset"):
+                    # Mark particle as consumed this frame to prevent double nutrient deposition
+                    if hasattr(t, "_consumed_this_frame"):
+                        t._consumed_this_frame = True
                     t.reset()
                 elif t in targets:
                     targets.remove(t)

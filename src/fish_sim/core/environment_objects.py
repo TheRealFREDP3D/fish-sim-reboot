@@ -244,6 +244,8 @@ class DeadFish:
         self.decomp_timer = 0.0
         self.decomp_duration = DEAD_FISH_DECOMPOSITION_TIME
         self.fade_progress = 0.0  # 0.0 = fresh, 1.0 = fully decomposed
+        # Prevent multiple cleaners from accelerating the same corpse per frame
+        self._cleaner_accelerated_this_frame = False
 
         # Rotation for the sinking tumble
         self.rotation = 0.0
@@ -258,6 +260,9 @@ class DeadFish:
 
     def update(self, dt, world):
         """Returns True if still alive (not fully decomposed)."""
+        # Reset frame-specific flags
+        self._cleaner_accelerated_this_frame = False
+
         if self.phase == "sinking":
             self.y += self.sink_vy * dt
             self.x += self.sink_vx * dt

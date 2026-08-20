@@ -151,10 +151,12 @@ class Particle:
 
     def __init__(self, is_plankton=False):
         self.is_plankton = is_plankton
+        self._consumed_this_frame = False
         self.reset()
 
     def reset(self, spawn_x=None, spawn_y=None):
         """Reset to a random position, or to a specific plant-tip location."""
+        self._consumed_this_frame = False
         if spawn_x is not None and spawn_y is not None:
             self.x = spawn_x + random.uniform(-8, 8)
             self.y = spawn_y + random.uniform(-8, 8)
@@ -215,7 +217,10 @@ class Particle:
 
         if self.y < WATER_LINE_Y + 5 or self.y > WORLD_HEIGHT - 5:
             # Plankton that expires near the seabed deposits nutrients into soil
-            if self.is_plankton and soil_grid is not None and self.y >= WORLD_HEIGHT - 20:
+            # Only deposit if not consumed by a fish this frame
+            near_seabed = self.y >= WORLD_HEIGHT - 20
+            if (self.is_plankton and not self._consumed_this_frame
+                    and soil_grid is not None and near_seabed):
                 cell = soil_grid.get_cell_at_pixel(self.x, min(self.y, WORLD_HEIGHT - 10))
                 if cell and not cell.is_water:
                     from ..config import SOIL_MAX_NUTRIENT

@@ -150,7 +150,7 @@ class CleanerFish(NeuralFish):
             if food in poops:
                 poops.remove(food)
                 # Deposit processed nutrients into the soil below
-                if hasattr(food, "nutrition"):
+                if hasattr(food, "nutrition") and hasattr(self.world, "soil_grid"):
                     cell = self.world.soil_grid.get_cell_at_pixel(
                         self.physics.pos.x, self.physics.pos.y
                     )
@@ -228,10 +228,14 @@ class CleanerFish(NeuralFish):
         for corpse in dead_fish_list:
             if corpse.phase != "decomposing":
                 continue
+            # Skip if another cleaner already accelerated this corpse this frame
+            if getattr(corpse, "_cleaner_accelerated_this_frame", False):
+                continue
             dist = self.physics.pos.distance_to((corpse.x, corpse.y))
             if dist < CLEANER_CORPSE_RANGE:
                 # Accelerate decomposition (50% faster while cleaner is present)
                 corpse.decomp_timer += dt * 0.5
+                corpse._cleaner_accelerated_this_frame = True
                 # Small energy gain for the cleaner
                 self.energy = min(FISH_MAX_ENERGY, self.energy + dt * 1.5)
                 break
