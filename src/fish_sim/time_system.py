@@ -1,34 +1,35 @@
-"""
-TimeSystem — Master clock for day/night cycles and seasons.
+﻿"""
+TimeSystem â€” Master clock for day/night cycles and seasons.
 
 Time-of-day:  0.0 = midnight, 0.25 = dawn, 0.5 = noon, 0.75 = dusk, 1.0 = midnight
 Season index: 0 = Spring, 1 = Summer, 2 = Autumn, 3 = Winter
 """
 
 import math
+
 from .config import (
-    DAY_DURATION,
-    SEASON_DURATION,
-    DAWN_START,
     DAWN_END,
-    DUSK_START,
+    DAWN_START,
+    DAY_DURATION,
     DUSK_END,
-    SEASON_NAMES,
+    DUSK_START,
     SEASON_COLORS,
+    SEASON_DURATION,
+    SEASON_NAMES,
 )
 
 
 class TimeSystem:
     def __init__(self):
         # Start at early morning so the player sees a dawn immediately
-        self.time_of_day = 0.22  # 0.0–1.0, fraction of a full day
+        self.time_of_day = 0.22  # 0.0â€“1.0, fraction of a full day
         self.day_count = 0
         self.season_time = 0.0  # seconds elapsed in current season
         self.season_index = 0  # 0=Spring 1=Summer 2=Autumn 3=Winter
         self.paused = False
         self.speed_mult = 1.0  # can be raised for fast-forward
 
-    # ── Update ────────────────────────────────────────────────────────────────
+    # -- â --
 
     def update(self, dt):
         if self.paused:
@@ -48,7 +49,7 @@ class TimeSystem:
             self.season_time -= SEASON_DURATION
             self.season_index = (self.season_index + 1) % 4
 
-    # ── Derived properties ────────────────────────────────────────────────────
+    # -- â --
 
     @property
     def season_name(self):
@@ -56,7 +57,7 @@ class TimeSystem:
 
     @property
     def season_progress(self):
-        """0.0 → 1.0 through the current season."""
+        """0.0 â†’ 1.0 through the current season."""
         if SEASON_DURATION <= 0:
             return 0.0
         return self.season_time / SEASON_DURATION
@@ -146,15 +147,15 @@ class TimeSystem:
     @property
     def nutrient_upwelling(self):
         """Extra base nutrient injection per second. Spring surge."""
-        mods = {0: 0.003, 1: 0.001, 2: 0.001, 3: 0.0}
+        mods = {0: 0.003, 1: 0.001, 2: 0.001, 3: 0.0005}
         return mods[self.season_index]
 
-    # ── Sky / Water colours ───────────────────────────────────────────────────
+    # -- â --
 
     def get_sky_color(self):
         """Interpolate sky colour through day phases and seasons."""
         t = self.time_of_day
-        ll = self.light_level
+        _ll = self.light_level
 
         # Base day/night sky
         if self.is_night:
@@ -204,7 +205,7 @@ class TimeSystem:
         """Glow intensity for fish/plants at night. 0 during day."""
         return int(max(0.0, 1.0 - self.light_level * 2.5) * 120)
 
-    # ── HUD helpers ───────────────────────────────────────────────────────────
+    # -- â --
 
     def get_hud_strings(self):
         hour = int(self.time_of_day * 24)
@@ -222,7 +223,7 @@ class TimeSystem:
         }
 
     def cycle_speed(self):
-        """Cycle through 1x → 3x → 6x → 1x."""
+        """Cycle through 1x â†’ 3x â†’ 6x â†’ 1x."""
         if self.speed_mult < 2:
             self.speed_mult = 3.0
         elif self.speed_mult < 5:
@@ -231,7 +232,7 @@ class TimeSystem:
             self.speed_mult = 1.0
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -- â --
 
 
 def _smoothstep(t):
@@ -242,3 +243,4 @@ def _smoothstep(t):
 def _lerp_color(c1, c2, t):
     t = max(0.0, min(1.0, t))
     return tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
+

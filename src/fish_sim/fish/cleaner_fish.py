@@ -1,36 +1,41 @@
-"""
-Cleaner Fish — Mutualistic symbiont with improved neural network integration.
+﻿"""
+Cleaner Fish -- Mutualistic symbiont with improved neural network integration.
 
-Three behavioral pillars:
+Four behavioral pillars:
   1. Cleaning Mutualism (primary):   Approach client fish and clean them.
   2. Scavenging (secondary):          Opportunistically eat poop AND plankton.
   3. Cleaning Station Affinity:       Drift toward coral / anemone / sponge.
+  4. Corpse Scavenging:               Accelerate dead fish decomposition.
 
 Improvements:
-- Uses NN's clean_drive output (output 2) for behavior control
+- Uses NN's clean_drive output (index 4) for behavior control
 - Reduced hard-coded behavior in favor of learned responses
 - Temporal context helps cleaners remember recent cleaning opportunities
+- Poop consumption deposits processed nutrients into soil (mutualistic)
+- Near corpses, cleaners accelerate decomposition
 """
 
-import math
 import random
-from .fish_base import NeuralFish
+
 from ..config import (
-    CLEANER_FISH_SPEED_MULT,
-    CLEANER_CLEANING_RANGE,
-    CLEANER_CLEANING_DURATION,
     CLEANER_CLEANING_COOLDOWN,
+    CLEANER_CLEANING_DURATION,
     CLEANER_CLEANING_ENERGY_GAIN,
-    CLIENT_STAMINA_GAIN,
-    CLIENT_ENERGY_GAIN,
-    CLEANER_IMMUNITY_CHANCE,
+    CLEANER_CLEANING_RANGE,
+    CLEANER_CLIENT_SEEK_WEIGHT,
+    CLEANER_CORPSE_RANGE,
+    CLEANER_FISH_SPEED_MULT,
+    CLEANER_POOP_NUTRIENT_RETURN_RATIO,
+    CLEANER_POOP_SEEK_WEIGHT,
     CLEANER_STATION_PLANT_TYPES,
     CLEANER_STATION_RADIUS,
     CLEANER_STATION_SEEK_WEIGHT,
-    CLEANER_POOP_SEEK_WEIGHT,
-    CLEANER_CLIENT_SEEK_WEIGHT,
+    CLIENT_ENERGY_GAIN,
+    CLIENT_STAMINA_GAIN,
     FISH_MAX_ENERGY,
+    SOIL_MAX_NUTRIENT,
 )
+from .fish_base import NeuralFish
 
 
 class CleanerFish(NeuralFish):
@@ -133,11 +138,27 @@ class CleanerFish(NeuralFish):
             particle_system.spawn_cleaning_effect(mid_x, mid_y)
 
     def on_food_consumed(self, food):
-        """Override to remove consumed poop from the fish system's poop list."""
+        """Override to remove consumed poop and deposit processed nutrients into soil.
+
+        When the cleaner eats a poop particle, it processes the waste and
+        deposits a fraction of the nutrient value into the nearest soil cell.
+        This makes poop-scavenging a net positive for the ecosystem:
+        the cleaner gains energy AND fertilises the soil.
+        """
         if hasattr(self.world, "fish_system"):
             poops = self.world.fish_system.poops
             if food in poops:
                 poops.remove(food)
+                # Deposit processed nutrients into the soil below
+                if hasattr(food, "nutrition") and hasattr(self.world, "soil_grid"):
+                    cell = self.world.soil_grid.get_cell_at_pixel(
+                        self.physics.pos.x, self.physics.pos.y
+                    )
+                    if cell and not cell.is_water:
+                        cell.nutrient = min(
+                            SOIL_MAX_NUTRIENT,
+                            cell.nutrient + food.nutrition * CLEANER_POOP_NUTRIENT_RETURN_RATIO,
+                        )
 
     def _update_cleaning(self, dt, all_fish, particle_system):
         """Pillar 1: Cleaning mutualism behavior."""
@@ -175,7 +196,7 @@ class CleanerFish(NeuralFish):
                 self.physics.apply_force(seek)
 
     def _update_scavenging(self, dt, poops):
-        """Pillar 2: Scavenging behavior using NN's clean_drive output."""
+        """Pillar 2: Scavenging behaviour using NN's clean_drive output."""
         if not self._is_actively_cleaning:
             clean_drive = self.last_outputs[4] if len(self.last_outputs) > 4 else 0.5
             nearest_poop = self._find_nearest_poop(poops)
@@ -188,7 +209,7 @@ class CleanerFish(NeuralFish):
                 self.physics.apply_force(seek)
 
     def _update_station_affinity(self, plant_manager):
-        """Pillar 3: Cleaning station affinity behavior."""
+        """Pillar 3: Cleaning station affinity behaviour."""
         if not self._is_actively_cleaning and random.random() < 0.3:
             station = self._find_nearest_station(plant_manager)
             if station:
@@ -199,18 +220,48 @@ class CleanerFish(NeuralFish):
                 )
                 self.physics.apply_force(seek)
 
+    def _update_scavenge_corpse(self, dt, dead_fish_list):
+        """Pillar 4: Near a decomposing corpse, the cleaner nibbles to
+        accelerate decomposition while gaining a small energy reward."""
+        if self._is_actively_cleaning:
+            return
+        for corpse in dead_fish_list:
+            if corpse.phase != "decomposing":
+                continue
+            # Skip if another cleaner already accelerated this corpse this frame
+            if getattr(corpse, "_cleaner_accelerated_this_frame", False):
+                continue
+            dist = self.physics.pos.distance_to((corpse.x, corpse.y))
+            if dist < CLEANER_CORPSE_RANGE:
+                # Accelerate decomposition (50% faster while cleaner is present)
+                corpse.decomp_timer += dt * 0.5
+                corpse._cleaner_accelerated_this_frame = True
+                # Small energy gain for the cleaner
+                self.energy = min(FISH_MAX_ENERGY, self.energy + dt * 1.5)
+                break
+
     def update(
         self, dt, all_fish, targets, particle_system, plant_manager, time_system=None
     ):
         self._cleaning_cooldown = max(0.0, self._cleaning_cooldown - dt)
 
         # Separate poop from plankton
-        poops = [t for t in targets if hasattr(t, "nutrition") and not getattr(t, "is_plankton", False)]
+        poops = [
+            t for t in targets
+            if hasattr(t, "nutrition")
+            and not getattr(t, "is_plankton", False)
+        ]
 
-        # Behavioral pillars orchestrated through helper methods
+        # Behavioural pillars orchestrated through helper methods
         self._update_cleaning(dt, all_fish, particle_system)
         self._update_scavenging(dt, poops)
         self._update_station_affinity(plant_manager)
+
+        # Pillar 4: corpse scavenging
+        dead_fish_list = []
+        if hasattr(self.world, "fish_system"):
+            dead_fish_list = self.world.fish_system.dead_fish
+        self._update_scavenge_corpse(dt, dead_fish_list)
 
         # Parent update (NN, state machine, physics, food collision)
         result = super().update(

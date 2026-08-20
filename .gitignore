@@ -37,3 +37,10 @@ _DEV_/
 
 # AI/Assistant rules
 .github/instructions/codacy.instructions.md
+/node_modules
+package.json
+package-lock.json
+/.ruff_cache
+.kanban/
+/.opencode
+

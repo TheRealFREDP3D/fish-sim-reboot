@@ -1,25 +1,26 @@
-"""Particle system for floating sediment and plankton"""
+﻿"""Particle system for floating sediment and plankton"""
+
+import math
+import random
 
 import pygame
-import random
-import math
+
 from ..config import (
-    SCREEN_WIDTH,
-    SCREEN_HEIGHT,
-    WORLD_WIDTH,
-    WORLD_HEIGHT,
-    WATER_LINE_Y,
-    PARTICLE_MIN_SIZE,
+    PARTICLE_ALPHA,
     PARTICLE_MAX_SIZE,
     PARTICLE_MAX_SPEED,
-    SEDIMENT_COLOR,
-    PLANKTON_COLOR,
-    PLANKTON_COLORS,
-    PLANKTON_BASE_RADIUS_MIN,
+    PARTICLE_MIN_SIZE,
     PLANKTON_BASE_RADIUS_MAX,
-    PARTICLE_ALPHA,
-    SEDIMENT_COUNT,
+    PLANKTON_BASE_RADIUS_MIN,
+    PLANKTON_COLORS,
     PLANKTON_COUNT,
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
+    SEDIMENT_COLOR,
+    SEDIMENT_COUNT,
+    WATER_LINE_Y,
+    WORLD_HEIGHT,
+    WORLD_WIDTH,
 )
 
 
@@ -150,10 +151,12 @@ class Particle:
 
     def __init__(self, is_plankton=False):
         self.is_plankton = is_plankton
+        self._consumed_this_frame = False
         self.reset()
 
     def reset(self, spawn_x=None, spawn_y=None):
         """Reset to a random position, or to a specific plant-tip location."""
+        self._consumed_this_frame = False
         if spawn_x is not None and spawn_y is not None:
             self.x = spawn_x + random.uniform(-8, 8)
             self.y = spawn_y + random.uniform(-8, 8)
@@ -184,14 +187,14 @@ class Particle:
             self.nutrition = 1.0
 
         self.variant = random.randint(0, 2) if self.is_plankton else 0
-        
+
         # Cache alpha value to prevent flickering
         if not self.is_plankton:
             self.cached_alpha = max(0, min(255, PARTICLE_ALPHA + random.randint(-20, 20)))
         else:
             self.cached_alpha = None
 
-    def update(self, time, depth_bias=0.0):
+    def update(self, time, depth_bias=0.0, soil_grid=None):
         drift_x = math.sin(time * 0.5 + self.phase) * 0.4
         drift_y = math.cos(time * 0.3 + self.phase) * 0.2
 
@@ -213,6 +216,15 @@ class Particle:
             self.x = 0
 
         if self.y < WATER_LINE_Y + 5 or self.y > WORLD_HEIGHT - 5:
+            # Plankton that expires near the seabed deposits nutrients into soil
+            # Only deposit if not consumed by a fish this frame
+            near_seabed = self.y >= WORLD_HEIGHT - 20
+            if (self.is_plankton and not self._consumed_this_frame
+                    and soil_grid is not None and near_seabed):
+                cell = soil_grid.get_cell_at_pixel(self.x, min(self.y, WORLD_HEIGHT - 10))
+                if cell and not cell.is_water:
+                    from ..config import SOIL_MAX_NUTRIENT
+                    cell.nutrient = min(SOIL_MAX_NUTRIENT, cell.nutrient + 0.05)
             self.reset()
 
     def _draw_plankton_shape(self, surface, color, cx, cy, r, spin):
@@ -282,7 +294,7 @@ class ParticleSystem:
         # Hearts are imported lazily to avoid circular imports
         self._heart_particles: list = []
 
-    # ── Public helpers called by other systems ─────────────────────────────
+    # -- â --
 
     def spawn_plankton_at(self, x, y, color_hint=None):
         from ..config import PLANKTON_HARD_CAP
@@ -344,13 +356,16 @@ class ParticleSystem:
         p.size = random.randint(1, 3)
         self.particles.append(p)
 
-    # ── Update / Draw ──────────────────────────────────────────────────────
+    # -- â --
 
-    def update_with_dt(self, dt, time_system=None):
-        """Preferred update — accepts real dt with optimized particle management."""
+    def update_with_dt(self, dt, time_system=None, soil_grid=None):
+        """Preferred update - accepts real dt with optimized particle management."""
         depth_bias = time_system.plankton_depth_bias if time_system else 0.0
         for particle in self.particles:
-            particle.update(pygame.time.get_ticks() * 0.001, depth_bias=depth_bias)
+            particle.update(
+                pygame.time.get_ticks() * 0.001,
+                depth_bias=depth_bias, soil_grid=soil_grid,
+            )
 
         # In-place filtering for better performance
         self.eat_effects = [e for e in self.eat_effects if e.update(dt)]
@@ -439,3 +454,5 @@ class ParticleSystem:
             effect.draw(screen, camera)
         for heart in self._heart_particles:
             heart.draw(screen, camera)
+
+

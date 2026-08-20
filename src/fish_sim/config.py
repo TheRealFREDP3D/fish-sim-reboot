@@ -1,21 +1,31 @@
-"""Configuration settings for the Underwater Plant Ecosystem Simulation
+﻿"""Configuration settings for the Underwater Plant Ecosystem Simulation
 
 Improved neural network settings with:
 - Proper input normalization bounds
 - Reduced state override biases (allows NN to learn)
 - Layer-specific mutation rates
 - Temporal context inputs
+
+NN output layout (12 outputs, indices 0-11):
+  [0]  steer         - turning force
+  [1]  thrust        - forward/backward force
+  [2]  hide_drive    - flee-to-cover intensity
+  [3]  sprint_drive  - stamina-burning speed boost
+  [4]  clean_drive   - scavenging/cleaning motivation (cleaner fish primary)
+  [5]  ambush_drive  - predator ambush intensity
+  [6]  dash_drive    - predator dash trigger
+  [7:12] raw_state_probs - softmax over 5 states (REST/HUNT/FLEE/MATE/NEST)
 """
 
 from enum import Enum, auto
 
 # Screen settings
-SCREEN_WIDTH = 1200
-SCREEN_HEIGHT = 800
-WORLD_WIDTH = 4000
-WORLD_HEIGHT = 1200
-FPS = 60
-TITLE = "Fish Simulation - Neural Network Improved"
+SCREEN_WIDTH = 1800
+SCREEN_HEIGHT = 1000
+WORLD_WIDTH = 1800
+WORLD_HEIGHT = 1000
+FPS = 30
+TITLE = "Underwater Neuronal Ecosytem v0.1"
 
 # Camera settings
 CAMERA_SMOOTHING = 0.1
@@ -25,7 +35,6 @@ SEDIMENT_COUNT = 120
 PLANKTON_COUNT = 60
 PARTICLE_MIN_SIZE = 1
 PARTICLE_MAX_SIZE = 4
-PARTICLE_MIN_SPEED = 0.1
 PARTICLE_MAX_SPEED = 0.5
 SEDIMENT_COLOR = (180, 160, 140)
 PLANKTON_COLOR = (100, 200, 100)
@@ -47,26 +56,41 @@ PLANKTON_BASE_RADIUS_MIN = 1.5
 PLANKTON_BASE_RADIUS_MAX = 3.5
 
 # Visual effects
-LIGHT_RAY_COUNT = 10
-LIGHT_RAY_ALPHA = 40
+LIGHT_RAY_COUNT = 5
+LIGHT_RAY_ALPHA = 20
 LIGHT_RAY_COLOR = (200, 230, 255)
 BUBBLE_CHANCE = 0.003
 BUBBLE_COLOR = (200, 230, 255)
 
 # Soil settings
-SOIL_CELL_SIZE = 12
+SOIL_CELL_SIZE = 10
 SOIL_BASE_NUTRIENT = 0.9
-SOIL_SURFACE_BONUS = 0.25
 SOIL_DEPLETED_COLOR = (85, 80, 75)
 SOIL_FERTILE_COLOR = (110, 70, 45)
 SOIL_SOLIDIFY_THRESHOLD = 0.4
 SOIL_MAX_NUTRIENT = 1.5
 
+"""
+
+Pygame coordinate system     
+     
+           y-
+           |
+           | w
+    x ---- 0 ------ x+
+           |
+        v  |
+           y+
+
+v = (-2, 2)
+w = (-1, 1)
+"""
+
 # Terrain zones
-WATER_LINE_Y = 150
-BEACH_SLOPE_END = 200
-STEEP_DROP_END = 400
-TERRAIN_BASE_HEIGHT = 700
+WATER_LINE_Y = 60 # Vertical coordinate (-y)
+BEACH_SLOPE_END = 250 # Horizontal coordinate (x)
+STEEP_DROP_END = 600 # Horizontal coordinate (x)
+TERRAIN_BASE_HEIGHT = 1000 # Vertical coordinate (-y) 
 
 # Colors - Environment
 SKY_COLOR = (152, 219, 249)
@@ -79,22 +103,22 @@ HAZE_COLOR = (20, 50, 90)
 
 # Plant species constants
 KELP_HEIGHT_MIN, KELP_HEIGHT_MAX = 100, 200
-KELP_SEGMENTS, KELP_SWAY_SPEED, KELP_SWAY_AMPLITUDE = 14, 1.2, 20
+KELP_SWAY_SPEED, KELP_SWAY_AMPLITUDE = 1.2, 20
 KELP_COLOR, KELP_HIGHLIGHT, KELP_WIDTH = (45, 110, 45), (80, 160, 80), 6
 KELP_DEPTH_MAX = 0.40
 
 SEAGRASS_HEIGHT_MIN, SEAGRASS_HEIGHT_MAX = 40, 90
-SEAGRASS_SEGMENTS, SEAGRASS_SWAY_SPEED, SEAGRASS_SWAY_AMPLITUDE = 10, 2.2, 12
+SEAGRASS_SWAY_SPEED, SEAGRASS_SWAY_AMPLITUDE = 2.2, 12
 SEAGRASS_COLOR, SEAGRASS_HIGHLIGHT, SEAGRASS_WIDTH = (60, 170, 60), (120, 220, 120), 3
 SEAGRASS_DEPTH_MIN, SEAGRASS_DEPTH_MAX = 0.20, 0.70
 
 ALGAE_HEIGHT_MIN, ALGAE_HEIGHT_MAX = 15, 60
-ALGAE_SEGMENTS, ALGAE_SWAY_SPEED, ALGAE_SWAY_AMPLITUDE = 5, 2.8, 6
+ALGAE_SWAY_SPEED, ALGAE_SWAY_AMPLITUDE = 2.8, 6
 ALGAE_COLOR, ALGAE_HIGHLIGHT, ALGAE_WIDTH = (30, 80, 30), (60, 120, 60), 4
 ALGAE_DEPTH_MIN = 0.60
 
 RED_SEAWEED_HEIGHT_MIN, RED_SEAWEED_HEIGHT_MAX = 80, 160
-RED_SEAWEED_SEGMENTS, RED_SEAWEED_SWAY_SPEED, RED_SEAWEED_SWAY_AMPLITUDE = 12, 0.8, 15
+RED_SEAWEED_SWAY_SPEED, RED_SEAWEED_SWAY_AMPLITUDE = 0.8, 15
 RED_SEAWEED_COLOR, RED_SEAWEED_HIGHLIGHT, RED_SEAWEED_WIDTH = (
     (140, 40, 40),
     (200, 80, 80),
@@ -106,7 +130,7 @@ RED_SEAWEED_GLOW_INTENSITY = 1.5
 LILY_PAD_SIZE_MIN, LILY_PAD_SIZE_MAX = 30, 60
 LILY_PAD_COLOR, LILY_PAD_HIGHLIGHT = (50, 120, 50), (80, 180, 80)
 LILY_PAD_FLOWER_COLOR = (255, 200, 220)
-LILY_PAD_DEPTH_MAX, LILY_PAD_SPREAD_RATE = 0.15, 0.3
+LILY_PAD_DEPTH_MAX = 0.15
 
 TUBE_SPONGE_HEIGHT_MIN, TUBE_SPONGE_HEIGHT_MAX = 50, 120
 TUBE_SPONGE_SEGMENTS, TUBE_SPONGE_COLOR, TUBE_SPONGE_WIDTH = 8, (180, 160, 120), 14
@@ -118,7 +142,7 @@ TUBE_SPONGE_HIGHLIGHT, TUBE_SPONGE_DEPTH_MIN, TUBE_SPONGE_DEPTH_MAX = (
 TUBE_SPONGE_FILTER_RATE = 0.15
 
 FAN_CORAL_HEIGHT_MIN, FAN_CORAL_HEIGHT_MAX = 40, 100
-FAN_CORAL_SEGMENTS, FAN_CORAL_SWAY_SPEED, FAN_CORAL_SWAY_AMPLITUDE = 16, 1.5, 25
+FAN_CORAL_SWAY_SPEED, FAN_CORAL_SWAY_AMPLITUDE = 1.5, 25
 FAN_CORAL_COLOR, FAN_CORAL_HIGHLIGHT, FAN_CORAL_WIDTH = (
     (200, 100, 150),
     (255, 150, 200),
@@ -134,14 +158,13 @@ ANEMONE_GLOW_COLOR, ANEMONE_HIGHLIGHT, ANEMONE_WIDTH = (
     3,
 )
 ANEMONE_DEPTH_MIN, ANEMONE_DEPTH_MAX, ANEMONE_PULSE_SPEED = 0.25, 0.60, 2.0
-ANEMONE_ATTRACT_RADIUS = 80
 
 # Root system
 ROOT_BASE_THICKNESS = 5
 ROOT_BASE_GROWTH_RATE = 0.6
 ROOT_MAX_NODES, ROOT_MAX_DEPTH = 120, 35
 ROOT_BRANCH_CHANCE = 0.15
-ROOT_UPTAKE_CAPACITY, ROOT_TRANSPORT_LOSS = 0.02, 0.005
+ROOT_UPTAKE_CAPACITY, ROOT_TRANSPORT_LOSS = 0.02, 0.003
 ROOT_BASE_COLOR, ROOT_ACTIVE_COLOR, ROOT_TIP_COLOR = (
     (130, 100, 80),
     (210, 170, 110),
@@ -154,7 +177,6 @@ MATURE_ENERGY_THRESHOLD = 1.2
 PLANT_BASE_MAINTENANCE = 0.05
 PLANT_SIZE_MAINTENANCE_FACTOR = 0.12
 PLANT_MAX_AGE = 800.0
-SEED_PRODUCTION_ENERGY, SEED_PRODUCTION_COST = 4.0, 1.2
 FLOWERING_ENERGY_THRESHOLD = 1.5
 FLOWERING_DURATION = 35.0
 DECOMPOSITION_NUTRIENT_RETURN, DECOMPOSITION_DURATION = 0.9, 8.0
@@ -168,25 +190,25 @@ PLANKTON_HARD_CAP = 250
 MUTATION_RATE, MUTATION_STRENGTH = 0.2, 0.15
 
 # ═══════════════════════════════════════════════════════════════════════════
-# NEURAL NETWORK IMPROVEMENTS
+# NEURAL NETWORK
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Input counts (expanded for temporal context)
-NN_INPUT_COUNT = 30  # 9 radar + 18 stats (2 phys + 2 spatial + 3 env + 2 threats + 2 temporal + 5 state + 1 hunger + 1 age) + 3 specialized (Prey_Distance, Client_Distance, Poop_Distance)
-NN_HIDDEN1_SIZE = 14  # Increased from 12
-NN_HIDDEN2_SIZE = 8   # Same
+NN_INPUT_COUNT = 30  # 9 radar + 18 stats + 3 specialized (Prey_Dist, Client_Dist, Poop_Dist)
+NN_HIDDEN1_SIZE = 14
+NN_HIDDEN2_SIZE = 8
 NN_OUTPUT_COUNT = 12
 
 # Recurrent network settings
 NN_RECURRENT = True
-NN_RECURRENT_DECAY = 0.7  # How much of previous hidden state to retain
-NN_RECURRENT_WEIGHT = 0.5  # Weight of recurrent connections in hidden layer
+NN_RECURRENT_DECAY = 0.7
+NN_RECURRENT_WEIGHT = 0.5
 
-# Layer-specific mutation rates (allows structured exploration)
-NN_MUTATION_RATE_INPUT = 0.15      # Higher for sensory adaptation
-NN_MUTATION_RATE_HIDDEN = 0.10     # Standard for hidden layers
-NN_MUTATION_RATE_OUTPUT = 0.05     # Lower to preserve learned behaviors
-NN_MUTATION_RATE_RECURRENT = 0.03  # Very low for memory stability
+# Layer-specific mutation rates
+NN_MUTATION_RATE_INPUT = 0.15
+NN_MUTATION_RATE_HIDDEN = 0.10
+NN_MUTATION_RATE_OUTPUT = 0.05
+NN_MUTATION_RATE_RECURRENT = 0.03
 
 # Layer-specific mutation strengths
 NN_MUTATION_STRENGTH_INPUT = 0.25
@@ -194,32 +216,28 @@ NN_MUTATION_STRENGTH_HIDDEN = 0.20
 NN_MUTATION_STRENGTH_OUTPUT = 0.12
 NN_MUTATION_STRENGTH_RECURRENT = 0.08
 
-# Weight clamping (prevent explosion)
+# Weight clamping
 NN_WEIGHT_MAX = 3.0
 NN_BIAS_MAX = 2.0
 
 # ═══════════════════════════════════════════════════════════════════════════
-# REDUCED STATE BIAS MULTIPLIERS (allows NN to learn behaviors)
+# STATE BIAS MULTIPLIERS (gentle nudges, NN has primary control)
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Old values were: FLEE=3.5, HUNT=2.5, MATE=2.0, REST=1.5
-# New values allow the NN's learned probabilities to matter
-STATE_BIAS_FLEE_THREAT = 0.6      # Reduced from 3.5
-STATE_BIAS_HUNT_HUNGER = 0.4      # Reduced from 2.5
-STATE_BIAS_MATE_DRIVE = 0.3       # Reduced from 2.0
-STATE_BIAS_REST_NIGHT = 0.3       # Reduced from 1.5
+STATE_BIAS_FLEE_THREAT = 0.6
+STATE_BIAS_HUNT_HUNGER = 0.4
+STATE_BIAS_MATE_DRIVE = 0.3
+STATE_BIAS_REST_NIGHT = 0.3
+STATE_BLOCK_IMMATURE = 1.5
 
-# Soft blocks instead of hard blocks (-1e9)
-STATE_BLOCK_IMMATURE = 1.5        # Discourage immature fish from hunting/mating
-
-# Input normalization bounds (for clamping)
+# Input normalization bounds
 INPUT_MAX_ABS_VALUE = 2.0
 
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Fish Physics
 FISH_MAX_FORCE, FISH_MAX_SPEED = 4.5, 140.0
-FISH_DRAG, FISH_MIN_SPEED = 0.96, 15.0
+FISH_DRAG = 0.96
 FISH_TURN_RATE_SCALAR, FISH_STEERING_FORCE_FACTOR = 2.5, 0.35
 FISH_SENSOR_RANGE, FISH_SENSOR_ARC, FISH_SENSORS_COUNT = 250.0, 1.2, 3
 
@@ -235,37 +253,36 @@ FISH_MAX_AGE = (
 
 # Predator & Cleaner Specialties
 CLEANER_FISH_SPEED_MULT = 0.85
-CLEANER_FISH_CLEANING_ENERGY_THRESHOLD = 45.0
-PREDATOR_SPEED_MULT = 1.15  # Predators are faster than prey
-PREDATOR_DASH_DURATION = 1.2  # Longer dash burst
-PREDATOR_DASH_COOLDOWN, PREDATOR_DASH_STAMINA_THRESHOLD = 2.0, 12.0  # Faster dash recovery, lower stamina gate
-PREDATOR_DASH_STAMINA_DRAIN, PREDATOR_DASH_FORCE_MULT = 25.0, 3.5  # Less stamina drain per dash
-PREDATOR_SIZE_ADVANTAGE_MULTIPLIER = 1.0  # Can hunt same-sized prey
-PREY_PREDATOR_MIN_DISTANCE = 500  # Larger detection range
+PREDATOR_SPEED_MULT = 1.15
+PREDATOR_DASH_DURATION = 1.2
+PREDATOR_DASH_COOLDOWN, PREDATOR_DASH_STAMINA_THRESHOLD = 2.0, 12.0
+PREDATOR_DASH_STAMINA_DRAIN, PREDATOR_DASH_FORCE_MULT = 25.0, 3.5
+PREDATOR_SIZE_ADVANTAGE_MULTIPLIER = 1.0
+PREY_PREDATOR_MIN_DISTANCE = 500
 PREDATOR_PREY_RATIO_MIN = 5.0
 
-# Predator hunt mechanics — highly lethal
-PREDATOR_DAMAGE_PER_BITE = 45.0  # More lethal predators
+# Predator hunt mechanics
+PREDATOR_DAMAGE_PER_BITE = 45.0
 PREDATOR_BACKSTAB_MULTIPLIER = 1.5
-PREDATOR_BITE_COOLDOWN = 1.2  # Fast bite rate for aggressive hunting
-PREDATOR_CANNIBAL_SIZE_RATIO = 1.5  # More frequent cannibalism
+PREDATOR_BITE_COOLDOWN = 1.2
+PREDATOR_CANNIBAL_SIZE_RATIO = 1.5
 
 # Predator dash mechanics constants
-PREDATOR_DASH_TRIGGER_RANGE = 350  # Distance at which dash can be triggered
-PREDATOR_DASH_MIN_STAMINA_RATIO = 0.4  # Minimum stamina ratio to dash
-PREDATOR_DASH_MIN_ACTIVITY = 0.2  # Minimum activity modifier for dash
-PREDATOR_DASH_DRIVE_THRESHOLD = 0.1  # Minimum dash_drive to initiate dash
-PREDATOR_DASH_CLOSE_RANGE = 180  # Always dash if closer than this
+PREDATOR_DASH_TRIGGER_RANGE = 350
+PREDATOR_DASH_MIN_STAMINA_RATIO = 0.4
+PREDATOR_DASH_MIN_ACTIVITY = 0.2
+PREDATOR_DASH_DRIVE_THRESHOLD = 0.1
+PREDATOR_DASH_CLOSE_RANGE = 180
 
-# Predator ecosystem balance - improved scavenging
+# Predator ecosystem balance
 PREDATOR_SCAVENGE_THRESHOLD = 20.0
 PREDATOR_SCAVENGE_ENERGY_GAIN = 8.0
 
 # Predator collision and interaction ranges
-PREDATOR_COLLISION_RADIUS_MULT = 20  # Multiplied by size for bite collision
-PREDATOR_EGG_EATING_RANGE = 40  # Distance to eat eggs when scavenging
+PREDATOR_COLLISION_RADIUS_MULT = 20
+PREDATOR_EGG_EATING_RANGE = 40
 
-# Cleaner Fish – Mutualism & Scavenging
+# Cleaner Fish
 CLEANER_CLEANING_RANGE = 60.0
 CLEANER_CLEANING_DURATION = 1.8
 CLEANER_CLEANING_COOLDOWN = 4.0
@@ -276,11 +293,12 @@ CLEANER_IMMUNITY_CHANCE = 0.90
 CLEANER_STATION_PLANT_TYPES = ("fan_coral", "anemone", "tube_sponge")
 CLEANER_STATION_RADIUS = 100.0
 CLEANER_STATION_SEEK_WEIGHT = 0.35
-CLEANER_PLANKTON_EAT_CHANCE = 0.6
 CLEANER_POOP_SEEK_WEIGHT = 0.7
 CLEANER_CLIENT_SEEK_WEIGHT = 0.8
 CLEANER_CLEANING_FLASH_DURATION = 0.5
-CLEANER_NEED_CLEANING_DECAY = 0.05
+CLEANER_CORPSE_RANGE = 80.0
+CLEANER_STATION_BUFF_RATE = 0.15
+CLEANER_POOP_NUTRIENT_RETURN_RATIO = 0.5
 
 # Fish Logic
 FISH_MAX_ENERGY, FISH_HUNGER_THRESHOLD = 50.0, 30.0
@@ -381,12 +399,10 @@ WINTER_MAINTENANCE_MULT = 1.15
 DEAD_FISH_SINK_SPEED = 40.0
 DEAD_FISH_DECOMPOSITION_TIME = 12.0
 DEAD_FISH_NUTRIENT_RETURN = 1.8
-DEAD_FISH_COLOR_FADE_SPEED = 0.06
 
 # Blood Effect (predator bite)
 BLOOD_DROP_COUNT = 10
 BLOOD_DROP_DURATION = 1.2
-BLOOD_DROP_BASE_COLOR = (200, 30, 30)
 BLOOD_DROP_COLORS = [
     (200, 30, 30),
     (220, 50, 40),
@@ -412,17 +428,3 @@ CLEANER_POPULATION_FLOOR = 2
 PREDATOR_POPULATION_FLOOR = 2
 FISH_CARRYING_CAPACITY = 50
 FISH_CARRYING_CAPACITY_STRENGTH = 3.0
-
-# ═══════════════════════════════════════════════════════════════════════════
-# SPECIALIZED OUTPUT HEADS (for different fish types)
-# ═══════════════════════════════════════════════════════════════════════════
-
-# Output indices for common fish
-OUTPUT_STEER = 0
-OUTPUT_THRUST = 1
-OUTPUT_HIDE_DRIVE = 2
-OUTPUT_SPRINT_DRIVE = 3
-OUTPUT_STATE_START = 4  # States are indices 4-8
-
-# For cleaner fish, output 2 becomes "clean_drive"
-# For predator fish, output 2 becomes "ambush_drive", output 3 becomes "dash_drive"

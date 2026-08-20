@@ -1,54 +1,55 @@
-"""
-Plant development system — staged lifecycle with strict seasonal behaviour.
+﻿"""
+Plant development system â€” staged lifecycle with strict seasonal behaviour.
 
 Season index:  0=Spring  1=Summer  2=Autumn  3=Winter
 
 Lifecycle (linear, one-way):
-  seed → germinating → seedling → mature → flowering → seeding → dormant/dying → decomposing
+  seed -> germinating -> seedling -> mature -> flowering -> seeding -> dormant/dying -> decomposing
 
 FIXED: Plants now return to mature after flowering (if healthy) instead of dying.
 This allows sustainable reproduction cycles.
 
-Strict seasonal rules ──────────────────────
-  Spring  – seeds germinate, dormant plants wake up, roots/growth begins
-  Summer  – peak growth, photosynthesis at max, some seeding allowed
-  Autumn  – flowering peaks, seed dispersal, plants prepare for winter
-  Winter  – no germination, no growth, plants go dormant or die, decomposition
+Strict seasonal rules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  Spring  â€“ seeds germinate, dormant plants wake up, roots/growth begins
+  Summer  â€“ peak growth, photosynthesis at max, some seeding allowed
+  Autumn  â€“ flowering peaks, seed dispersal, plants prepare for winter
+  Winter  â€“ no germination, no growth, plants go dormant or die, decomposition
 """
 
 import random
+
 from ..config import (
-    SEED_GROWTH_ENERGY,
-    MATURE_ENERGY_THRESHOLD,
-    PLANT_BASE_MAINTENANCE,
-    PLANT_SIZE_MAINTENANCE_FACTOR,
-    PLANT_MAX_AGE,
-    FLOWERING_ENERGY_THRESHOLD,
-    FLOWERING_DURATION,
+    _SEASON_AGE_RATE,
+    _SEASON_CAN_SEED,
+    _SEASON_PHOTO_MOD,
+    _SEASON_SEED_COOLDOWN,
+    AUTUMN_SEED_BASE_PROBABILITY,
     DECOMPOSITION_DURATION,
     DECOMPOSITION_NUTRIENT_RETURN,
-    WINTER_SURVIVAL_CHANCE,
-    SPRING_GERMINATION_BOOST,
-    WINTER_PHOTOSYNTHESIS_BASE,
+    DORMANT_DEATH_TIME,
+    DORMANT_ENERGY_MINIMUM,
+    FLOWERING_BASE_CHANCE,
+    FLOWERING_DURATION,
+    FLOWERING_ENERGY_THRESHOLD,
     FLOWERING_SEASON_PREFERENCE,
-    _SEASON_AGE_RATE,
-    _SEASON_PHOTO_MOD,
-    _SEASON_CAN_SEED,
-    _SEASON_SEED_COOLDOWN,
     GERMINATION_FAILURE_ENERGY_THRESHOLD,
     GERMINATION_FAILURE_TIME,
-    SEEDLING_DEATH_TIME,
-    DORMANT_ENERGY_MINIMUM,
-    DORMANT_DEATH_TIME,
-    SPRING_GERMINATION_BASE_CHANCE,
-    SUMMER_GERMINATION_BASE_CHANCE,
-    SEED_ENERGY_THRESHOLD,
-    FLOWERING_BASE_CHANCE,
-    AUTUMN_SEED_BASE_PROBABILITY,
-    SUMMER_SEED_BASE_PROBABILITY,
-    SPRING_SEED_BASE_PROBABILITY,
+    MATURE_ENERGY_THRESHOLD,
+    PLANT_BASE_MAINTENANCE,
+    PLANT_MAX_AGE,
+    PLANT_SIZE_MAINTENANCE_FACTOR,
     SEED_ENERGY_COST,
+    SEED_ENERGY_THRESHOLD,
+    SEED_GROWTH_ENERGY,
+    SEEDLING_DEATH_TIME,
+    SPRING_GERMINATION_BASE_CHANCE,
+    SPRING_GERMINATION_BOOST,
+    SPRING_SEED_BASE_PROBABILITY,
+    SUMMER_GERMINATION_BASE_CHANCE,
+    SUMMER_SEED_BASE_PROBABILITY,
     WINTER_MAINTENANCE_MULT,
+    WINTER_PHOTOSYNTHESIS_BASE,
+    WINTER_SURVIVAL_CHANCE,
 )
 
 
@@ -84,7 +85,7 @@ class PlantDevelopment:
         self.seed_cooldown = random.uniform(5.0, 20.0)
         self.season_index = 0
 
-    # ── Species parameters ────────────────────────────────────────────────
+    # -- â --
 
     def _init_species_params(self):
         self.germination_energy = SEED_GROWTH_ENERGY
@@ -106,6 +107,9 @@ class PlantDevelopment:
             self.flowering_energy *= o["flow"]
             self.max_age *= o["age"]
 
+        # Segment counts define visual rendering detail per species.
+        # These are intentionally local (not in config.py) because they
+        # control internal rendering resolution, not tunable gameplay.
         segs = {
             "kelp": 14,
             "seagrass": 10,
@@ -118,14 +122,14 @@ class PlantDevelopment:
         }
         self._max_segments = segs.get(self.plant_type, 8)
 
-    # ── Root-growth multiplier ────────────────────────────────────────────
+    # -- â --
 
     def get_root_growth_multiplier(self, energy, height):
         energy_factor = min(energy / 10.0, 2.0)
         height_factor = max(0.1, 1.0 - (height / 100.0))
         return energy_factor * height_factor
 
-    # ── Main update ───────────────────────────────────────────────────────
+    # -- â --
 
     def update(
         self,
@@ -136,10 +140,10 @@ class PlantDevelopment:
         season_index=0,
     ):
         """
-        dt                  – seconds since last frame
-        growth_nutrients    – nutrients harvested from roots this frame
-        photosynthesis_rate – from TimeSystem (0..~1.2)
-        season_index        – 0=Spring 1=Summer 2=Autumn 3=Winter
+        dt                  â€“ seconds since last frame
+        growth_nutrients    â€“ nutrients harvested from roots this frame
+        photosynthesis_rate â€“ from TimeSystem (0..~1.2)
+        season_index        â€“ 0=Spring 1=Summer 2=Autumn 3=Winter
         """
         self.season_index = season_index
         self.time_in_stage += dt
@@ -149,14 +153,14 @@ class PlantDevelopment:
         season_changed = season_index != self._last_season
         self._last_season = season_index
 
-        # ── Age rate ───────────────────────────────────────────────────────
+        # -- â --
         age_mult = _SEASON_AGE_RATE.get(season_index, 1.0)
         if self.stage in ("seed", "dormant"):
             age_mult *= 0.2  # seeds/dormant plants age very slowly
         self.age += dt * age_mult
 
-        # ── Photosynthesis & energy gain ───────────────────────────────────
-        # Only growing/mature plants photosynthesise — seeds and dormant plants don't
+        # -- â --
+        # Only growing/mature plants photosynthesise â€” seeds and dormant plants don't
         if self.stage not in ("seed", "dormant", "decomposing"):
             photo = photosynthesis_rate
             if season_index == 3:  # winter
@@ -178,10 +182,10 @@ class PlantDevelopment:
 
         self._update_dimensions(dt, season_index)
 
-        # ── Strict seasonal stage transitions ──────────────────────────────
+        # -- â --
         self._handle_seasonal_transitions(season_index, season_changed)
 
-        # ── Per-stage logic ────────────────────────────────────────────────
+        # -- â --
         if self.stage == "seed":
             self._update_as_seed(dt, season_index)
 
@@ -196,7 +200,7 @@ class PlantDevelopment:
                 self.time_in_stage > GERMINATION_FAILURE_TIME
                 and self.energy < GERMINATION_FAILURE_ENERGY_THRESHOLD
             ):
-                # Failed to germinate — die
+                # Failed to germinate â€” die
                 self._transition("dying")
 
         elif self.stage == "seedling":
@@ -208,7 +212,7 @@ class PlantDevelopment:
 
         elif self.stage == "mature":
             # FIX: Spring, Summer AND Autumn: try to flower
-            # Previously only (1, 2) — plants in Spring couldn't flower at all
+            # Previously only (1, 2) â€” plants in Spring couldn't flower at all
             if season_index in (0, 1, 2):  # Spring, Summer, Autumn
                 self._try_enter_flowering(season_index)
             # Check for old age death
@@ -241,7 +245,7 @@ class PlantDevelopment:
 
         return self.stage != "decomposing"
 
-    # ── Seasonal transition logic ─────────────────────────────────────────
+    # -- â --
 
     def _handle_seasonal_transitions(self, season, season_changed):
         """
@@ -254,7 +258,7 @@ class PlantDevelopment:
                     self._transition("dying")
             return
 
-        # ── Season just changed ────────────────────────────────────────────
+        # -- â --
 
         if season == 3:  # Just entered Winter
             self._winter_roll_made = False  # reset for this winter
@@ -280,7 +284,7 @@ class PlantDevelopment:
                 # Germinating plants always die in winter
                 self._transition("dying")
 
-            # Seeds just wait — they don't transition
+            # Seeds just wait â€” they don't transition
 
         elif season == 0:  # Just entered Spring
             self._winter_roll_made = False
@@ -295,7 +299,7 @@ class PlantDevelopment:
                 if random.random() < wake_chance:
                     self._transition("mature")  # dormant plants resume as mature
                 else:
-                    # Failed to wake — die
+                    # Failed to wake â€” die
                     self._transition("dying")
 
         elif season == 2:  # Just entered Autumn
@@ -308,9 +312,9 @@ class PlantDevelopment:
         Seeds germinate in Spring (primary) and early Summer (fallback).
         They wait patiently through Autumn and Winter.
         """
-        if season == 3:  # Winter — stay dormant as seed
+        if season == 3:  # Winter â€” stay dormant as seed
             return
-        if season == 2:  # Autumn — wait for next spring
+        if season == 2:  # Autumn â€” wait for next spring
             return
 
         # Spring: high chance to germinate
@@ -344,7 +348,7 @@ class PlantDevelopment:
             self._transition("dying")
 
     def _try_enter_flowering(self, season_index):
-        """Called in Spring, Summer and Autumn. Each plant flowers at most once per YEAR (reset in spring)."""
+        """Each plant flowers at most once per YEAR (reset in spring)."""
         if self._has_flowered:
             return
         pref = FLOWERING_SEASON_PREFERENCE.get(season_index, 0.0)
@@ -364,7 +368,7 @@ class PlantDevelopment:
         if new_stage == "flowering":
             self._has_flowered = True
 
-    # ── Physical dimensions ───────────────────────────────────────────────
+    # -- â --
 
     def _update_dimensions(self, dt, season_index):
         stage_frac = {
@@ -414,7 +418,7 @@ class PlantDevelopment:
             else:
                 self.visible_blades = max(0.0, self.visible_blades - seg_speed * 0.3)
 
-    # ── Seed production ───────────────────────────────────────────────────
+    # -- â --
 
     def can_produce_seed(self, seed_dispersal_modifier, season_index):
         """
@@ -433,10 +437,10 @@ class PlantDevelopment:
         if self.seed_cooldown > 0:
             return False
 
-        # Base probability — Autumn is primary seeding window
+        # Base probability â€” Autumn is primary seeding window
         if season_index == 2:  # Autumn
             base_p = AUTUMN_SEED_BASE_PROBABILITY
-        elif season_index == 0:  # Spring — new: moderate seed output
+        elif season_index == 0:  # Spring â€” new: moderate seed output
             base_p = SPRING_SEED_BASE_PROBABILITY
         else:  # Summer
             base_p = SUMMER_SEED_BASE_PROBABILITY
@@ -455,7 +459,8 @@ class PlantDevelopment:
         self.seed_cooldown = _SEASON_SEED_COOLDOWN.get(season_index, 20.0)
         return True
 
-    # ── Decomposition ─────────────────────────────────────────────────────
+    # -- â --
 
     def get_decomposition_return(self):
         return DECOMPOSITION_NUTRIENT_RETURN if self.stage == "decomposing" else 0.0
+
