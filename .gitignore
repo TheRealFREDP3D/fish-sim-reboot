@@ -41,3 +41,5 @@ _DEV_/
 package.json
 package-lock.json
 /.ruff_cache
+.kanban/
+/.opencode

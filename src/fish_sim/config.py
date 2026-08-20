@@ -20,12 +20,12 @@ NN output layout (12 outputs, indices 0-11):
 from enum import Enum, auto
 
 # Screen settings
-SCREEN_WIDTH = 1200
-SCREEN_HEIGHT = 800
-WORLD_WIDTH = 4000
-WORLD_HEIGHT = 1200
-FPS = 60
-TITLE = "Fish Simulation - Neural Network Improved"
+SCREEN_WIDTH = 1800
+SCREEN_HEIGHT = 1000
+WORLD_WIDTH = 1800
+WORLD_HEIGHT = 1000
+FPS = 30
+TITLE = "Underwater Neuronal Ecosytem v0.1"
 
 # Camera settings
 CAMERA_SMOOTHING = 0.1
@@ -56,25 +56,41 @@ PLANKTON_BASE_RADIUS_MIN = 1.5
 PLANKTON_BASE_RADIUS_MAX = 3.5
 
 # Visual effects
-LIGHT_RAY_COUNT = 10
-LIGHT_RAY_ALPHA = 40
+LIGHT_RAY_COUNT = 5
+LIGHT_RAY_ALPHA = 20
 LIGHT_RAY_COLOR = (200, 230, 255)
 BUBBLE_CHANCE = 0.003
 BUBBLE_COLOR = (200, 230, 255)
 
 # Soil settings
-SOIL_CELL_SIZE = 12
+SOIL_CELL_SIZE = 10
 SOIL_BASE_NUTRIENT = 0.9
 SOIL_DEPLETED_COLOR = (85, 80, 75)
 SOIL_FERTILE_COLOR = (110, 70, 45)
 SOIL_SOLIDIFY_THRESHOLD = 0.4
 SOIL_MAX_NUTRIENT = 1.5
 
+"""
+
+Pygame coordinate system     
+     
+           y-
+           |
+           | w
+    x ---- 0 ------ x+
+           |
+        v  |
+           y+
+
+v = (-2, 2)
+w = (-1, 1)
+"""
+
 # Terrain zones
-WATER_LINE_Y = 150
-BEACH_SLOPE_END = 200
-STEEP_DROP_END = 400
-TERRAIN_BASE_HEIGHT = 700
+WATER_LINE_Y = 60 # Vertical coordinate (-y)
+BEACH_SLOPE_END = 250 # Horizontal coordinate (x)
+STEEP_DROP_END = 600 # Horizontal coordinate (x)
+TERRAIN_BASE_HEIGHT = 1000 # Vertical coordinate (-y) 
 
 # Colors - Environment
 SKY_COLOR = (152, 219, 249)
