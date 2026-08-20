@@ -40,3 +40,4 @@ _DEV_/
 /node_modules
 package.json
 package-lock.json
+/.ruff_cache
