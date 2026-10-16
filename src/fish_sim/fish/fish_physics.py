@@ -1,5 +1,6 @@
 import math
 import random
+
 import pygame
 
 # No typing imports needed
@@ -34,12 +35,13 @@ class SteeringPhysics:
             steer = desired - self.vel
             if steer.length() > self.max_force:
                 steer.scale_to_length(self.max_force)
-            return steer * weight
+            return steer * weight  # type: ignore[no-any-return]
         return pygame.Vector2(0, 0)
 
     def update(self, dt: float, drag: float, speed_ceiling: float | None = None):
         """Standard Euler integration with drag"""
-        # Update velocity (dt is multiplied by 60 for consistency with previous fixed framerate logic)
+        # Update velocity (dt is multiplied by 60 for consistency
+        # with previous fixed framerate logic)
         self.vel += self.acc * dt * 60
 
         # Apply natural water drag

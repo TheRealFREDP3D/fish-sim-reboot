@@ -1,21 +1,23 @@
 """Root network system - directed graphs for nutrient transport"""
 
-import pygame
-import random
 import math
-from ..config import (
-    ROOT_BASE_THICKNESS,
-    ROOT_BASE_GROWTH_RATE,
-    ROOT_MAX_NODES,
-    ROOT_MAX_DEPTH,
-    ROOT_BRANCH_CHANCE,
-    ROOT_UPTAKE_CAPACITY,
-    ROOT_TRANSPORT_LOSS,
-    ROOT_BASE_COLOR,
-    ROOT_ACTIVE_COLOR,
-    ROOT_TIP_COLOR,
-)
+import random
 from collections import deque
+
+import pygame
+
+from ..config import (
+    ROOT_ACTIVE_COLOR,
+    ROOT_BASE_COLOR,
+    ROOT_BASE_GROWTH_RATE,
+    ROOT_BASE_THICKNESS,
+    ROOT_BRANCH_CHANCE,
+    ROOT_MAX_DEPTH,
+    ROOT_MAX_NODES,
+    ROOT_TIP_COLOR,
+    ROOT_TRANSPORT_LOSS,
+    ROOT_UPTAKE_CAPACITY,
+)
 
 
 class RootNode:

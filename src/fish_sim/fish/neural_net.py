@@ -10,37 +10,38 @@ Features:
 
 import math
 import random
+
 from ..config import (
-    NN_INPUT_COUNT,
+    INPUT_MAX_ABS_VALUE,
+    NN_BIAS_MAX,
     NN_HIDDEN1_SIZE,
     NN_HIDDEN2_SIZE,
+    NN_INPUT_COUNT,
+    NN_MUTATION_RATE_HIDDEN,
+    NN_MUTATION_RATE_INPUT,
+    NN_MUTATION_RATE_OUTPUT,
+    NN_MUTATION_RATE_RECURRENT,
+    NN_MUTATION_STRENGTH_HIDDEN,
+    NN_MUTATION_STRENGTH_INPUT,
+    NN_MUTATION_STRENGTH_OUTPUT,
+    NN_MUTATION_STRENGTH_RECURRENT,
     NN_OUTPUT_COUNT,
     NN_RECURRENT,
     NN_RECURRENT_DECAY,
     NN_RECURRENT_WEIGHT,
-    NN_MUTATION_RATE_INPUT,
-    NN_MUTATION_RATE_HIDDEN,
-    NN_MUTATION_RATE_OUTPUT,
-    NN_MUTATION_RATE_RECURRENT,
-    NN_MUTATION_STRENGTH_INPUT,
-    NN_MUTATION_STRENGTH_HIDDEN,
-    NN_MUTATION_STRENGTH_OUTPUT,
-    NN_MUTATION_STRENGTH_RECURRENT,
     NN_WEIGHT_MAX,
-    NN_BIAS_MAX,
-    INPUT_MAX_ABS_VALUE,
 )
 
 
 class NeuralNet:
     """Feed-forward neural network with optional recurrent connections.
-    
+
     Architecture:
-        Input (NN_INPUT_COUNT) 
-          → Hidden1 (NN_HIDDEN1_SIZE, tanh) 
-          → Hidden2 (NN_HIDDEN2_SIZE, tanh + recurrent) 
-          → Output (NN_OUTPUT_COUNT)
-    
+        Input (NN_INPUT_COUNT)
+          -> Hidden1 (NN_HIDDEN1_SIZE, tanh)
+          -> Hidden2 (NN_HIDDEN2_SIZE, tanh + recurrent)
+          -> Output (NN_OUTPUT_COUNT)
+
     Outputs:
         0: steer (tanh, -1 to 1)
         1: thrust (sigmoid, 0 to 1)
@@ -54,7 +55,7 @@ class NeuralNet:
 
     def __init__(self, input_size=None, hidden_size=None, output_size=None, recurrent=None):
         """Initialize the neural network with Xavier initialization.
-        
+
         Args:
             input_size: Number of input neurons (default: NN_INPUT_COUNT)
             hidden_size: Size of first hidden layer (default: NN_HIDDEN1_SIZE)
@@ -102,7 +103,7 @@ class NeuralNet:
         ]
         self.b3 = [0.0 for _ in range(self.output_size)]
 
-    # ── Activation Functions ─────────────────────────────────────────────────
+    # ── Activation Functions ----
 
     @staticmethod
     def sigmoid(x: float) -> float:
@@ -129,17 +130,19 @@ class NeuralNet:
         sum_exps = sum(exps)
         return [e / sum_exps for e in exps]
 
-    # ── Forward Pass ─────────────────────────────────────────────────────────
+    # ── Forward Pass ----
 
     def forward(self, inputs: list) -> tuple:
         """Run forward pass through the network.
-        
+
         Args:
             inputs: List of input values (will be normalized)
-            
+
         Returns:
             Tuple of (outputs, hidden1_activations, hidden2_activations)
-            outputs: [steer, thrust, hide_drive, sprint_drive, clean_drive, ambush_drive, dash_drive, state_probs...]
+            outputs: [steer, thrust, hide_drive, sprint_drive,
+                      clean_drive, ambush_drive, dash_drive,
+                      state_probs...]
         """
         # Normalize inputs to prevent extreme activations
         normalized = [max(-INPUT_MAX_ABS_VALUE, min(INPUT_MAX_ABS_VALUE, x)) for x in inputs]
@@ -190,35 +193,39 @@ class NeuralNet:
         # Apply output-specific activations
         # Output 0: steer (tanh, -1 to 1)
         steer = self.tanh(raw_outputs[0])
-        
+
         # Output 1: thrust (sigmoid, 0 to 1)
         thrust = self.sigmoid(raw_outputs[1])
-        
+
         # Output 2: hide_drive (sigmoid, 0 to 1)
         hide_drive = self.sigmoid(raw_outputs[2]) if len(raw_outputs) > 2 else 0.5
-        
+
         # Output 3: sprint_drive (sigmoid, 0 to 1)
         sprint_drive = self.sigmoid(raw_outputs[3]) if len(raw_outputs) > 3 else 0.5
-        
+
         # Output 4: clean_drive (sigmoid, 0 to 1)
         clean_drive = self.sigmoid(raw_outputs[4]) if len(raw_outputs) > 4 else 0.5
-        
+
         # Output 5: ambush_drive (sigmoid, 0 to 1)
         ambush_drive = self.sigmoid(raw_outputs[5]) if len(raw_outputs) > 5 else 0.5
-        
+
         # Output 6: dash_drive (sigmoid, 0 to 1)
         dash_drive = self.sigmoid(raw_outputs[6]) if len(raw_outputs) > 6 else 0.5
-        
+
         # Outputs 7-11: state probabilities (softmax)
         state_logits = raw_outputs[7:12] if len(raw_outputs) >= 12 else [0.0] * 5
         state_probs = self.softmax(state_logits)
 
         # Combine all outputs
-        outputs = [steer, thrust, hide_drive, sprint_drive, clean_drive, ambush_drive, dash_drive] + state_probs
+        outputs = (
+            [steer, thrust, hide_drive, sprint_drive,
+             clean_drive, ambush_drive, dash_drive]
+            + state_probs
+        )
 
         return outputs, h1, h2
 
-    # ── State Management ─────────────────────────────────────────────────────
+    # ── State Management ----
 
     def reset_hidden(self):
         """Reset recurrent hidden state (e.g., on fish death/birth)."""
@@ -233,7 +240,7 @@ class NeuralNet:
             self.output_size,
             recurrent=self.recurrent
         )
-        
+
         # Deep copy all weights
         child.w1 = [row[:] for row in self.w1]
         child.b1 = self.b1[:]
@@ -241,27 +248,27 @@ class NeuralNet:
         child.b2 = self.b2[:]
         child.w3 = [row[:] for row in self.w3]
         child.b3 = self.b3[:]
-        
+
         if self.recurrent:
             child.w_rec = [row[:] for row in self.w_rec]
             child.hidden_state = [0.0] * self.hidden2_size
-            
+
         return child
 
     def clone(self) -> 'NeuralNet':
         """Alias for copy() - create an identical copy of this network."""
         return self.copy()
 
-    # ── Reproduction ─────────────────────────────────────────────────────────
+    # ── Reproduction ----
 
     @staticmethod
     def blend(parent1: 'NeuralNet', parent2: 'NeuralNet') -> 'NeuralNet':
         """Create a child network via uniform crossover of two parents.
-        
+
         Args:
             parent1: First parent network
             parent2: Second parent network
-            
+
         Returns:
             Child network with mixed weights from both parents
         """
@@ -305,17 +312,21 @@ class NeuralNet:
 
     def mutate(self, rate: float | None = None, strength: float | None = None) -> 'NeuralNet':
         """Create a mutated copy with layer-specific mutation rates.
-        
+
         Args:
             rate: Base mutation rate (default: uses config values)
             strength: Base mutation strength (default: uses config values)
-            
+
         Returns:
             Mutated copy of this network
         """
         child = self.copy()
 
-        def mutate_matrix(matrix: list, rate_mult: float, strength_mult: float, base_rate: float, base_strength: float) -> list:
+        def mutate_matrix(
+            matrix: list, rate_mult: float,
+            strength_mult: float, base_rate: float,
+            base_strength: float,
+        ) -> list:
             """Mutate a weight matrix with Gaussian noise."""
             result = []
             for row in matrix:
@@ -332,10 +343,18 @@ class NeuralNet:
                 result.append(new_row)
             return result
 
-        def mutate_vector(vector: list, rate_mult: float, strength_mult: float, base_rate: float, base_strength: float) -> list:
+        def mutate_vector(
+            vector: list, rate_mult: float,
+            strength_mult: float, base_rate: float,
+            base_strength: float,
+        ) -> list:
             """Mutate a bias vector with Gaussian noise."""
             return [
-                max(-NN_BIAS_MAX, min(NN_BIAS_MAX, v + random.gauss(0, base_strength * strength_mult)))
+                max(
+                    -NN_BIAS_MAX,
+                    min(NN_BIAS_MAX,
+                        v + random.gauss(0, base_strength * strength_mult)),
+                )
                 if random.random() < base_rate * rate_mult else v
                 for v in vector
             ]
@@ -345,28 +364,41 @@ class NeuralNet:
         base_strength = strength if strength is not None else 0.2
 
         # Layer 1: Higher mutation for sensory adaptation
-        child.w1 = mutate_matrix(child.w1, NN_MUTATION_RATE_INPUT / base_rate, 
-                                  NN_MUTATION_STRENGTH_INPUT / base_strength, base_rate, base_strength)
+        child.w1 = mutate_matrix(
+            child.w1, NN_MUTATION_RATE_INPUT / base_rate,
+            NN_MUTATION_STRENGTH_INPUT / base_strength,
+            base_rate, base_strength,
+        )
         child.b1 = mutate_vector(child.b1, 1.0, 1.0, base_rate, base_strength)
 
         # Layer 2: Standard mutation
-        child.w2 = mutate_matrix(child.w2, NN_MUTATION_RATE_HIDDEN / base_rate,
-                                  NN_MUTATION_STRENGTH_HIDDEN / base_strength, base_rate, base_strength)
+        child.w2 = mutate_matrix(
+            child.w2, NN_MUTATION_RATE_HIDDEN / base_rate,
+            NN_MUTATION_STRENGTH_HIDDEN / base_strength,
+            base_rate, base_strength,
+        )
         child.b2 = mutate_vector(child.b2, 1.0, 1.0, base_rate, base_strength)
 
         # Output layer: Lower mutation to preserve learned behaviors
-        child.w3 = mutate_matrix(child.w3, NN_MUTATION_RATE_OUTPUT / base_rate,
-                                  NN_MUTATION_STRENGTH_OUTPUT / base_strength, base_rate, base_strength)
+        child.w3 = mutate_matrix(
+            child.w3, NN_MUTATION_RATE_OUTPUT / base_rate,
+            NN_MUTATION_STRENGTH_OUTPUT / base_strength,
+            base_rate, base_strength,
+        )
         child.b3 = mutate_vector(child.b3, 0.5, 0.5, base_rate, base_strength)
 
         # Recurrent weights: Very low mutation for memory stability
         if child.recurrent:
-            child.w_rec = mutate_matrix(child.w_rec, NN_MUTATION_RATE_RECURRENT / base_rate,
-                                         NN_MUTATION_STRENGTH_RECURRENT / base_strength, base_rate, base_strength)
+            child.w_rec = mutate_matrix(
+                child.w_rec,
+                NN_MUTATION_RATE_RECURRENT / base_rate,
+                NN_MUTATION_STRENGTH_RECURRENT / base_strength,
+                base_rate, base_strength,
+            )
 
         return child
 
-    # ── Utility Methods ──────────────────────────────────────────────────────
+    # ── Utility Methods ----
 
     def get_weight_stats(self) -> dict:
         """Get statistics about network weights for debugging."""
@@ -378,7 +410,7 @@ class NeuralNet:
                 'max': max(flat),
                 'std': math.sqrt(sum((v - sum(flat)/len(flat))**2 for v in flat) / len(flat))
             }
-        
+
         return {
             'w1': stats(self.w1),
             'w2': stats(self.w2),

@@ -1,32 +1,34 @@
 """World system with dynamic terrain derivation and time-of-day / season lighting"""
 
-import pygame
-import random
 import math
+import random
+
+import pygame
+
 from ..config import (
-    SCREEN_WIDTH,
-    SCREEN_HEIGHT,
-    WORLD_WIDTH,
-    WORLD_HEIGHT,
-    WATER_LINE_Y,
     BEACH_SLOPE_END,
-    STEEP_DROP_END,
-    TERRAIN_BASE_HEIGHT,
-    SKY_COLOR,
-    TERRAIN_COLOR,
-    WATER_SURFACE_COLOR,
-    WATER_DEEP_COLOR,
-    LIGHT_RAY_COUNT,
-    LIGHT_RAY_ALPHA,
-    SOIL_CELL_SIZE,
-    LIGHT_RAY_COLOR,
     HAZE_COLOR,
+    LEAF_COLORS,
+    LIGHT_RAY_ALPHA,
+    LIGHT_RAY_COLOR,
+    LIGHT_RAY_COUNT,
     NIGHT_OVERLAY_COLOR,
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
+    SEASONAL_PARTICLE_CHANCE,
+    SKY_COLOR,
+    SNOW_COLOR,
+    SOIL_CELL_SIZE,
     STAR_COUNT,
     STAR_MAX_ALPHA,
-    SEASONAL_PARTICLE_CHANCE,
-    LEAF_COLORS,
-    SNOW_COLOR,
+    STEEP_DROP_END,
+    TERRAIN_BASE_HEIGHT,
+    TERRAIN_COLOR,
+    WATER_DEEP_COLOR,
+    WATER_LINE_Y,
+    WATER_SURFACE_COLOR,
+    WORLD_HEIGHT,
+    WORLD_WIDTH,
 )
 from ..environment.soil import SoilGrid
 
@@ -234,7 +236,7 @@ class World:
             )
             if star_alpha > 5:
                 anim_t = pygame.time.get_ticks() * 0.001
-                for idx, (sx, sy, sfactor, sphase) in enumerate(self.stars):
+                for idx, (sx, sy, _sfactor, sphase) in enumerate(self.stars):
                     screen_sx = sx - camera.x
                     if screen_sx < -4 or screen_sx > SCREEN_WIDTH + 4:
                         continue

@@ -1,8 +1,8 @@
 """Heritable traits for fish - expanded to include physical performance and appearance"""
 
 import random
-from ..config import MUTATION_RATE, MUTATION_STRENGTH
 
+from ..config import MUTATION_RATE, MUTATION_STRENGTH
 
 # ── Appearance Trait Enums ─────────────────────────────────────────────────────
 
@@ -71,50 +71,56 @@ class FishTraits:
         """Generate random appearance traits for a new fish"""
         return {
             # Body shape: 0=streamlined, 1=standard, 2=rounded
-            "body_shape": random.choice([BODY_SHAPE_STREAMLINED, BODY_SHAPE_STANDARD, BODY_SHAPE_ROUNDED]),
-            
+            "body_shape": random.choice([
+                BODY_SHAPE_STREAMLINED, BODY_SHAPE_STANDARD,
+                BODY_SHAPE_ROUNDED,
+            ]),
+
             # Body proportions
             "body_length_mult": random.uniform(0.85, 1.25),  # How elongated the body is
             "body_width_mult": random.uniform(0.75, 1.30),   # How wide/flat the body is
             "head_size_mult": random.uniform(0.80, 1.20),    # Head proportional size
-            
+
             # Fin configuration
-            "fin_style": random.choice([FIN_STYLE_MINIMAL, FIN_STYLE_STANDARD, FIN_STYLE_ELEGANT, FIN_STYLE_DRAMATIC]),
+            "fin_style": random.choice([
+                FIN_STYLE_MINIMAL, FIN_STYLE_STANDARD,
+                FIN_STYLE_ELEGANT, FIN_STYLE_DRAMATIC,
+            ]),
             "dorsal_fin_size": random.uniform(0.5, 1.5),      # Size of top fin
             "pectoral_fin_size": random.uniform(0.6, 1.4),    # Size of side fins
             "anal_fin_size": random.uniform(0.4, 1.3),        # Size of bottom fin
-            
-            # Tail configuration  
+
+            # Tail configuration
             "tail_shape": random.choice([TAIL_POINTED, TAIL_FORKED, TAIL_ROUNDED, TAIL_LYRE]),
             "tail_size_mult": random.uniform(0.7, 1.4),       # Overall tail size
             "tail_spread": random.uniform(0.6, 1.3),          # How wide the tail spreads
-            
+
             # Pattern and coloration
-            "pattern_type": random.choice([PATTERN_SOLID, PATTERN_STRIPES, PATTERN_SPOTS, 
+            "pattern_type": random.choice([PATTERN_SOLID, PATTERN_STRIPES, PATTERN_SPOTS,
                                            PATTERN_GRADIENT, PATTERN_BANDS, PATTERN_MARBLED]),
             "pattern_intensity": random.uniform(0.3, 1.0),    # How visible the pattern is
             "pattern_scale": random.uniform(0.5, 1.5),        # Size of pattern elements
             "pattern_density": random.uniform(0.3, 0.8),      # How many pattern elements
-            
+
             # Secondary color (for patterns)
             "secondary_color_offset": (
                 random.uniform(-80, 80),
                 random.uniform(-60, 60),
                 random.uniform(-60, 80),
             ),
-            
+
             # Eye variation
             "eye_size_mult": random.uniform(0.8, 1.3),
             "eye_position": random.uniform(-0.1, 0.1),        # Slight forward/back variation
-            
+
             # Scale/shine effects
             "scale_shine": random.uniform(0.0, 0.8),          # How glossy the fish appears
             "iridescence": random.uniform(0.0, 0.5),          # Color-shifting effect
-            
+
             # Additional fins
             "has_barbels": random.random() < 0.15,            # Whisker-like appendages
             "barbel_length": random.uniform(0.3, 0.8),
-            
+
             # Body features
             "belly_curve": random.uniform(-0.2, 0.3),         # Convex/concave belly
             "snout_length": random.uniform(0.8, 1.2),         # Pointed vs blunt face
@@ -168,14 +174,26 @@ class FishTraits:
             if random.random() < MUTATION_RATE * 0.5:
                 # Mutation: pick random value
                 if key == "body_shape":
-                    child_appearance[key] = random.choice([BODY_SHAPE_STREAMLINED, BODY_SHAPE_STANDARD, BODY_SHAPE_ROUNDED])
+                    child_appearance[key] = random.choice([
+                        BODY_SHAPE_STREAMLINED, BODY_SHAPE_STANDARD,
+                        BODY_SHAPE_ROUNDED,
+                    ])
                 elif key == "fin_style":
-                    child_appearance[key] = random.choice([FIN_STYLE_MINIMAL, FIN_STYLE_STANDARD, FIN_STYLE_ELEGANT, FIN_STYLE_DRAMATIC])
+                    child_appearance[key] = random.choice([
+                        FIN_STYLE_MINIMAL, FIN_STYLE_STANDARD,
+                        FIN_STYLE_ELEGANT, FIN_STYLE_DRAMATIC,
+                    ])
                 elif key == "tail_shape":
-                    child_appearance[key] = random.choice([TAIL_POINTED, TAIL_FORKED, TAIL_ROUNDED, TAIL_LYRE])
+                    child_appearance[key] = random.choice([
+                        TAIL_POINTED, TAIL_FORKED,
+                        TAIL_ROUNDED, TAIL_LYRE,
+                    ])
                 elif key == "pattern_type":
-                    child_appearance[key] = random.choice([PATTERN_SOLID, PATTERN_STRIPES, PATTERN_SPOTS, 
-                                                           PATTERN_GRADIENT, PATTERN_BANDS, PATTERN_MARBLED])
+                    child_appearance[key] = random.choice([
+                        PATTERN_SOLID, PATTERN_STRIPES,
+                        PATTERN_SPOTS, PATTERN_GRADIENT,
+                        PATTERN_BANDS, PATTERN_MARBLED,
+                    ])
             else:
                 # Inherit from one parent
                 child_appearance[key] = p1_a[key] if random.random() < 0.5 else p2_a[key]
@@ -190,16 +208,16 @@ class FishTraits:
             "scale_shine", "iridescence",
             "belly_curve", "snout_length", "barbel_length"
         ]
-        
+
         for key in continuous_traits:
             blend = random.uniform(0.3, 0.7)
             val = p1_a[key] * blend + p2_a[key] * (1 - blend)
-            
+
             # Apply mutation
             if random.random() < MUTATION_RATE:
                 change = random.uniform(-MUTATION_STRENGTH * 0.15, MUTATION_STRENGTH * 0.15)
                 val = max(0.3, min(1.8, val + change))
-            
+
             child_appearance[key] = val
 
         # Secondary color: special blending
@@ -218,7 +236,10 @@ class FishTraits:
         if random.random() < MUTATION_RATE * 0.3:
             child_appearance["has_barbels"] = random.random() < 0.15
         else:
-            child_appearance["has_barbels"] = p1_a["has_barbels"] if random.random() < 0.5 else p2_a["has_barbels"]
+            child_appearance["has_barbels"] = (
+                p1_a["has_barbels"] if random.random() < 0.5
+                else p2_a["has_barbels"]
+            )
 
         return FishTraits(tuple(mutated_color), child_phys, child_appearance)
 
@@ -258,7 +279,7 @@ class FishTraits:
             FIN_STYLE_DRAMATIC: 1.6,
         }
         mult = style_mult.get(self.appearance_traits["fin_style"], 1.0)
-        
+
         return {
             "dorsal": self.appearance_traits["dorsal_fin_size"] * mult,
             "pectoral": self.appearance_traits["pectoral_fin_size"] * mult,

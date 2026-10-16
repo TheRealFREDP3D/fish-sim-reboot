@@ -1,32 +1,31 @@
 import random
+
 from ..config import (
-    FISH_MAX_POPULATION,
     CLEANER_FISH_MAX_POPULATION,
-    PREDATOR_MAX_POPULATION,
+    CLEANER_POPULATION_FLOOR,
+    FISH_CARRYING_CAPACITY,
+    FISH_MATING_THRESHOLD,
     FISH_MAX_AGE,
     FISH_MAX_ENERGY,
+    FISH_MAX_POPULATION,
     FISH_POPULATION_FLOOR,
-    CLEANER_POPULATION_FLOOR,
+    FISH_REPRODUCTION_COST,
+    PREDATOR_MAX_POPULATION,
     PREDATOR_POPULATION_FLOOR,
-    FISH_CARRYING_CAPACITY,
-    FISH_CARRYING_CAPACITY_STRENGTH,
+    PREDATOR_PREY_RATIO_MIN,
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
     WATER_LINE_Y,
     WORLD_HEIGHT,
     WORLD_WIDTH,
-    SCREEN_WIDTH,
-    SCREEN_HEIGHT,
-    SOIL_MAX_NUTRIENT,
-    FISH_REPRODUCTION_COST,
-    FISH_MATING_THRESHOLD,
-    PREDATOR_PREY_RATIO_MIN,
 )
-from .fish_base import NeuralFish, FishState
-from ..core.environment_objects import PoopParticle, FishEgg, DeadFish, BloodEffect
-from .fish_traits import FishTraits
-from .family import Family
+from ..core.environment_objects import BloodEffect, DeadFish, FishEgg, PoopParticle
 from ..ui.brain_visualizer_enhanced import EnhancedBrainVisualizer as BrainVisualizer
-from .neural_net import NeuralNet
 from .cleaner_fish import CleanerFish
+from .family import Family
+from .fish_base import FishState, NeuralFish
+from .fish_traits import FishTraits
+from .neural_net import NeuralNet
 from .predator_fish import PredatorFish
 
 
@@ -128,7 +127,7 @@ class FishSystem:
         # Build the plankton list once for reuse
         plankton = [p for p in self.particle_system.particles if p.is_plankton]
 
-        pred_activity = time_system.predator_activity_modifier if time_system else 1.0
+        _pred_activity = time_system.predator_activity_modifier if time_system else 1.0
 
         # ── Simulation groups ─────────────────────────────────────────────
         # Common fish: eat plankton
@@ -368,7 +367,7 @@ class FishSystem:
             p.draw(screen, camera)
         for f in self.fish + self.cleaner_fish + self.predators:
             f.draw(screen, camera, time, f == self.selected_fish, biolum_alpha=biolum)
-        
+
         # Draw the visualizer overlay last
         if self.selected_fish:
             self.brain_visualizer.draw(screen, self.selected_fish, time)

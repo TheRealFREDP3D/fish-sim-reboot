@@ -17,40 +17,40 @@ AGGRESSION OVERHAUL:
 
 import math
 import random
-from .fish_base import NeuralFish
+
 from ..config import (
-    PREDATOR_SPEED_MULT,
-    PREDATOR_DASH_DURATION,
-    PREDATOR_DASH_COOLDOWN,
-    PREDATOR_DASH_STAMINA_THRESHOLD,
-    PREDATOR_DASH_STAMINA_DRAIN,
-    PREDATOR_DASH_FORCE_MULT,
-    PREDATOR_SIZE_ADVANTAGE_MULTIPLIER,
-    PREDATOR_CANNIBAL_SIZE_RATIO,
-    PREDATOR_DAMAGE_PER_BITE,
+    CLEANER_IMMUNITY_CHANCE,
+    FISH_EXPLORATION_FORCE,
+    FISH_HUNGER_THRESHOLD,
+    FISH_MATING_THRESHOLD,
+    FISH_MAX_ENERGY,
+    FISH_REPRODUCTION_COST,
     PREDATOR_BACKSTAB_MULTIPLIER,
     PREDATOR_BITE_COOLDOWN,
-    PREDATOR_SCAVENGE_THRESHOLD,
-    PREDATOR_SCAVENGE_ENERGY_GAIN,
+    PREDATOR_CANNIBAL_SIZE_RATIO,
+    PREDATOR_COLLISION_RADIUS_MULT,
+    PREDATOR_DAMAGE_PER_BITE,
+    PREDATOR_DASH_CLOSE_RANGE,
+    PREDATOR_DASH_COOLDOWN,
+    PREDATOR_DASH_DRIVE_THRESHOLD,
+    PREDATOR_DASH_DURATION,
+    PREDATOR_DASH_FORCE_MULT,
+    PREDATOR_DASH_MIN_ACTIVITY,
+    PREDATOR_DASH_MIN_STAMINA_RATIO,
+    PREDATOR_DASH_STAMINA_DRAIN,
+    PREDATOR_DASH_STAMINA_THRESHOLD,
+    PREDATOR_DASH_TRIGGER_RANGE,
+    PREDATOR_EGG_EATING_RANGE,
     PREDATOR_MAX_POPULATION,
     PREDATOR_PREY_RATIO_MIN,
-    PREDATOR_DASH_TRIGGER_RANGE,
-    PREDATOR_DASH_MIN_STAMINA_RATIO,
-    PREDATOR_DASH_MIN_ACTIVITY,
-    PREDATOR_DASH_DRIVE_THRESHOLD,
-    PREDATOR_DASH_CLOSE_RANGE,
-    PREDATOR_COLLISION_RADIUS_MULT,
-    PREDATOR_EGG_EATING_RANGE,
-    CLEANER_IMMUNITY_CHANCE,
+    PREDATOR_SCAVENGE_ENERGY_GAIN,
+    PREDATOR_SCAVENGE_THRESHOLD,
+    PREDATOR_SIZE_ADVANTAGE_MULTIPLIER,
+    PREDATOR_SPEED_MULT,
     PREY_PREDATOR_MIN_DISTANCE,
-    FISH_HUNGER_THRESHOLD,
-    FISH_MAX_ENERGY,
-    FISH_MAX_AGE,
-    FISH_MATING_THRESHOLD,
-    FISH_REPRODUCTION_COST,
     FishState,
-    FISH_EXPLORATION_FORCE,
 )
+from .fish_base import NeuralFish
 
 
 class PredatorFish(NeuralFish):
@@ -74,20 +74,20 @@ class PredatorFish(NeuralFish):
 
         # Bite-based hunting
         self._bite_cooldown = 0.0
-        
+
         # Patrol hunting state
         self._wander_angle = random.uniform(0, math.pi * 2)
         self._wander_timer = 0.0
 
     def _get_viable_prey(self, all_fish):
         """Return prey fish that are smaller than this predator.
-        
+
         Includes cannibalism for much larger predators.
         Cleaner fish have 90% immunity.
         """
         my_size = self.get_current_size_mult()
         prey = []
-        
+
         for f in all_fish:
             if f is self:
                 continue
@@ -107,7 +107,7 @@ class PredatorFish(NeuralFish):
                 prey_size = f.get_current_size_mult()
                 if my_size >= prey_size * PREDATOR_SIZE_ADVANTAGE_MULTIPLIER:
                     prey.append(f)
-                    
+
         return prey
 
     def update(
@@ -117,7 +117,7 @@ class PredatorFish(NeuralFish):
         activity_mod = time_system.predator_activity_modifier if time_system else 1.0
 
         # Dash stamina drain
-        effective_dash_drain = PREDATOR_DASH_STAMINA_DRAIN * (0.8 + 0.2 * activity_mod)
+        _effective_dash_drain = PREDATOR_DASH_STAMINA_DRAIN * (0.8 + 0.2 * activity_mod)
 
         # ALWAYS scan for prey — predators are opportunistic apex hunters
         prey_targets = self._get_viable_prey(all_fish)
@@ -155,13 +155,13 @@ class PredatorFish(NeuralFish):
             # Always hunt — hungrier = more aggressive pursuit
             hunger_boost = 1.8 if is_hungry else 0.9
             base_hunt_weight = 0.9 * activity_mod * hunger_boost
-            
+
             # NN enhancement when in HUNTING state
             if self.state == FishState.HUNTING:
                 hunt_weight = base_hunt_weight * (1.0 + ambush_drive * 0.6)
             else:
                 hunt_weight = base_hunt_weight * 0.5  # Still pursue even outside HUNTING state
-                
+
             seek_force = self.physics.seek(
                 closest_prey.physics.pos.x,
                 closest_prey.physics.pos.y,
@@ -176,7 +176,10 @@ class PredatorFish(NeuralFish):
                 and not self.is_dashing
                 and self.stamina > PREDATOR_DASH_STAMINA_THRESHOLD * PREDATOR_DASH_MIN_STAMINA_RATIO
                 and activity_mod > PREDATOR_DASH_MIN_ACTIVITY
-                and (dash_drive > PREDATOR_DASH_DRIVE_THRESHOLD or min_dist < PREDATOR_DASH_CLOSE_RANGE)
+                and (
+                    dash_drive > PREDATOR_DASH_DRIVE_THRESHOLD
+                    or min_dist < PREDATOR_DASH_CLOSE_RANGE
+                )
             ):
                 self.is_dashing = True
                 self.dash_timer = PREDATOR_DASH_DURATION
@@ -216,7 +219,7 @@ class PredatorFish(NeuralFish):
             if dist < collision_radius and self._bite_cooldown <= 0:
                 # Base bite damage scales with predator size — highly lethal
                 base_damage = PREDATOR_DAMAGE_PER_BITE * self.get_current_size_mult()
-                
+
                 # Hunger bonus — predators deal more damage when desperate
                 hunger_multiplier = 1.0 + (1.0 - self.energy / FISH_MAX_ENERGY) * 0.5
                 damage = base_damage * hunger_multiplier
@@ -230,12 +233,12 @@ class PredatorFish(NeuralFish):
                     damage *= PREDATOR_BACKSTAB_MULTIPLIER
 
                 prey.energy -= damage
-                
+
                 # Energy gain from biting — hunting is always worthwhile
                 energy_gain = damage * 0.6
                 self.energy = min(FISH_MAX_ENERGY, self.energy + energy_gain)
                 self._bite_cooldown = PREDATOR_BITE_COOLDOWN
-                
+
                 # Kill prey if damage is lethal
                 if prey.energy <= 0:
                     prey.energy = 0
@@ -257,7 +260,7 @@ class PredatorFish(NeuralFish):
         # ═══════════════════════════════════════════════════════════════════
         # Active prey pursuit — predators always actively seek food
         # ═══════════════════════════════════════════════════════════════════
-        
+
         # Always patrol when no prey nearby — predators actively seek food
         if not closest_prey and activity_mod > 0.3:
             # Patrol hunting behavior - swim in patterns to find prey
@@ -265,12 +268,12 @@ class PredatorFish(NeuralFish):
             if self._wander_timer > 2.5:  # Change direction more frequently
                 self._wander_angle += random.uniform(-math.pi/2, math.pi/2)
                 self._wander_timer = 0.0
-            
+
             # Patrol movement — faster and wider search patterns
             patrol_fx = math.cos(self._wander_angle) * FISH_EXPLORATION_FORCE * 1.5
             patrol_fy = math.sin(self._wander_angle) * FISH_EXPLORATION_FORCE * 1.5
             self.physics.apply_force((patrol_fx, patrol_fy))
-        
+
         # ═══════════════════════════════════════════════════════════════════
         # Scavenging fallback — eat eggs when desperate
         # ═══════════════════════════════════════════════════════════════════
@@ -303,7 +306,7 @@ class PredatorFish(NeuralFish):
         """Check if predator can reproduce (population control)."""
         # Use boosted threshold if prey is scarce
         effective_mating_threshold = getattr(self, 'mating_threshold_boost', FISH_MATING_THRESHOLD)
-        
+
         if (
             not self.is_mature
             or self.energy < effective_mating_threshold
